@@ -4,7 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 
 // Initialize the Google GenAI SDK
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "mock-key-to-prevent-crash" }); 
 
 // Initialize Google Cloud TTS Client
 let ttsClient: TextToSpeechClient | null = null;

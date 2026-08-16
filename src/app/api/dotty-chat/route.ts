@@ -10,7 +10,7 @@ const aiConfig: any = {};
 if (geminiKey?.startsWith("AQ.")) {
   aiConfig.httpOptions = { headers: { Authorization: `Bearer ${geminiKey}` } };
 } else {
-  aiConfig.apiKey = geminiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  aiConfig.apiKey = geminiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "mock-key-to-prevent-crash";
 }
 const ai = new GoogleGenAI(aiConfig);
 

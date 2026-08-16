@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "c-g-ltd"
+  },
+  "targets": {
+    "c-g-ltd": {
+      "hosting": {
+        "kampin": [
+          "c-g-ltd"
+        ]
+      }
+    }
   }
 }
