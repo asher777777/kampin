@@ -1,0 +1,55 @@
+{
+  "id": "v1_ChdrZGR4YXAtdE00dWVuc0VQNjRHRG9RSRIXa2RkeGFwLXRNNHVlbnNFUDY0R0RvUUk",
+  "status": "completed",
+  "usage": {
+    "total_tokens": 163,
+    "total_input_tokens": 14,
+    "input_tokens_by_modality": [
+      {
+        "modality": "text",
+        "tokens": 14
+      }
+    ],
+    "total_cached_tokens": 0,
+    "total_output_tokens": 5,
+    "total_tool_use_tokens": 0,
+    "total_thought_tokens": 144
+  },
+  "created": "2026-08-04T12:14:09Z",
+  "updated": "2026-08-04T12:14:09Z",
+  "service_tier": "standard",
+  "steps": [
+    {
+      "signature": "EuYECuMEARFNMg8lNlfVT4yeo3ItIg/qJllVgTDxJdI+Z5XzMk0p27B8X0j+I7xR/zhjIcdwFJdwzDBHHw20tb82es6Qj4K3Sya+Q9/zutRWyM8qMYPAfwT+UEFZ15bRJ3h9Dx4dpYjUEH/B2t66e1FrpV151vnFZ1JLWdLuqHfIqK061Utlk/SLaNbPg4KQelK4KISJM3HVmwvOE0g0MqXu7hfe3rGLme0UzQL6n6WJwzqdWaJamZY6MLtZQZwW6Fl5cfwjty49RUPsF4BlGsrKhrcCX5P2C88OKUGgpQceZMyTZUO9PdRg1Pad80hQiVj1oZud5wr2/AJv4qTVQYcbmQKosmjJj7UbbH5+fAkrAqu8aQuRi2LjMRUVRMwdr27SYDgOrLGdrldoWElk1bNZLPRk+E9iuuH4a1z17i6Yjf+yZiR6UPdnYoy0mtRnEgPLuW5R5CXqCv58r7hBSytt4gxsVOw5nvYE1ji8JOMcmzB3U0F6SL+tqC0pLruARanTwHciCM9bMLrxcaFWOMBuCe4wXOydAqnUIGqb8P66smkVAqOSz/wOsOqZ9JZ+43k6/GcFjwEXrY/gHn6NLulLE0/BrYfflVjHNNbaBPugs7j9Nm4obZTE654Lwta3nszpSNNqWgZyzYRPftkPttIPaJgIjpQbH/2FsWMQzuNeYMJdKVAlshg0YN8wVTKJWNiJJMSiPnjcr3wLDTcPGjZJ3tY4vVg2E47/qJWmPWBq9eQVlvOaaA0HdiAGuVDv7esqBD4CQXjmsmBwhVSvG4217ehJwRj24KGjpv7IWDtUXNEw+omyUYE=",
+      "type": "thought"
+    },
+    {
+      "content": [
+        {
+          "text": "{\"hello\": \"world\"}",
+          "type": "text"
+        }
+      ],
+      "type": "model_output"
+    }
+  ],
+  "object": "interaction",
+  "model": "gemini-3.6-flash",
+  "sdkHttpResponse": {
+    "headers": {
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "content-encoding": "gzip",
+      "content-type": "application/json",
+      "date": "Tue, 04 Aug 2026 12:14:11 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "server-timing": "gfet4t7; dur=3195",
+      "transfer-encoding": "chunked",
+      "vary": "Origin, X-Origin, Referer",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN",
+      "x-xss-protection": "0"
+    },
+    "responseInternal": {}
+  },
+  "output_text": "{\"hello\": \"world\"}"
+}

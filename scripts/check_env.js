@@ -1,0 +1,1 @@
+const fs = require('fs'); if (fs.existsSync('.env.local')) { const envConfig = fs.readFileSync('.env.local', 'utf8').split('\n'); for (const line of envConfig) { const match = line.match(/^([^=]+)=(.*)$/); if (match) { process.env[match[1]] = match[2]; } } } console.log(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID); console.log(process.env.FIREBASE_ADMIN_PROJECT_ID);

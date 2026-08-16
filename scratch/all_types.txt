@@ -1,0 +1,1028 @@
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\app\dashboard\welcome\OnboardingWizard.tsx ---
+export interface OnboardingWizardProps {
+  onClose?: () => void;
+  initialData?: any;
+  onSaveAction?: (data: any) => Promise<any>;
+  showStrategyOnSuccess?: boolean;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\layout\RhombusMenu.tsx ---
+export interface RhombusMenuItemProps {
+  icon: ReactNode;
+  label: string;
+  href?: string;
+  onClick?: () => void;
+}
+
+export interface RhombusMenuProps {
+  topRight: RhombusMenuItemProps;
+  topLeft: RhombusMenuItemProps;
+  bottomRight: RhombusMenuItemProps;
+  bottomLeft: RhombusMenuItemProps;
+  center: {
+    content: ReactNode;
+  }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\sections\CommunitySection.tsx ---
+export interface CommunitySectionProps {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  quote?: string;
+  imageSrc?: string;
+  badgeTitle?: string;
+  badgeSubtitle?: string;
+  buttonText?: string;
+  whatsappNumber?: string;
+  layout?: "split-left" | "split-right" | "centered";
+  badgeVisible?: boolean;
+  buttonVisible?: boolean;
+  isEditing?: boolean;
+  onUpdate?: (field: string, value: any) => void;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\sections\CourseBanner.tsx ---
+export interface CourseFeature {
+  id: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface CourseBannerProps {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  imageSrc?: string;
+  features?: CourseFeature[];
+  buttonsVisible?: boolean;
+  primaryButton?: { text: string; link: string; backgroundColor?: string; textColor?: string; }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\sections\ImageListingEditor.tsx ---
+export interface ImageListingItem {
+  url: string;
+  form?: FormConfig;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\ui\Button.tsx ---
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "destructive" | "ghost" | "link" | "outline"
+  size?: "default" | "sm" | "lg" | "icon"
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\components\ui\Input.tsx ---
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\assistant\actions.ts ---
+export interface AiPreferences {
+  hasCompletedOnboarding: boolean;
+  organizationName?: string;
+  targetAudience?: string;
+  preferredTone?: string;
+  mainGoals?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\assistant\db.ts ---
+export interface ChatMessage {
+  id?: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  ownerId: string;
+  contextType: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\assistant\interceptor.ts ---
+export interface InterceptorResult {
+  handled: boolean;
+  text?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\calendar\actions.ts ---
+export type UnifiedEvent = {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  type: "google" | "task" | "meeting" | "reminder" | "interaction";
+  description?: string;
+  sourceId?: string; // Original ID from source
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\communities\components\CommunityWizardModal.tsx ---
+export interface CommunityWizardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: Partial<Community>) => Promise<void>;
+  initialData?: Community;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\communities\types.ts ---
+export interface CommunityFile {
+  name: string;
+  url: string;
+  type: string; // "pdf", "image", "doc", etc.
+  size?: number;
+  uploadedAt: string;
+}
+
+export interface Community {
+  id?: string;
+  ownerId: string;
+  name: string;
+  color: string;
+  icon: string;
+  purpose?: string;
+  isDraft?: boolean;
+  files?: CommunityFile[];
+  memberCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\company-assets\actions.ts ---
+export interface CompanyAsset {
+  id: string;
+  ownerId: string;
+  name: string;
+  category: "logo" | "incorporation_doc" | "dealer_cert" | "vibe_image" | "other";
+  url: string;
+  fileType: "image" | "document" | "video";
+  extractedColors?: string[];
+  createdAt: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\company-services\actions.ts ---
+export interface PainPoint {
+  id: string;
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+export interface ServiceProblem {
+  id: string;
+  title: string;
+  painPoints: PainPoint[];
+}
+
+export interface BenefitItem {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface ServiceBenefit {
+  id: string;
+  title: string;
+  items: BenefitItem[];
+}
+
+export interface CompanyCoreService {
+  id?: string;
+  name: string;
+  targetAudiences: string[];
+  problems?: ServiceProblem[];
+  benefitGroups?: ServiceBenefit[];
+  benefits: string; // Kept for backward compatibility if needed
+  communityId: string;
+  ownerId: string;
+  createdAt: string;
+}
+
+export interface Audience {
+  id?: string;
+  name: string;
+  ownerId: string;
+}
+
+export interface GoalGlossaryItem {
+  id?: string;
+  name: string;
+  icon: string;
+  ownerId: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\company-services\goals-actions.ts ---
+export interface GoalGlossaryItem {
+  id?: string;
+  name: string;
+  icon: string;
+  ownerId: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\credits\actions.ts ---
+export interface CoinTransaction {
+  id: string;
+  amount: number; // positive for additions, negative for deductions
+  reason: string;
+  timestamp: string;
+  balanceAfter: number;
+}
+
+export interface UserCoinsData {
+  coins: number;
+  pitchBonusGranted: boolean;
+  activePagesCount: number;
+  lastDailyDeduction?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\crm\components\CRMFormBuilder.tsx ---
+export interface FormField {
+  label: string;
+  type: string; // text, tel, email, textarea, select, number, fixed_amount, hidden, step
+  map_to: string;
+  map_to_2?: string;
+  required: boolean;
+  submitOnNext?: boolean;
+  default_value: string;
+  options: string;
+  url_param_enable: boolean;
+  url_param_name: string;
+  cond_enable: boolean;
+  cond_field_index: number;
+  cond_operator: string; // is, is_not
+  cond_value: string;
+  step?: number;
+  calc_formula?: string;
+  icon?: string;
+  widthPercentage?: number;
+  bgColor?: string;
+  borderColor?: string;
+  focusColor?: string;
+  placeholder?: string;
+  height?: string | number;
+  textColor?: string;
+  textAlign?: "left" | "center" | "right";
+  fontSize?: number;
+  communityId?: string;
+  autocomplete?: string;
+  payment_doc_type?: string;
+  payment_methods?: string[];
+  payment_recurring_limit?: string;
+  payment_require_id?: boolean;
+  step_button_text?: string;
+  step_button_icon?: string;
+  step_button_bg_color?: string;
+  step_button_text_color?: string;
+  step_back_button_text?: string;
+  step_back_button_bg_color?: string;
+  step_back_button_text_color?: string;
+}
+
+export interface FormStepConfig {
+  step: number;
+  title: string;
+  icon: string;
+}
+
+export interface LogicAction {
+  id: string;
+  field_index: number;
+  operator: "is" | "is_not";
+  value: string;
+  action_type: "redirect" | "modal" | "payment";
+  action_value: string; // URL for redirect, HTML/text for modal
+}
+
+export interface FormConfig {
+  enabled: boolean;
+  form_type: "standard" | "payment" | "register";
+  submit_button_text: string;
+  submit_button_bg_color: string;
+  submit_button_text_color: string;
+  continue_button_text?: string;
+  continue_button_icon?: string;
+  back_button_text?: string;
+  back_button_bg_color?: string;
+  back_button_text_color?: string;
+  step_configs?: FormStepConfig[];
+  form_bg_color?: string;
+  field_bg_color?: string;
+  fields: FormField[];
+  save_to_crm: boolean;
+  crm_owner_id: string;
+  standard_success_message: string;
+  standard_redirect_url: string;
+  standard_whatsapp_message: string;
+  standard_whatsapp_image_url: string;
+  payment_amount: number;
+  payment_amount_crm_map: string;
+  payment_pending_message: string;
+  payment_pending_image_url: string;
+  payment_success_message: string;
+  payment_success_image_url: string;
+  payment_group: string;
+  payment_zeut_kupa: string;
+  payment_receipt_type: string;
+  payment_frequency: "one-time" | "recurring" | "user-choice";
+  action_rules?: LogicAction[];
+  custom_success_modal_enable?: boolean;
+  custom_success_modal_content?: string;
+  custom_success_modal_image_url?: string;
+  crm_save_step?: number;
+  register_role?: "DEVELOPING" | "TRIAL";
+  templateId?: string;
+  templateName?: string;
+  communityId?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\crm\formTemplates.ts ---
+export interface FormTemplate {
+  id?: string;
+  name: string;
+  config: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\crm\types.ts ---
+export interface CustomTab {
+  id: string;
+  title: string;
+  icon: string;
+}
+
+export interface CustomField {
+  id: string;
+  category: string;
+  type: string; // text, date, number, etc.
+  label: string;
+}
+
+export interface ContactEvent {
+  time: string;
+  title: string;
+  text: string;
+}
+
+export interface CalendarEvent {
+  id?: string;
+  contactId: string;
+  userId: string;
+  title: string;
+  date: string;
+  time: string;
+  description?: string;
+  start: string; // ISO string
+  end: string;   // ISO string
+  type?: string;
+  status?: string;
+  followUpDate?: string;
+  linkedContacts?: { id: string, name: string }
+
+export interface FormSubmission {
+  name: string;
+  page: string;
+  date: string;
+}
+
+export interface PaymentRecord {
+  id?: string;
+  date: string;
+  amount: number;
+  paymentType: string;
+  receiptType?: string;
+  kesherStatus?: string;
+  receiptLink?: string;
+}
+
+export interface Contact {
+  id?: string;
+  ownerId: string;
+  status: "active" | "trashed";
+  
+  // Core Fields
+  conta_name: string;
+  f_m?: string;
+  conta_phone: string;
+  email?: string;
+  gender?: string;
+  
+  // Address Fields
+  mh_crm_city?: string;
+  mh_crm_street?: string;
+  
+  // Tag Fields
+  tg1?: string;
+  tg2?: string;
+  tg3?: string;
+
+  // Company Fields
+  company_name?: string;
+  job_title?: string;
+  lead_source?: string;
+
+  // Other Contact Info
+  segment?: string;
+  work_phone?: string;
+  website?: string;
+  birth_date?: string; // YYYY-MM-DD
+  notes?: string;
+  events?: ContactEvent[];
+  form_submissions?: FormSubmission[];
+
+  // Form Tracking Fields
+  last_form_name?: string;
+  last_form_page?: string;
+  last_form_submission_date?: string;
+  
+  // Community Fields
+  communityIds?: string[];
+  isUser?: boolean;
+  systemUserId?: string;
+  
+  // Message Tracking Fields
+  last_message_read_status?: string;
+
+  // WooCommerce Summary Fields
+  total_spent?: number;
+  order_count?: number;
+  last_order_date?: string;
+  payments?: PaymentRecord[];
+  
+  // Payment Details (Default Bank/Check Info)
+  payment_details?: {
+    checkNumber?: string;
+    bankName?: string;
+    branchNumber?: string;
+    accountNumber?: string;
+    transferRef?: string;
+  }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\emails\actions.ts ---
+export interface Campaign {
+  id?: string;
+  ownerId: string;
+  subject: string;
+  content: string;
+  status: "draft" | "sent";
+  sentAt?: string;
+  recipientsCount: number;
+  opensCount?: number;
+  errorCount?: number;
+  createdAt: string;
+}
+
+export interface EmailTemplate {
+  id?: string;
+  ownerId: string;
+  name: string;
+  subject: string;
+  content: string;
+  createdAt: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\expenses\types.ts ---
+export interface Expense {
+  id: string;
+  ownerId: string;
+  expenseType: string;
+  amount: number;
+  paymentMethod: string;
+  purchaseDate: string;
+  paymentDate: string;
+  receiptUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseOption {
+  id: string;
+  ownerId: string;
+  type: "expenseType" | "paymentMethod";
+  value: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\gatekeeper\actions.ts ---
+export type VettingState = 
+  | "GREETING"
+  | "OFFER_COINS"
+  | "FIELD_SELECTION"
+  | "VALUE_ADD"
+  | "PRODUCT_FORMULATION"
+  | "COMPETITORS_1"
+  | "COMPETITORS_2"
+  | "DECISION_PASS"
+  | "DECISION_FAIL";
+
+export interface GatekeeperResponse {
+  text: string;
+  nextState: VettingState;
+  options?: string[]; // Buttons / choices to display
+  optionsType?: 'buttons' | 'diamonds'; // How to render them
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\generator\types.ts ---
+export interface SmartGoals {
+  s: string; // Specific
+  m: string; // Measurable (KPIs)
+  a: string; // Achievable
+  r: string; // Relevant
+  t: string; // Time-bound
+}
+
+export interface ProjectCharter {
+  lockedBudget: number;
+  durationDays: number;
+  signedBy: string | null;
+  signedAt: string | null;
+}
+
+export interface RaciMatrix {
+  r: string; // Responsible (e.g. "דרוש מעצב" or dynamic user names)
+  a: string; // Accountable (e.g. Project Manager)
+  c: string; // Consulted
+  i: string; // Informed
+}
+
+export interface WbsTask {
+  id: string;
+  parentId: string | null;
+  title: string;
+  durationDays: number;
+  cost: number;
+  dependencies: string[];
+  raci: RaciMatrix;
+}
+
+export interface ValidatorResult {
+  estimatedCostMin: number;
+  estimatedCostMax: number;
+  estimatedDurationDays: number;
+  risks: string[];
+  demandValidation: string; // Needs Validation results summary
+}
+
+export interface ProjectData {
+  id?: string;
+  name: string;
+  type: "new" | "recurring";
+  status: "draft" | "active";
+  smartGoals: SmartGoals;
+  charter: ProjectCharter;
+  tasks: WbsTask[];
+  createdAt?: string;
+  updatedAt?: string;
+  userId: string;
+  baseline?: ProjectBaseline;
+  roles?: RoleRequirement[];
+  changeRequests?: ChangeRequest[];
+  warRoomMessages?: WarRoomMessage[];
+  metrics?: {
+    budget: number;
+    hours: number;
+    deadlineDays: number;
+  }
+
+export interface RiskItem {
+  id: string;
+  risk: string;
+  probability: "Low" | "Medium" | "High";
+  impact: "Low" | "Medium" | "High";
+  mitigation: string;
+  approved: boolean;
+}
+
+export interface ProjectBaseline {
+  inScope: string[];
+  outScope: string[];
+  milestones: { taskId: string; financialFlag?: string; contractualFlag?: string }
+
+export interface RoleRequirement {
+  id: string;
+  taskId: string;
+  roleTitle: string;
+  requirements: string;
+  budget: number;
+  presenceMilestoneId?: string; // milestone presence required
+  assignedContactId?: string;
+  assignedContactName?: string;
+  status: "draft" | "invited" | "signed" | "active";
+}
+
+export interface ChangeRequest {
+  id: string;
+  title: string;
+  description: string;
+  budgetImpact: number;
+  scheduleImpactDays: number;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected";
+  approvedBy?: string[];
+}
+
+export interface WarRoomMessage {
+  id: string;
+  senderName: string;
+  senderRole: string;
+  message: string;
+  timestamp: string;
+  channel: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\home\actions.ts ---
+export interface ButtonConfig {
+  text: string;
+  link: string;
+  backgroundColor?: string;
+  textColor?: string;
+}
+
+export interface ServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  icon: string;
+  imageSrc?: string;
+  isVisible: boolean;
+}
+
+export interface PricingPackage {
+  id: string;
+  title: string;
+  price: string;
+  period: string;
+  description: string;
+  features: string[];
+  buttonText: string;
+  buttonLink: string;
+  isPopular?: boolean;
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  icon?: string;
+  isVisible?: boolean;
+}
+
+export interface HomePageConfig {
+  hero: {
+    visible?: boolean;
+    title: string;
+    subtitle: string;
+    description: string;
+    imageSrc: string;
+    layout: "fz" | "bento" | "modular" | "progressive" | "spatial" | "thumb";
+    buttonsVisible?: boolean;
+    primaryButton?: ButtonConfig;
+    secondaryButton?: ButtonConfig;
+    anchorId?: string;
+    backgroundColor?: string;
+    bottomStripeColor?: string;
+    hoverColor?: string;
+    titleColor?: string;
+    descriptionColor?: string;
+    featuresTextColor?: string;
+    heroStyle?: "hero" | "content" | "landing";
+    flexDirection?: "row" | "row-reverse" | "col" | "col-reverse";
+    formMode?: "visible" | "modal";
+    form?: any;
+  }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\incomes\types.ts ---
+export interface Income {
+  id: string;
+  ownerId: string;
+  clientName: string;
+  amount: number;
+  paymentType: string;
+  receiptType: string;
+  kesherUrl?: string; // Can be a URL or a reason why it failed to arrive
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\mini-site-builder\actions\builderActions.ts ---
+export interface PersonaCard {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface CompetitorInfo {
+  name: string;
+  type: string;
+  offering: string;
+}
+
+export interface BuilderStateData {
+  pitchProblem?: string;
+  differentiator?: string;
+  competitors?: CompetitorInfo[];
+  companyName?: string;
+  siteSlug?: string;
+  slogan?: string;
+  companyVision?: string;
+  shortVision?: string;
+  personas?: PersonaCard[];
+  servicePages?: { id: string; title: string; description: string; imageUrl?: string }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\mini-site-builder\utils\logoPromptBuilder.ts ---
+export interface BrandLogoContext {
+  companyName: string;
+  slogan?: string;
+  businessProblem?: string;
+  companyVision?: string;
+  personas?: string[];
+  services?: string[];
+  preferredStyle?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\posts\actions.ts ---
+export interface LivePost {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  category: string;
+  tags: string[];
+  imageUrl?: string;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  formConfig?: any;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\settings\actions.ts ---
+export interface NavLink {
+  name: string;
+  href: string;
+}
+
+export interface CommunityGoal {
+  name: string;
+  icon: string;
+}
+
+export interface CommunityData {
+  id: string;
+  name: string;
+  icon?: string;
+  targetAudiences?: string[];
+  goals?: CommunityGoal[];
+  brandColor: string;
+}
+
+export interface GlobalSettings {
+  communities?: CommunityData[];
+  siteLogoUrl: string;
+  headerLayout: "classic" | "center" | "left";
+  theme: "navy" | "emerald" | "rose" | "violet" | "charcoal";
+  navLinks: NavLink[];
+  customAudiences?: string[];
+  customGoals?: string[];
+  whatToGenerate?: string[];
+  
+  // Global Colors
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+  
+  // Text Colors
+  textColor?: string;
+  textColorH1?: string;
+  textColorH2?: string;
+  textColorH3?: string;
+  
+  // Button Colors
+  buttonBgColor?: string;
+  buttonTextColor?: string;
+  
+  // Personal Details
+  companyName?: string;
+  organizationType?: "חברה" | "עמותה" | "שותפות" | "עוסק מורשה" | "עוסק פטור";
+  organizationPurpose?: string;
+  slogan?: string;
+  shortVision?: string;
+  companyVision?: string;
+  logoUrl?: string;
+  memberCount?: string;
+  personalName?: string;
+  personalEmail?: string;
+  personalPhone?: string;
+  personalTitle?: string;
+
+  // Contact Info
+  contactPhone?: string;
+  contactEmail?: string;
+  contactAddress?: string;
+
+  // Social Networks
+  contactFacebook?: string;
+  contactInstagram?: string;
+  contactYouTube?: string;
+  contactWhatsApp?: string;
+  contactTikTok?: string;
+  contactLinkedIn?: string;
+
+  hasFacebook?: "yes" | "no" | null;
+  hasInstagram?: "yes" | "no" | null;
+  hasTikTok?: "yes" | "no" | null;
+  hasYouTube?: "yes" | "no" | null;
+  hasLinkedIn?: "yes" | "no" | null;
+  socialSetupCompleted?: boolean;
+  
+  // Mini Site
+  miniSiteSlug?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\shabbat\actions.ts ---
+export interface ShabbatTimesData {
+  candleLighting: string;
+  havdalah: string;
+  parashaHebrew: string;
+  parashaEnglish: string;
+  dvarTorah: string;
+  prayerTimes: {
+    minchaErevShabbat: string;
+    shacharitShabbat: string;
+    minchaShabbat: string;
+    arvitMotzeiShabbat: string;
+  }
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\users\actions.ts ---
+export type UserRole = "SUPERADMIN" | "ADMIN" | "PRO" | "DEVELOPING" | "TRIAL";
+
+export interface UserDoc {
+  id?: string;
+  email: string;
+  username: string;
+  name?: string;
+  password?: string;
+  role: UserRole;
+  createdAt: string;
+  trialExpiresAt?: string;
+  
+  // Admin API Overrides
+  useAdminGoogleAi?: boolean;
+  googleAiKey?: string;
+  
+  useAdminKesher?: boolean;
+  kesherSettings?: any;
+  
+  useAdminGreenApi?: boolean;
+  greenApiSettings?: any;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\features\whatsapp\types.ts ---
+export interface WhatsAppSettings {
+  idInstance: string;
+  apiToken: string;
+}
+
+export type WhatsAppConnectionStatus = "authorized" | "notAuthorized" | "checking" | "qr" | "error";
+
+export interface WhatsAppConnectionState {
+  status: WhatsAppConnectionStatus;
+  phoneNumber?: string;
+  avatar?: string;
+  name?: string;
+  qrCode?: string; // base64 QR code image string
+  error?: string;
+}
+
+export interface WhatsAppRecipient {
+  name: string;
+  phone: string;
+  status: string;
+  messageId?: string;
+  apiResponse?: string;
+  personalizedContent?: string;
+}
+
+export interface WhatsAppCampaign {
+  id?: string;
+  userId: string;
+  messageContent: string;
+  totalRecipients: number;
+  successCount: number;
+  failureCount: number;
+  createdAt: string;
+  formName?: string | null;
+  pageName?: string | null;
+  recipients?: WhatsAppRecipient[];
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\lib\automations\engine.ts ---
+export type Trigger = 
+  | { type: "webhook"; webhookId: string }
+
+export type ActionStep =
+  | { type: "whatsapp_send"; config: { phoneField: string; messageTemplate: string }
+
+export interface Automation {
+  id: string;
+  ownerId: string;
+  name: string;
+  isActive: boolean;
+  trigger: Trigger;
+  steps: ActionStep[];
+  createdAt?: string;
+  updatedAt?: string;
+  lastRunAt?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\lib\system-logger.ts ---
+export type LogLevel = "info" | "warn" | "error" | "success";
+export type LogModule = "calendar" | "automation" | "auth" | "crm" | "general" | "whatsapp" | "email";
+
+export interface SystemLog {
+  id?: string;
+  level: LogLevel;
+  module: LogModule;
+  action: string;
+  description: string;
+  ownerId?: string;
+  metadata?: Record<string, any>;
+  timestamp?: string;
+}
+
+
+
+--- FILE: C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\src\lib\validations.ts ---

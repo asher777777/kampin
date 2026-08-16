@@ -1,0 +1,32 @@
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+
+const serviceAccount = {
+  projectId: "c-g-ltd",
+  clientEmail: "firebase-adminsdk-fbsvc@c-g-ltd.iam.gserviceaccount.com",
+  privateKey: Buffer.from("LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV2QUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktZd2dnU2lBZ0VBQW9JQkFRREg5MldkUmRpUktKb3cKY29pQncxUmhVbWNXY2s1ZGw3K2Y3Z01rU3BZSWFOcVB3NTlXRUkwL2NKcS92Uk9mZ1RmclVFaEQ2Uno2SkJzeQpDYUx0dmk5Y1dSaS9wT1V5SXNpRzZQWlN2OHROYWFrZDR1d1pkeUMyMkVvcU9EZ0tnZUtrZ1VhTkVkRVNWWDViCk1SV2NnT3J3Q1QvZFJmSGdCK1dsdnQwSzBiakdjRDNSR251S0wxMXNzZXRUdGl0TEdqNUNzSVp2K1FzT1N2YVYKMEVub2JNRnllcDdRRmNtM2FEcjI0OFlwUWFIbHQ5S0I1Rnd1Vi9JMDRZWlNzZ1p3Y2FZWTVWNnEwUTZJUnlzZgpTVExBNHREK2Zqak55Q0VocWMyZ2lqWS9mYlRMb2NjaGY2QTRPY3VtS0FLbkZadkorOTY0WEsvQWk3d0VJdWRIClBsdXR4dGMxQWdNQkFBRUNnZ0VBRGRQNTN1cFprNUF2T1hKeUppY1B5cnNjRGQxUnRmOHNiUzdVWU1vWG5mVkMKUi9iTEtmUnpFQlFGWDRUL3VtUUJMZkNiVHJic0hoQXBJVWl4VDZkN052T2lWbjVjcXg3a3B3K3RHUVBTVjBRYgpRY25UY2Q5ZkQ4WGRPeFl3S2VuWmRtN0tKaTg1T2Y5WGdZN2ZZN2MyaCtyYjA3MW1nSXVMUWU3MDhpNldqSUpQCkxiVFZIb0FKU3YyNGNEaGQvWUxWZzNGeDZPaldhSWZodXZob00xcS9GMCthOVVERnpYSWNjVGY3Z3JYWGwxOHUKTTZNcm1MdUw0VVY0ZVdIZVJyR1NPM2dkbm9SMEdZUGZ5ZDhUeWdnRzdjRWg4ajJNZDRYMVZGK2VOcjFxVUFSOApZS3lVUFZJWjFtVmRMTHhPZWQrbDgrVGpiMXllM0wrKzdnSGQ3eWFOQVFLQmdRRHVzNEVTMFR4bHg3Q29KSnVQCnNISFJ3QW9vdlBJNHZUV3Jxbng5S3d3TXZNL016QXhkcFkySG5qeFFaUlpQR0xKcFZ3ckwrU2txdnlUblBzUkoKV0lFRU9BeCtPeGRwVUNOMWU0aHdzL1EyK2YxcUZia3IzNXFVYzlraGZvSnNUYVM3cTBSZExPbjhoSHRwK1p1UgpUYjhtazBOSzVLZEVySytrUE1rRlZxTGtrUUtCZ1FEV2RVUks3MVpsZ3Jkb3pzM2k1ZG93RGFyTy9oekc4U2JKCjk2SkFOb3U1VnAzUUtPRzFZTGNldGJpWFI5SXJhczJETitDY2FocG92Yno1aGF5dlIyWFk4M2ZpR0dSUW1tMi8KUWNGWGtPV0NheFNZVFB5NnJUK0hPSjBOS2hHWHVDQUxaWFVObk9xaHNCRXErVS9WUTZGR3ZwVjZUMWxoekpJQwpVZ29EejhVS1pRS0JnQ3pLem12RGk3dmxyd2ErWjlxYzE1N3VsSGwwaTFlT1dlWHV4aEdPNUdIM2hGNy80MG9uCmFObU1IZkZRSnRHTTV0M1JrWnNaRkZxTEo5ZWs5WngxMlMvN2ZJeXJkZ2N6SEpSTkxCdEtDWWZQZlhoTXYwUzIKWHdHQWc3dy9TeVlibzgvN29ZYUNpUjN6bGwwYWs5QytjQ0pDL0J1dnNKdTRjL1V6MnR6L2x1MmhBb0dBS2pNcApIUlc3aW40T1dURllraTFvb2N3T3NHeVFmUlUyN01jdHhqVDFpYUxocXZSZ2RiQnlXRGlwK2hySDRJTkRyVzV4ClpGWDhuRis1cjkvOSt2K3hxdDg5MTkrMDNhZUZzUHpmYnJ1MGJkVmtXQlBPSjIydjhvdlJXNlhMa0c5SzN2TTMKOVZYTFZjV3ZteVV6OEdNK2VRMUhuS25Bak40VVhTQ0hsL2hxYllFQ2dZQjVXTlpwbXRoeVNPUnZoZHZ2M1NROQpRVmNXYTh3aFVBWGorZnpFeWhBK1pmS3hFdVRuY1doVVo2THova0RpQWhrbnVpd1NTemVNWGRvaks4aHZCbU1hCmp1TmxNTDdmVFRoc3JjUjVxTFNCS3BuUCtzWURXcE5nVDRDMkdVay9TV2hGTDlhYS9QZCs4MW9RQmxDWlFlOEEKNUFNejFEUkhOeFpFcUM2d0NRc2N0Zz09Ci0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K", "base64").toString("utf8")
+};
+
+initializeApp({
+  credential: cert(serviceAccount)
+});
+
+const db = getFirestore();
+
+async function run() {
+  const snap = await db.collection("dotty_interviews").get();
+  const docs = snap.docs.filter(d => d.id.includes("walker") || (d.data().agentId === "walker")).sort((a,b) => b.data().lastUpdatedAt.toDate() - a.data().lastUpdatedAt.toDate());
+  
+  if(docs.length===0){
+    console.log("No walker conversations in dotty_interviews"); 
+    return;
+  }
+  
+  const doc = docs[0]; 
+  console.log("ID:", doc.id, "LastUpdated:", doc.data().lastUpdatedAt.toDate()); 
+  
+  const msgs = await doc.ref.collection("messages").orderBy("createdAt", "asc").get(); 
+  msgs.docs.forEach(m => console.log(`[${m.data().role.toUpperCase()}]: ${m.data().text}`));
+}
+
+run().catch(console.error);

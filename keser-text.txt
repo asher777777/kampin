@@ -1,0 +1,1577 @@
+קשרIPA -  תיעוד
+מלאIPA  תיעוד
+6202  ביולי7
+6202  ביולי7 • נוצר אוטומטית
+סליקת אשראי ותשלומים
+העברות בנקאיות ומזומןtiB,  ,ביצוע עסקאות אשראי
+ביצוע עסקת אשראי
+ביצוע עסקת אשראי רגילה 
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+שימו לב להערות בתחתית הדף
+בקשה זו מתאימה לביצוע חיובים חוזרים, חיוב על בסיס טוקן קיים, או חיוב מתוך ממשק קופה פנימי שלכם.
+ללא צורך במעורבות הלקוח בזמן אמת. 
+למערכת שלכם לבצע חיוב מיידי של כרטיס אשראי (באמצעות טוקן או פרטי אשראי מלאים) ישירות מול השרת, 
+פונקציה זו מאפשרת
+שחוזר. אם לא התקבלה תשובה, יש לבדוק סטטוס מול השרת לפני שליחת בקשת חיוב נוספתdInoitcasnarT -מומלץ לשמור בצד הלקוח את ה
+כדי למנוע חיוב כפול במקרה של ניתוק רשת,
+Idempotency): ( תויוליפכב לופיט
+ומעלה. בקשות שיישלחו מפלטפורמות ישנות (כגון שרתים ישנים מאוד) ייחסמו ברמת השרת.2.1 SLT  תומך אך ורק בפרוטוקול אבטחהIPA -ה
+TLS): SSL( תרושקת תחטבא
+שליחה בקידוד אחר תגרום להופעת ג'יבריש בקבלות ובדוחות.ytiC. -וtnemmoC ,emaNtneilC  במיוחד עבור שדות טקסטואליים כמו8-FTU, 
+יש לוודא שכל הבקשות נשלחות בקידוד
+ Encoding):( 006.םיוות דודיק
+זהות של בעל הכרטיס). המערכת מבצעת הצלבה מול חברת האשראי. במידה והמסוף מוגדר כ"מחייב אימות", אי-שליחת ת"ז תגרור שגיאה 
+תעודתzT ( מומלץ תמיד לשלוח את שדה
+מניעת הכחשות עסקה: 
+דגשים טכניים ופתרון בעיות
+פרמטרים
+תיאורחובה סוגשם 
+SendTransaction חובה string func
+.נומרי בלבדnekoT.  מספר כרטיס אשראי. נדרש רק אם לא נשלחחובה number CreditNum
+.נומרי בלבדnekoT.  נדרש רק אם לא נשלחMMYY.  תוקף הכרטיס בפורמטחובה number Expiry
+.נדרש אם לא נשלחו פרטי כרטיסmuNtiderC .yripxE פרטי כרטיס. יכול להחליף את
+טוקן לחיוב ללאאופציונלי string Token
+. ספרות בגב הכרטיס. לפעמים נדרש לפי חברת האשראי3 אופציונלי number Cvv2
+.)בעסקאות תשלומים – לשים לב להגדרת הסכום בהתאם למדיניות (סכום מלא/חודשי
+סכום העסקה באגורות/סנטים.חובה number Total
+6202  ביולי7 • נוצר אוטומטית
+תיאורחובה סוגשם 
+=יורו.879 ,=ליש״ט628 ,=דולר2 ,=שקל1 :מטבעחובה number Currency
+.=הוראת קבע. חלק מהערכים דורשים אישור מהספק01 ,=תשלומים8 ,)(בדומה לדיירקט
+= חיוב מיידי3  ,=רגיל1 :סוג תשלוםחובה number CreditType
+9999. - הראשון. בעסקת הוראת קבע  מס' תשלומים מלא. בהוראת קבע ללא הגבלה
+בעסקת תשלומים  לשלוח מס' תשלומים פחות התשלוםllun  - בעסקה חד פעמית
+מספר תשלומים.אופציונלי number NumPayment
+null.  תימעפ־דח הקסעב .םימולשת תקסעב ןושארה םולשתה םוכסאופציונלי number FirstPayment
+. עסקת זיכויtiderc  , עסקת חיובtibed  :סוג עסקהחובה string TransactionType
+.) תפיסת מסגרת (דורש אישור ספק5J  , ביצוע עסקה4J  , בדיקה בלבד2J  :סוג פעולהחובה string ParamJ
+. ספרות, ספרות בלבד5 מספר הפרויקט כפי שהוגדר במערכת. עדחובה string ProjectNumber
+. תווים אלפא־נומריים7 מספר אישור מחברת האשראי (אם נדרש). עדאופציונלי string AuthCode
+.מזהה ייחודי לעסקה כפי שהתקבל מחברת האשראי. משמש לזיהוי/חזרה לעסקהאופציונלי number CompanyTranId
+. תווים. ניתן לכלול תווים מיוחדים54 שם פרטי. עדאופציונלי string FirstName
+. תווים. ניתן לכלול תווים מיוחדים54 שם משפחה. עדאופציונלי string LastName
+.)תעודת זהות של מחזיק הכרטיס (לפעמים נדרש לפי חברת האשראיאופציונלי string Id
+.אימייל בפורמט תקין. אם מוגדר בחשבון – תישלח קבלה/חשבונית אוטומטית לכתובת זו
+כתובתאופציונלי string Mail
+. ספרות, ספרות בלבד01 מספר טלפון. עדאופציונלי string Phone
+. ספרות, ספרות בלבד01 מספר טלפון נוסף. עדאופציונלי string Phone2
+. תווים. יכול לכלול תווים מיוחדים54 כתובת רחוב מלאה (ללא עיר). עדאופציונלי string Address
+.)עיר. טקסט חופשי (מותר תווים מיוחדיםאופציונלי string City
+.מספר בית/דירה. שדה נומריאופציונלי number NumHouse
+.)כניסה. טקסט חופשי (לדוגמה: א, מערביאופציונלי string Entrance
+.קומה. ערך נומריאופציונלי number Floor
+.מספר בניין. ספרות בלבדאופציונלי number ApartmentNumber
+.טקסטtnuocze). -שם שיופיע על המסמך (ללקוחות המחוברים לאופציונלי string ReceiptName
+. תווים נומריים9 תעודת זהות שתופיע על המסמך. עדאופציונלי string ReceiptId
+. תווים54 תיאור השירות/המוצר שיופיע במסמך. עדאופציונלי string ReceiptFor
+.לביצוע העסקה. אם לא נשלח או נשלח תאריך שכבר עבר – העסקה תבוצע מיידית
+תאריךאופציונלי string TransactionDate
+.=חשבונית זיכוי033 ,=קבלה על תרומה504 ,=קבלה004 ,=חשבונית מס/קבלה023 ,מסאופציונלי number DocumentType
+6202  ביולי7 • נוצר אוטומטית
+תיאורחובה סוגשם 
+=חשבונית503 .)סוג מסמך לעסקה (עוקף הגדרות פרויקט
+ערך נומרי. נועד להצלבה בין העסקה ללקוח במערכת אחרת.MRC). ( במערכת חיצונית
+מזהה לקוחאופציונלי number ClientApiIdentity
+.מאפשר לקשר התחייבויות חוזרות לאובייקט חיצוניMRC). ( התחייבות במערכת חיצונית
+מזההאופציונלי number ObligationApiIdentity
+.תווים אלפא־נומריים91  עדycnetopmedI). ( מזהה ייחודי לעסקה מצדכםאופציונלי string UniqNum
+.)אסמכתא פנימית. ספרות בלבד (נומריאופציונלי number Reference
+הערך אותו אתם מעוניינים לשמורeulaV -  לקחת מאתר - ניהול שדות מותאמים אישית
+מזהה שדה - ישecnerefeRdleiF -   :המכיל את השדותdleiFimanyD  - אובייקטים מסוג
+.מערך שלeulaV ,ecnerefeRdleiF   :שדות דינמיים. מערך של אובייקטים בפורמטאופציונלי array DynamicFields
+.)הערהtnemmoC ( ,)כמותytitnauQ ( ,)מחירecirP ( ,)מקטtakaM ( :של אובייקטים עם
+רשימת מוצרים. מערךאופציונלי array Products
+? $ ₪ /. ,"-\)(][  תווים (אותיות, ספרות ותוים052 . עד1 שדה הערהאופציונלי string Comment1
+2 -", ./ ₪ $ ?), פרטים נוספים על העסקה, מגיע להערה\)(][ תווים (אותיות, ספרו ותוים
+052 שדה פרטים טקסטואלי מורחב. עדאופציונלי string Details
+. תווים. ניתן לשימוש לסימון מתנה/קמפיין54 שדה טקסט עדאופציונלי string Gift
+. תווים. שיוך למוקד טלפוני/סניף/קבוצת חיוב051 שדה טקסט עדאופציונלי string Moked
+.של דף התשלוםLRU -מספר עמוד תשלום. הערך מופיע בסוף כתובת האופציונלי number PaymentPage
+שדות תשובה
+תיאורסוג שם
+תיאור חדש string newField
+זיכוי עסקת אשראי
+ביצוע זיכוי לעסקת אשראי שכבר בוצעה
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+הפעולה דורשת את מספר העסקה המקורי שהתקבל בעת הביצוע
+ביצוע זיכוי מלא או חלקי לעסקת אשראי שכבר בוצעה במערכת.
+פרמטרים
+תיאורחובה סוגשם 
+6202  ביולי7 • נוצר אוטומטית
+תיאורחובה סוגשם 
+CreditTransaction. :עובק ךרעחובה string func
+.מספר העסקה המיועדת לזיכויחובה string transactionNum
+שדות תשובה
+תיאורסוג שם
+false).true( החלצהב עצוב יוכיזה םאה boolean RequestResult.Status
+.) לסירוב4 , להצלחה0( קוד סטטוס number RequestResult.Code
+.)"תיאור תוצאת הפעולה (לדוגמה: "סירוב" או "עסקה עברה בהצלחה string RequestResult.Description
+העברה בנקאית בקליק
+ביצוע העברה בנקאית מהירה
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+מחשבון הלקוחgniknaB nepO) ( יצירת קישור מאובטח לביצוע העברה בנקאית ישירה
+פרמטרים
+תיאורחובה סוגשם 
+SendFastBankTransfer. :עובק ךרעחובה string func
+.סכום להעברה באגורותחובה number Total
+.קוד בנקחובה string Bank
+.מספר סניףחובה string Branch
+.מספר חשבון בנקחובה string Account
+.תעודת זהות של בעל החשבוןחובה string Id
+שדות תשובה
+תיאורסוג שם
+קישור מאובטח לעמוד ביצוע ההעברה הבנקאית. string Link
+.האם הבקשה נוצרה בהצלחה boolean Success
+.קוד סטטוס פנימי string Status
+6202  ביולי7 • נוצר אוטומטית
+Bit-ב םולשת
+Bit תייצקילפא תועצמאב הקסע עוציב
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+המערכת מייצרת קישור ייחודי המפעיל את האפליקציה במכשיר המשלםtiB
+ ביצוע עסקה באמצעות אפליקציית
+פרמטרים
+תיאורחובה סוגשם 
+SendBitTransaction. :עובק ךרעחובה string func
+.סכום העסקה באגורותחובה number Total
+.)מספר טלפון של המשלם (עליו מותקנת האפליקציהחובה string Phone
+. לשקל1 :מטבעחובה number Currency
+.מספר הפרויקט אליו משויכת העסקהחובה string ProjectNumber
+שדות תשובה
+תיאורסוג שם
+במכשיר המשתמש.tiB  קישור ייחודי לפתיחת אפליקציית string BitUrl
+.האם הבקשה ליצירת התשלום הצליחה boolean RequestResult.Status
+.מספר עסקה פנימי במערכת string NumTransaction
+רישום תשלום במזומן/צ'ק
+תיעוד עסקאות שאינן אשראי (מזומן, צ'ק, העברה ידנית)
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+תיעוד עסקאות שאינן אשראי (מזומן, צ'ק, העברה ידנית) לצורך ניהול דוחות ריכוזי והפקת מסמכים
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+Wallet. ואCash, Check, BankTransfer  :גוסחובה string ChargeOptionType
+.סכום באגורותחובה number Total
+.מספר הפרויקט לתיעודחובה string ProjectNumber
+.)זיכויtiderc ( חיוב) אוtibed ( :סוג פעולהחובה string TransactionType
+שדות תשובה
+תיאורסוג שם
+האם הרישום בוצע בהצלחה. boolean RequestResult.Status
+.)"תיאור (לדוגמה: "עסקה עברה בהצלחה string RequestResult.Description
+ניסיון חוזר לעסקה
+שליחה חוזרת/אימות
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.)מחדשVVC  ביצוע העברה חוזרת של עסקה שנכשלה או עסקה הדורשת אימות מוגבר (כמו הזנת
+פרמטרים
+תיאורחובה סוגשם 
+SendTryAgainTransaction. :עובק ךרעחובה string func
+.מספר העסקה המקורית שנכשלהחובה string transaction.NumTransaction
+CVV. דוק בייחמ ףוסמהו הדימב חולשל שיאופציונלי string transaction.Cvv
+שדות תשובה
+תיאורסוג שם
+מס׳ כרטיס ממוסך (עם כוכביות) string CardMumber
+YYMM) הנבמב( הקסעה ףקות string ExpairyDate
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+תאריך העסקה string Date
+שם החברה string CompanyName
+שם הפרויקט string ProjectName
+מס׳ פרויקט string ProjectNumber
+.ת.ז string Id
+)שם בעל הכרטיס (שם משפחה + שם פרטי string Name
+סכום העסקה באגורות number Sum
+)שם מטבע בעברית (לדוגמא: שקל/דולר וכו׳ string CurrencyName
+)וכו׳673  :של המטבע (לדוגמאOSI ערך ה string CurrencyISOValue
+)סמל המטבע (לדוגמא: ₪ וכו׳ string CurrencySymbole
+)!מס׳ תשלומים לעסקה (בעסקת תשלומים בלבד number NumPayment
+)!סכום תשלום ראשון (בשקלים) (בעסקת תשלומים בלבד number FirstPayment
+)!סכום תשלום קבוע (בשקלים) (בעסקת תשלומים בלבד number MonthlyPayment
+מס׳ אישור string OKNum
+ בוליאני לסטטוסsutatS  , תיאור השגיאהnoitpircseD  , קוד הסטטוסedoC  :העסקה
+אוביקט המכיל שלוש שדות של סטטוסobject RequestResult
+מס׳ עסקה string NumTransaction
+)מזהה לעסקה (במידה ונשלח ע״י המפתח string UniqNum
+)באמצעות מה בוצעה העסקה (ווב סרויס/תוכנה string Service
+מס׳ מסוף עליו בוצעה העסקה string TerminalNumber
+שם המסוף עליו בוצעה העסקה string TerminalName
+כתובת string Address
+עיר string City
+טלפון string Phone
+כתובת אימייל string Mail
+)טוקן (במידה שנוצר לעסקה, או שהעסקה בוצעה באמצעותו string Token
+1 הערה string Comment1
+2 הערה string Comment2
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+3 הערה string Comment3
+4 הערה string Comment4
+5 הערה string Comment5
+מסמך על שם string ReciptName
+מסמך עבור string ReciptFor
+שם הכרטיס (ישראכרט, כ.א.ל וכו׳) - חוזר מחברת האשראי string CardName
+החוזר מחברת האשראיtni  שדה במבנה number Intot
+)!מזהה יחודי לעסקה (יחודי לחברה בלבד string CompanyTranId
+)הוראות תצוגה לכרטיס נטען (בעסקת טעינה בלבד string DisplayInstructionsForChargeCard
+)וכו׳LACasiV ,dracarsI ( שם חברה סולקת string ClearingCompany
+.סטטוס חברת האשראי על בדיקת ת.ז string CheckIdentityNumber
+CVV תקידב לע יארשאה תרבח סוטטס string CheckCVV
+נתונים נוספים string AddData
+)וכו׳LACasiV ,dracarsI ( שם חברה מנפיקה string IssuerCompany
+)וכו׳ralugeRtibeD tiderC( סוג עסקה string TransactionType
+)וכו׳raluger tnemyap( סוג תשלום string TransactionCreditType
+)קוד עסקה (משבא string TransactionCode
+)מס׳ מועדון (משבא string ClubCode
+מקור אישור לעסקה string ConfirmSource
+)מס׳ קובץ (משבא string FileNumber
+נתונים נוספים string UserData
+סוג כרטיס string CardType
+למשלםSMS ppAstahW במכשיר של המשלם. עבור עסקאות במחשב - נשלח
+קישור עבור עסקאות ביט - יש לפתוח את הקישור בשביל שתפתח האפליקציהstring BitUrl
+J5 הקסע רפסמ string J5TranId
+מזהה תוכנה חיצונית להתחייבות string ObligationApiIdentity
+מזהה התחייבות string ObligationReference
+6202  ביולי7 • נוצר אוטומטית
+ביטול עסקת אשראי לפני שידור
+ביטול עסקה קיימת
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.ביטול עסקה שבוצעה במערכת באמצעות מספר העסקה הייחודי שלה
+פרמטרים
+תיאורחובה סוגשם 
+CancelTranByNumTransaction. :עובק ךרעחובה string func
+.מספר העסקה המיועדת לביטולחובה string numTransaction
+false).true( הקסעל הרושקה עבקה תארוה תא םג לטבל םאהחובה boolean cancelHok
+שדות תשובה
+תיאורסוג שם
+האם פעולת הביטול הצליחה. boolean Status
+.קוד סטטוס הפעולה number Code
+.)"תיאור תוצאת הביטול (לדוגמה: "פעולה בוצעה בהצלחה string Description
+J5)( יארשא תרגסמ תסיפת
+תפיסת מסגרת אשראי ללא חיוב מיידי
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+ParamJ. רטמרפה לע שגד םעtran  טקייבואה תא חולשל שי
+פעולה זו מבטיחה שהסכום יהיה זמין לחיוב עתידי.
+ביצוע בדיקה ותפיסת מסגרת בכרטיס האשראי של הלקוח ללא חיוב בפועל. 
+פרמטרים
+תיאורחובה סוגשם 
+6202  ביולי7 • נוצר אוטומטית
+תיאורחובה סוגשם 
+SendTransaction. :עובק ךרעחובה string func
+.)מס' כרטיס (נדרש אם אין טוקןחובה string tran.CreditNum
+.)טוקן לחיוב (נדרש אם אין מס' כרטיסחובה string tran.Token
+.סכום לתפיסה באגורותחובה number tran.Total
+.לתפיסת מסגרתJ5  חובה לשלוחחובה string tran.ParamJ
+השלמת חיוב אשראי
+J5 יארשא בויח שומימ
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.השלמת תהליך התשלום וחיוב בפועל של מסגרת שנתפסה מראש
+פרמטרים
+תיאורחובה סוגשם 
+ExecutionJ5Tran. :עובק ךרעחובה string func
+J5TranId).( תרגסמה תסיפת בלשב לבקתהש הקסעה ההזמחובה string tranId
+.סכום לחיוב סופי באגורותחובה number sum
+שדות תשובה
+תיאורסוג שם
+פרטי העסקה המלאים ואישור החיוב string TranOutput
+שחרור מסגרת אשראי
+ביטול תפיסת מסגרת אשראי
+POST POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.)ביטול תפיסת המסגרת ושחרור הסכום חזרה לכרטיס האשראי של הלקוח (במקרה שלא בוצע חיוב סופי
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+FreeJ5AskTran. :עובק ךרעחובה string func
+J5TranId).( תרגסמ תסיפתל הקסעה ההזמחובה string tranId
+שדות תשובה
+תיאורסוג שם
+האם השחרור בוצע בהצלחה. boolean Status
+.תיאור תוצאת הפעולה string Description
+שליחת דף תשלום
+שליחת דף תשלום חיצוני או פנימי
+POST /api/v1/
+.לאחר התשלום הוא מוחזר חזרה לאתר שלךrehseK.
+ המשתמש נשלח מהאתר שלך לדף תשלום חיצוני של
+ דף תשלום חיצוניrehseK tcerideR.
+ דף התשלום נטען בתוך האתר שלך באמצעות
+הטמעת דף התשלום בתוך האתרemarfI- 
+ סוגי דפי תשלום
+קישור זה הוא הבסיס לכל אפשרויות השליחה וההטמעה שיוסברו בהמשך.DI). ( תנפיק לכם קישור המכיל את מספר הדף
+לאחר שמירת ההגדרות, המערכת
+השדות שיוצגו למשתמש, דרך הגדרת אמצעי התשלום המותרים, הכתובת אליה יופנה הלקוח לאחר התשלום ועוד.
+במסך זה תוכלו לשלוט באופן מלא על נראות הדף והתנהגותו: החל מבחירת
+כדי להתחיל, יש ליצור דף תשלום חדש בממשק הניהול תחת לשונית "פרויקטים ודפי תשלום". 
+יצירת דף תשלום
+קשר המאובטחים. פתרון זה מסיר משרתי הלקוח את הצורך באגירת נתוני אשראי ועמידה בתקני אבטחה מחמירים.
+התהליך מתבצע באמצעות הפניית הלקוח לדף תשלום (חיצוני או מוטמע באתר) המארח את טופס הסליקה בשרתי
+ואפליקציות גבייה לבצע חיוב כרטיסי אשראי מבלי לגעת בפרטי הכרטיס הרגישים.MRC  המאפשר לאתרי מסחר, מערכות
+ומאובטח,dnE-ot-dnE) ( מספקת פתרון סליקה מלאrehseK  מערכת דפי התשלום של
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים לשליחה
+שם פרמטרסוג חובהתיאור 
+id||id Number||Number Yesןכ Payment page ID..םולשתה דומע ההזמ
+token||token String||String Yesןכ Temporary token created by GetLinkToken (recommended for
+enhanced security)..)תרבגומ החטבאל ץלמומGetLinkToken (-ב רצונש ינמז
+טוקן
+total||total Number||Number Noאל Transaction amount in shekels..םילקשב הקסעה םוכס
+currency||currency Number||Number Noאל Currency: 1 (ILS), 2 (USD), 826 (GBP), 978 (EUR)..)826 ( ,)דנואפ978( ורוי
+דולר),2 ( ,)שקל1 ( :מטבע
+firstname||firstname String||String Noאל Payer first name..םלשמה לש יטרפ םש
+lastname||lastname String||String Noאל Payer last name..םלשמה לש החפשמ םש
+tel||tel String||String Noאל Payer phone number..םלשמה לש ןופלט רפסמ
+mail||mail String||String Noאל Email address for sending receipt..הלבק חולשמל ליימיא תבותכ
+tz||tz String||String Noאל Payer ID number..םלשמה לש תוהז תדועת
+credittype||credittype Number||Number Noאל - עסקת ביט 6  - הו"ק בנקאית5 ) - תשלומים בהו"ק (אשראי4 חיוב חוזר באשראי
+ -3  - תשלומים2  - חיוב ח"פ1
+numpayment||numpayment Number||Number Noאל Number of installments displayed by default..לדחמ תרירבכ גצויש
+מספר תשלומים
+successurl||successurl URL||URL Noאל URL to redirect user after success..החלצה רחאל שמתשמה הנפוי הילא
+כתובת
+failedurl||failedurl URL||URL Noאל URL to redirect user after failure..ןולשיכ רחאל שמתשמה הנפוי הילא תבותכ
+lang||lang String||String Noאל Page language: Hebrew or English.English. ואHebrew  :ףדה תפש
+addactiondata||addactiondata String||String Noאל Free text that will be returned in the callback.Callback).( הרזחה בותינב
+טקסט חופשי שיחזור אליכם
+Success URL)( החלצהל םירזוחה םינותנ
+שם פרמטרתיאור 
+transactionNumber||transactionNumber Transaction number in the system..תכרעמב העצובש הקסעה רפסמ
+ref||ref Confirmation number from the credit company..יארשאה תרבחמ רושיאה רפסמ
+total||total The actual amount charged..לעופב הבגנש םוכסה
+currency||currency Transaction currency type..הקסעה לש עבטמה גוס
+obligationRef||obligationRef Standing order reference (if created)..)הרצונו הדימב( עבקה תארוה תתכמסא
+receiptLink||receiptLink Direct link to download the generated receipt..הקפוהש הלבקה תדרוהל רישי רושיק
+6202  ביולי7 • נוצר אוטומטית
+שם פרמטרתיאור 
+docNumber||docNumber The issued receipt number..הקפנוהש הלבקה רפסמ
+adddata||adddata The identifier value sent in the original request..תירוקמה השקבב םתחלשש ההזמה ךרעה
+Failed URL)( ןולשיכל םירזוחה םינותנ
+שם פרמטרתיאור 
+transactionNumber||transactionNumber The failed transaction number..הלשכנש הקסעה רפסמ
+errorCode||errorCode Error code returned from the system..תכרעמהמ רזחש האיגשה דוק
+errorText||errorText Error description in words..םילימב האיגשה רואית
+adddata||adddata The identifier value sent in the original request..תירוקמה השקבב םתחלשש ההזמה ךרעה
+טוקן להצפנת אשראי
+יצירת טוקן לשמירת פרטי כרטיס האשראי בצורה מוצפנת
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.. פרמטר זה משמש כמזהה הלקוח במערכת שלכם ומאפשר לקשר באופן חד-ערכי בין הלקוח לטוקן שנוצרfeRremotsuc
+שיוך ללקוח (פרמטר חובה): בעת הקריאה לדף, חובה להעביר את הפרמטר
+מיקום: "פעולות לאחר שליחה"  "נתיב לקבלת טוקן".
+אליה יישלח הטוקן בסיום התהליך.LRU -חובה: יש להגדיר את כתובת הkcabllaC) - ( נתיב חזרה
+חשוב! הגדרת סוג הדף: במערכת הניהול, תחת 'הגדרות דף תשלום', יש לבחור באופציה "יצירת טוקן".
+הנחיות להטמעה:
+ממשק המשתמש הינו מינימליסטי וכולל שני שדות בלבד: מספר כרטיס ותוקף.
+לקבל "טוקן" מוצפן של פרטי האשראי של הלקוח, באמצעותו תוכלו לבצע חיובים עתידיים עבור הלקוח בצורה מאובטחת. 
+השימוש בדף זה מאפשר
+מאובטחת של פרטי אשראי ללא ביצוע חיוב מיידי, יש להשתמש בדף תשלום ייעודי מסוג 'יצירת טוקן'.
+לשמירהnoitazinekoT)
+( שמירת פרטי אשראי
+פרמטרים
+תיאורחובה סוגשם 
+מזהה לקוח חיצוניחובה string customerRef
+מזהה התחייבות חיצוניאופציונלי string obligationRef
+6202  ביולי7 • נוצר אוטומטית
+שדות תשובה
+תיאורסוג שם
+מחרוזת הטוקן המוצפנת שהופקה. string String
+יצירת טוקן לדף תשלום
+יצירת טוקן לדף תשלום לצורך אבטחה
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+"לאחר קבלת הטוקן ראו כיצד לשלוח דף תשלום בדף "שליחת דף תשלום
+ובכך להבטיח שנתוני העסקה "נעולים" ולא ניתנים לשינוי על ידי המשתמש.LRU, -מבלי לחשוף את הנתונים בכתובת ה
+השימוש בטוקן מאפשר לטעון את הדף עם נתונים מוגדרים מראש (כמו סכום ופרטי לקוח)
+בשליחת דף תשלום, יש אפשרות לשרשר ללינק התשלום טוקן מוצפן עם כל פרטי התשלום בדף.
+פרמטרים
+תיאורחובה סוגשם 
+GetLinkToken. :עובק ךרעחובה string func
+.מזהה עמוד התשלום במערכתחובה number request.PaymentPageId
+.)סכום העסקה לתצוגה (בשקליםחובה number request.Total
+.=יורו879 ,=פאונד628 ,=דולר2 ,=שקל1 :מטבעאופציונלי number request.Currency
+.שם פרטי של המשלםאופציונלי string request.FirstName
+.שם משפחה של המשלםאופציונלי string request.LastName
+.כתובת דוא"ל של המשלםאופציונלי string request.Mail
+.תעודת זהות של המשלםאופציונלי string request.Tz
+שדות תשובה
+תיאורסוג שם
+false).true( החילצה השקבה םאה boolean RequestResult.Status
+.) מסמל פעולה מוצלחת449( קוד סטטוס number RequestResult.Code
+.תיאור תוצאת הפעולה string RequestResult.Description
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+הטוקן הייחודי שיש לשרשר לכתובת דף התשלום. string Token
+6202  ביולי7 • נוצר אוטומטית
+הוראות קבע והתחייבויות
+ניהול הוראות קבע והתחייבויות חוזרות
+הקמת הוראת קבע בנקאית
+הקמת הרשאה בנקאית
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.המכיל את פרטי החשבון וההתחייבותnoitcasnart  יש לשלוח אובייקט
+במידה ונשלח תאריך תחילת גבייה הקטן מהתאריך הנוכחי, המערכת תיצור את ההתחייבות אוטומטית על התאריך הנוכחי.
+המערכת תבצע את הגבייה בתאריכים ובסכומים שיוגדרו.
+יצירת התחייבות חדשה לחיוב חשבון בנק (מס"ב). 
+פרמטרים
+תיאורחובה סוגשם 
+SendBankObligation. :עובק ךרעחובה string func
+.) ספרות2( קוד בנקחובה number Bank
+.) ספרות3( מספר סניףחובה number Branch
+.מספר חשבון בנקחובה number Account
+.סכום הגבייה החודשי באגורותחובה number Total
+.) להוראת קבע ללא הגבלה9999( מספר תשלומיםאופציונלי number NumPayment
+YYYY-MM-DD).( הייבג תליחת ךיראתאופציונלי string TransactionDate
+.)מספר פרויקט (מומלץ לשלוח לשיוך נכוןאופציונלי string ProjectNumber
+.שם פרטי של בעל החשבוןאופציונלי string FirstName
+.שם משפחה של בעל החשבוןאופציונלי string LastName
+.כתובת דוא"ל למשלוח אישורי קליטהאופציונלי string Mail
+CRM). לשמל( תינוציח תכרעמב חוקל ההזמאופציונלי number ClientApiIdentity
+FieldReference, Value).( תישיא םימאתומ תודש ךרעמאופציונלי array DynamicFields
+Makat, Price, Quantity).( םירצומ תמישראופציונלי array Products
+האם קיים איזשור בנקאופציונלי object HasBankAuth
+base64 טמרופל רימהל שי ,המיתח תחילשאופציונלי string Signature
+6202  ביולי7 • נוצר אוטומטית
+שדות תשובה
+תיאורסוג שם
+שדה בן שלוש ספרות המכיל את קוד הסטטוס number Code
+.אסמכתת ההתחייבות שנוצרה string Data
+.תיאור התוצאה string Description
+.האם הפעולה הצליחה boolean Status
+דוגמת בקשה
+{
+  "Json": {
+    "func": "SendBankObligation",
+    "password": "xyxyxyxyxyxyxyxyxyxyxyxy",
+    "userName": "xxxxxxxxxxx",
+    "transaction": {
+      "Bank": 12,
+      "City": null,
+      "Mail": "aaaaa@gmail.com",
+      "Phone": "00000000",
+      "Total": 500,
+      "Branch": 223,
+      "Account": 123654,
+      "Address": "A",
+      "Comment1": "",
+      "Currency": 1,
+      "LastName": null,
+      "FirstName": "Kuldeep",
+      "Signature": null,
+      "NumPayment": 9999,
+      "ReceiptFor": "",
+      "ReceiptName": "",
+      "ProjectNumber": "1",
+      "TransactionDate": "2024-08-14",
+      "ClientApiIdentity": null
+    }
+  },
+  "format": "json"
+}
+דוגמת תשובה
+{
+  "Code": 458,
+  "Data": "001696",
+  "Status": true,
+     " D e s c r i p t i o n " :   "Ô×ÜæÔÑ  ÔØÜçà  âÑç  êÐèÕÔ "
+}
+6202  ביולי7 • נוצר אוטומטית
+עדכון הוראת קבע
+עדכון הוראת קבע קיימת
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.)עדכון נתוני גבייה של התחייבות קיימת (שינוי סכום, תאריך או סטטוס
+פרמטרים
+תיאורחובה סוגשם 
+UpdateObligation. :עובק ךרעחובה string func
+.יום הגבייה המבוקש בחודשאופציונלי string Day
+.סכום הגבייה המעודכן בשקליםאופציונלי string Sum
+.) (מבוטל3 ,) (מושהה2 ,) (פעיל1 :קוד סטטוסאופציונלי number status
+.עדכון תאריך תחילת הגבייהאופציונלי string StartDate
+.עדכון מספר התשלומים הכוללאופציונלי number NumPayments
+.אסמכתת ההתחייבות לעדכוןחובה string ObligationRef
+yyyy-MM-dd. טמרופב הייהשה םויס ךיראתאופציונלי string PausedTill
+שדות תשובה
+תיאורסוג שם
+האם העדכון הצליח. boolean Status
+.) להצלחה449( קוד סטטוס number Code
+.תיאור התוצאה string Description
+דוגמת בקשה
+6202  ביולי7 • נוצר אוטומטית
+{
+  "Json": {
+    "func": "UpdateObligation",
+    "password": "xyxyxyxyxyxyxyxyxyxyxyxy",
+    "userName": "xxxxxxxxxxx",
+    "obligDetails": {
+      "Day": "10",
+      "Sum": "500",
+      "status": null,
+      "StartDate": null,
+      "NumPayments": 10,
+      "ObligationRef": "001668"
+    }
+  },
+  "format": "json"
+}
+דוגמת תשובה
+{
+  "Json": {
+    "func": "SendCashTransaction",
+    "format": "json",
+    "cashTran": {
+      "Bank": "12",
+      "Phone": "0500500500",
+      "Total": 120,
+      "Branch": "123",
+      "Account": "123321",
+      "Address": "address_test_test",
+      "Comment1": "",
+      "Currency": 1,
+      "LastName": "lname_test",
+      "FirstName": "fname_test",
+      "CheckNumber": null,
+      "ProjectNumber": "00032",
+      "TransactionType": "debit",
+      "ChargeOptionType": "Cash"
+    },
+    "password": "xyxyxyxyxyxyxyxyxyxyxy",
+    "userName": "xxxxxxxxxxxx"
+  },
+  "format": "json"
+}
+שינוי אמצעי התשלום
+שינוי אמצעי התשלום של הוראת קבע
+POST https://kesherhk.info/KesherAPI/ChangeChargeOptionForObligation
+.)שינוי אמצעי התשלום עבור התחייבות קיימת (החלפת כרטיס אשראי או מעבר לבנק
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+אסמכתת ההתחייבות שאת אמצעי התשלום שלה נרצה לשנות.חובה string obligationReference
+.כתובת אימייל של המפתח המנהלחובה string CompanyDeveloperMail
+.שם בעל אמצעי התשלום החדשאופציונלי string name
+.)תעודת זהות (חובה לאמצעי תשלום בנקאיחובה string tz
+.מספר חשבון בנק או טוקן אשראי חדשחובה string accountOrToken
+.)ספרות3 ( או מספר סניףMMYY  תוקף בפורמטחובה string expiryOrBranch
+.) ספרות, חובה לבנקאי2( קוד בנקאופציונלי number bank
+.) (בנקאי2 ,) (אשראי1 :סוג אמצעי תשלוםחובה number type
+.)הגבלת סכום (לאמצעי תשלום בנקאיאופציונלי number limitSum
+.)הגבלת תאריך (לאמצעי תשלום בנקאיאופציונלי string limitDate
+.)0/1( האם קיים אישור בנקאופציונלי number hasBankAuth
+שדות תשובה
+תיאורסוג שם
+האם הפעולה בוצעה בהצלחה. boolean Succeeded
+.קוד סטטוס הפעולה number Code
+.תיאור מילולי של התוצאה string Message
+דוגמת בקשה
+{
+  "obligationReference": "XXXXXXX",
+  "CompanyDeveloperMail": "XXXXX",
+  "addChargeOptionRequest": {
+    "entity": {
+      "tz": null,
+      "bank": null,
+      "name": "TEST",
+      "type": 1,
+      "limitSum": null,
+      "limitDate": null,
+      "hasBankAuth": 0,
+      "accountOrToken": "XXXXXXXX",
+      "expiryOrBranch": "XXXX"
+    }
+  }
+}
+6202  ביולי7 • נוצר אוטומטית
+דוגמת תשובה
+{
+  "Code": 944,
+     " M e s s a g e " :   "Ô×ÜæÔÑ  ÔâæÕÑ  ÔÜÕâä " ,
+  "Succeeded": true
+}
+הוספת חיוב חד פעמי להו"ק בנקאית
+שימו לב! זה הסכום לגביה הקרובה ולא משנה את סכום ההתחייבות
+שאנחנו נותנים ומאפשרת לגבות את ההתחייבות בגביה הקרובה.nekoT reraeB  מקבלת מייל מתכנת המורשה אצלינו היא דורשת
+הפונקציה
+POST https://kesherhk.info/KesherAPI/ChargeNextCollection
+פרמטרים
+תיאורחובה סוגשם 
+מייל מפתח מורשהאופציונלי string companyDeveloperMail
+אסמכתת התחייבותאופציונלי string reference
+סכוםאופציונלי string sum
+שדות תשובה
+תיאורסוג שם
+שדה בן שלוש ספרות המכיל את קוד הסטטוס string code
+שדה טקסט המכיל את תיאור השגיאה string message
+שדה בוליאני לסטטוס – האם זהו קוד שגיאה או הצלחה boolean succeeded
+דוגמת בקשה
+{
+  "sum": "1000",
+  "reference": "150",
+  "companyDeveloperMail": "test@test.co.il"
+}
+דוגמת תשובה
+6202  ביולי7 • נוצר אוטומטית
+{
+  "code": 0,
+  "message": "string",
+  "succeeded": true
+}
+6202  ביולי7 • נוצר אוטומטית
+דוחות ומידע
+שליפת דוחות ומידע מהמערכת
+בדיקת אישור בנק
+בדיקת קיום אישור חתום מהבנק
+GET https://kesherhk.info/KesherAPI/HasBankAuth
+kesherhk.co.iloffice תוחוקל תורישל תונפל שיBearer Token -   תלבקלfunc.
+ ואינה משתמשת בפרמטרredaeH -בnekoT reraeB  קריאה זו דורשת
+בדיקה האם קיים אישור חתום מהבנק עבור חשבון מסוים לצורך גבייה בהוראת קבע.
+פרמטרים
+תיאורחובה סוגשם 
+ ספרות)5( קוד המוסד במערכתחובה Number instituteCode
+) ספרות2( קוד בנקחובה Number bank
+מספר סניףחובה Number branch
+מספר חשבון בנקחובה Number account
+שדות תשובה
+תיאורסוג שם
+אובייקט המכיל מידע האם קיים אישור בנק או בוטל object Entity
+האם נמצא אישור תקין Boolean Succeeded
+) - פרטי בנק לא נמצאו213 :קוד סטטוס (למשל Number Code
+תיאור הסטטוס String Message
+דוגמת תשובה
+6202  ביולי7 • נוצר אוטומטית
+{
+  "Code": 944,
+  "Entity": {
+    "Tz": "123456782",
+         " N a m e " :   "Ô×äéÞÕ    Ýé " ,
+    "Branch": "740",
+    "Account": "8541233",
+         " A d d r e s s " :   "ÓÕÓéÐ   1 0  ÐÓáÙ×  Ñè " ,
+    "BankValue": "17",
+    "OldBranch": null,
+    "OldAccount": null,
+    "CompanyCode": "8541",
+         " C o m p a n y N a m e " :   "ØáØ " ,
+    "OldBankValue": null,
+    "InstituteCode": "12345",
+    "BankAuthStatus": 3,
+         " B a n k A u t h S t a t u s T e x t " :   "×ÕçÜÔ  ÙÓÙ -Üâ  ÔÜØÕÑ  ÔÐéèÔ "
+  },
+     " M e s s a g e " :   "Ô×ÜæÔÑ  ÔâæÕÑ  ÔÜÕâä " ,
+  "Succeeded": true
+}
+רשימת אישורי בנק
+קבלת פרטי עסקה בודדת
+GET https://kesherhk.info/KesherAPI/GetBankAuthList
+.חיפוש אישורי בנק לפי פרמטרי חשבון או אסמכתא ספציפית
+פרמטרים
+תיאורחובה סוגשם 
+קוד המוסד.חובה number instituteCode
+ מתאריךחובה string fromDate
+ עד תאריךחובה string toDate
+שדות תשובה
+תיאורסוג שם
+אובייקט המכיל רשימה של כל אישורי הבנק object Entities
+6202  ביולי7 • נוצר אוטומטית
+דוגמת תשובה
+{
+  "Entities": [
+    {
+      "Tz": " 123465782",
+             " N a m e " :   "Ýé " ,
+      "Branch": "475",
+      "Account": "12345",
+             " A d d r e s s " :   "êÕäáÕêÔ  ÙÜâÑ   " ,
+      "BankValue": "12",
+      "OldBranch": null,
+      "OldAccount": "",
+      "CompanyCode": "1234",
+             " C o m p a n y N a m e " :   "èéç " ,
+      "OldBankValue": null,
+      "InstituteCode": "1254",
+      "BankAuthStatus": 3,
+             " B a n k A u t h S t a t u s T e x t " :   "×ÕçÜÔ  ÙÓÙ -Üâ  ÔÜØÕÑ  ÔÐéèÔ "
+    },
+    {
+      "Tz": " 123456782",
+             " N a m e " :   "ÜÐÛÙÞ " ,
+      "Branch": "953",
+      "Account": "854122",
+             " A d d r e s s " :   "ÔèÓ× " ,
+      "BankValue": "10",
+      "OldBranch": null,
+      "OldAccount": "",
+      "CompanyCode": "1234",
+             " C o m p a n y N a m e " :   "ØáØ " ,
+      "OldBankValue": null,
+      "InstituteCode": "12584",
+      "BankAuthStatus": 3,
+             " B a n k A u t h S t a t u s T e x t " :   "×ÕçÜÔ  ÙÓÙ -Üâ  ÔÜØÕÑ  ÔÐéèÔ "
+    }
+  ]
+}
+דוח עסקאות
+שליפת דו"ח עסקאות
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.רשומות בכל קריאה000,2  המערכת שולפת עד
+משולב: ניתן לסנן לפי שני הפרמטרים יחד; יוחזרו רשומות העומדות בשני הקריטריונים.0.
+ השליפה תתבצע ממזהה זה ואילך (לא כולל). לשליפת הכל יש להזיןdInarTmorf.  שליחתDI): ( לפי מזההetaDot.
+ fromDate  תחילש :ךיראת יפל
+סוגי שליפה:3 תומך בIPA ה
+פונקציה זו משמשת לשליפת רשימת עסקאות לפי טווח תאריכים או לפי מזהה עסקה התחלתי. 
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+GetTrans. :עובק ךרעחובה string func
+json. חולשל שיחובה string format
+dd.mmyyyy הנבמב הלחתה ךיראתאופציונלי string fromDate
+dd.mmyyyy הנבמב םויס ךיראתאופציונלי string toDate
+.)מזהה עסקה התחלתי (שולף ממנו והלאהאופציונלי number fromTranId
+שדות תשובה
+תיאורסוג שם
+Idstring Id
+NumCard string NumCard
+ExpireDate string ExpireDate
+Total string Total
+TranDate string TranDate
+TransactionType string TransactionType
+CreditType string CreditType
+Currency string Currency
+Name string Name
+ProjectNum string ProjectNum
+ProjectName string ProjectName
+TerminalNumber string TerminalNumber
+Phone / Phone2 string Phone / Phone2
+Mail string Mail
+Address / City string Address / City
+Comment string Comment
+Details string Details
+Issuer string Issuer
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+Acquire string Acquire
+Token string Token
+Service string Service
+User string User
+CreditCardCompany string CreditCardCompany
+Uniq string Uniq
+NumPayments string NumPayments
+FirstPayment string FirstPayment
+MonthPayment string MonthPayment
+Status string Status
+ReceiptName string ReceiptName
+DocumentsDetails string DocumentsDetails
+DocNumber string DocNumber
+OriginalDoc string OriginalDoc
+CopyDoc string CopyDoc
+OKNum string OKNum
+Tz string Tz
+MobileName string MobileName
+CompanyName string CompanyName
+ClientReference string ClientReference
+ObligationReference string ObligationReference
+ObligationNumPayment string ObligationNumPayment
+DealType string DealType
+OverseasCard string OverseasCard
+CreditStatus string CreditStatus
+Brand string Brand
+ApartmentNumber / NumHouse string ApartmentNumber / NumHouse
+Entrance string Entrance
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+FirstName / LastName string FirstName / LastName
+ChargeOptionType string ChargeOptionType
+Team string Team
+PaymentPageName string PaymentPageName
+דוח עסקאות לפי חברה
+שליפת פירוט עסקאות מלא לחברה
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.שליפת פירוט עסקאות מלא הכולל עסקאות שנכשלו
+פרמטרים
+תיאורחובה סוגשם 
+GetAllTransForCompany. :עובק ךרעחובה string func
+json. חולשל שיחובה string format
+.תאריך התחלהחובה string FromDate
+.תאריך סיוםחובה string ToDate
+.מזהה עסקה התחלתיאופציונלי number FromTranId
+.עד מזהה עסקהאופציונלי number ToTranId
+.) (הכל5 ,) (הו"ק בנקאיות2 ,) (אשראי וביט1 :סוג עסקהחובה number Type
+.) (נכשל2 ,) (עבר בהצלחה1 ,) (הכל0 :סטטוסחובה number Succedded
+שדות תשובה
+תיאורסוג שם
+Code string Code
+אוביקט שמכיל את פירוט רשימת העסקאות object Data
+Count string Count
+Status string Status
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+Description string Description
+תיאור חדש string newField
+דוגמת בקשה
+{
+  "Json": {
+    "func": "GetAllTransForCompany",
+    "format": "json",
+    "password": "xyxyxyxyxyxyxy",
+    "userName": "xxxxxxxxxxxxx",
+    "tranDetails": {
+      "Type": 5,
+      "ToDate": "2024-08-12T00:00:00",
+      "FromDate": "2024-08-12T00:00:00",
+      "ToTranId": null,
+      "Succedded": 0,
+      "FromTranId": null
+    }
+  },
+  "format": "json"
+}
+דוגמת תשובה
+{
+  "Code": 0,
+  "Data": {
+    "TransactionResponseData": [
+      {
+        "Id": "443",
+        "Tz": null,
+        "City": "city_test",
+        "Gift": null,
+        "Mail": "a@a.co.il",
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "Phone": "0500500500",
+        "Token": "00392781368787999",
+        "Total": 180,
+                 " I s s u e r " :   "áèäáçÐ  ßçÙèÞÐ " ,
+        "Phone2": null,
+                 " S t a t u s " :   "ÕÐ  Ö .ê   C V V  ÝÙÙÕÒé " ,
+                 " A c q u i r e " :   "ØèÛÐèéÙ " ,
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+        "NumCard": "37551******7999",
+                 " S e r v i c e " :   "ÔàÛÕê /áÙÕÕèá  ÑÕÕ " ,
+        "Comment4": null,
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+        "LastName": "lname_test",
+        "NumHouse": null,
+6202  ביולי7 • נוצר אוטומטית
+        "TranDate": "2024-08-12T11:23:17.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "12/25",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": null,
+        "CouponNumber": "15-001-004",
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "443",
+        "TerminalNumber": "0882218",
+        "ApartmentNumber": 0,
+        "ClientReference": "004051",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ÙÐèéÐ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001688",
+        "ObligationNumPayment": 1
+      },
+      {
+        "Id": "444",
+        "Tz": null,
+        "City": "city_test",
+        "Gift": null,
+        "Mail": "a@a.co.il",
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "Phone": "0500500500",
+        "Token": "00316597086897999",
+        "Total": 180,
+                 " I s s u e r " :   "áèäáçÐ  ßçÙèÞÐ " ,
+        "Phone2": null,
+                 " S t a t u s " :   "ÕÐ  Ö .ê   C V V  ÝÙÙÕÒé " ,
+                 " A c q u i r e " :   "ØèÛÐèéÙ " ,
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+        "NumCard": "37551******7999",
+                 " S e r v i c e " :   "ÔàÛÕê /áÙÕÕèá  ÑÕÕ " ,
+        "Comment4": null,
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+6202  ביולי7 • נוצר אוטומטית
+        "LastName": "lname_test",
+        "NumHouse": null,
+        "TranDate": "2024-08-12T11:26:33.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "12/25",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": null,
+        "CouponNumber": "15-001-004",
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "444",
+        "TerminalNumber": "0882218",
+        "ApartmentNumber": 0,
+        "ClientReference": "004052",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ÙÐèéÐ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001689",
+        "ObligationNumPayment": 1
+      },
+      {
+        "Id": "445",
+        "Tz": null,
+        "City": null,
+        "Gift": null,
+        "Mail": "a@a.co.il",
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "OKNum": "0687212",
+        "Phone": "0500500500",
+        "Token": "00340757894947999",
+        "Total": 100,
+                 " I s s u e r " :   "áèäáçÐ  ßçÙèÞÐ " ,
+        "Phone2": null,
+                 " S t a t u s " :   "Ô×ÙÜéÜ  ßÙêÞÞ " ,
+                 " A c q u i r e " :   "ØèÛÐèéÙ " ,
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+        "NumCard": "37551******7999",
+                 " S e r v i c e " :   "èéç  èêÐ " ,
+        "Comment4": null,
+6202  ביולי7 • נוצר אוטומטית
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+        "LastName": "lname_test",
+        "NumHouse": null,
+        "TranDate": "2024-08-12T11:35:46.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "12/25",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": null,
+        "CouponNumber": "15-001-001",
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "445",
+        "TerminalNumber": "0882218",
+        "ApartmentNumber": 0,
+        "ClientReference": "004057",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ÙÐèéÐ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001690",
+        "ObligationNumPayment": 1
+      },
+      {
+        "Id": "446",
+        "Tz": null,
+        "City": null,
+        "Gift": null,
+        "Mail": "a@a.co.il",
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "OKNum": "0687212",
+        "Phone": "0500500500",
+        "Token": "00340757894947999",
+        "Total": 100,
+                 " I s s u e r " :   "áèäáçÐ  ßçÙèÞÐ " ,
+        "Phone2": null,
+                 " S t a t u s " :   "Ô×ÙÜéÜ  ßÙêÞÞ " ,
+                 " A c q u i r e " :   "ØèÛÐèéÙ " ,
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+6202  ביולי7 • נוצר אוטומטית
+        "NumCard": "37551******7999",
+                 " S e r v i c e " :   "èéç  èêÐ " ,
+        "Comment4": null,
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+        "LastName": "lname_test",
+        "NumHouse": null,
+        "TranDate": "2024-08-12T11:38:15.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "12/25",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": null,
+        "CouponNumber": "15-001-002",
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "446",
+        "TerminalNumber": "0882218",
+        "ApartmentNumber": 0,
+        "ClientReference": "004057",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ÙÐèéÐ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001691",
+        "ObligationNumPayment": 1
+      },
+      {
+        "Id": "447",
+        "Tz": null,
+        "City": null,
+        "Gift": null,
+        "Mail": null,
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "Moked": null,
+        "OKNum": null,
+        "Phone": "0500500500",
+        "Token": null,
+        "Total": 120,
+        "Issuer": null,
+        "Phone2": null,
+                 " S t a t u s " :   "Ô×ÜæÔÑ  èÑâ " ,
+        "Acquire": null,
+6202  ביולי7 • נוצר אוטומטית
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+                 " S e r v i c e " :   "èéç  èêÐ " ,
+                 " C o m m e n t 4 " :   "ßÞÕÖÞ  êçáâ " ,
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+        "LastName": "lname_test",
+        "NumHouse": null,
+        "TranDate": "2024-08-12T11:44:35.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "00/00",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": "fname_test lname_test",
+        "CouponNumber": null,
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "447",
+        "TerminalNumber": "5000000",
+        "ApartmentNumber": null,
+        "ClientReference": "004058",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ßÞÕÖÞ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001692",
+        "ObligationNumPayment": 1
+      },
+      {
+        "Id": "448",
+        "Tz": null,
+        "City": null,
+        "Gift": null,
+        "Mail": null,
+        "Name": "lname_test fname_test",
+        "Team": null,
+        "Uniq": null,
+        "User": null,
+        "Brand": "0",
+        "Moked": null,
+        "OKNum": null,
+        "Phone": "0500500500",
+        "Token": null,
+        "Total": 120,
+        "Issuer": null,
+6202  ביולי7 • נוצר אוטומטית
+        "Phone2": null,
+                 " S t a t u s " :   "Ô×ÜæÔÑ  èÑâ " ,
+        "Acquire": null,
+        "Address": "address_test_test",
+        "Comment": null,
+        "CopyDoc": null,
+        "Details": null,
+                 " S e r v i c e " :   "èéç  èêÐ " ,
+                 " C o m m e n t 4 " :   "ßÞÕÖÞ  êçáâ " ,
+                 " C u r r e n c y " :   "Üçé " ,
+        "DealType": "false",
+        "Entrance": null,
+        "LastName": "lname_test",
+        "NumHouse": null,
+        "TranDate": "2024-08-12T11:45:48.000Z",
+        "DocNumber": null,
+        "FirstName": "fname_test",
+                 " C r e d i t T y p e " :   "ÜÙÒè  ÙÐèéÐ " ,
+        "ExpireDate": "00/00",
+        "MobileName": null,
+        "ProjectNum": "00032",
+        "$attributes": {
+          "$xsiType": {
+            "type": "CreditResponseData",
+            "xmlns": "http://schemas.datacontract.org/2004/07/Entities"
+          }
+        },
+                 " C o m p a n y N a m e " :   " 9 8 7  ØáØ " ,
+        "IsFirstTran": null,
+        "NumPayments": null,
+        "OriginalDoc": null,
+                 " P r o j e c t N a m e " :   "ÝÕÜéê  ÙÒÕá " ,
+        "ReceiptName": "fname_test lname_test",
+        "CouponNumber": null,
+        "CreditStatus": "0",
+        "FirstPayment": null,
+        "MonthPayment": null,
+        "OverseasCard": "false",
+        "DepositNumber": null,
+        "NumTransaction": "448",
+        "TerminalNumber": "5000000",
+        "ApartmentNumber": null,
+        "ClientReference": "004059",
+        "PaymentPageName": null,
+                 " T r a n s a c t i o n T y p e " :   "ÔÑÕ×  êçáâ " ,
+                 " C h a r g e O p t i o n T y p e " :   "ßÞÕÖÞ " ,
+        "CreditCardCompany": null,
+        "ObligationReference": "001693",
+        "ObligationNumPayment": 1
+      }
+    ]
+  },
+  "Count": 6,
+  "Status": true,
+  "Description": null
+}
+6202  ביולי7 • נוצר אוטומטית
+נתוני עסקה בודדת
+קבלת נתונים מלאים עבור עסקה ספציפית
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+transactionNum).( הקסעה ההזמ יפל תיפיצפס הקסע רובע םיאלמ םינותנ תלבק
+פרמטרים
+תיאורחובה סוגשם 
+GetTranData. :עובק ךרעחובה string func
+.מזהה העסקה המבוקשחובה string transactionNum
+שדות תשובה
+תיאורסוג שם
+שם החברה הסולקת string Acquire
+מספר דירה number ApartmentNumber
+קוד מותג כרטיס number Brand
+API)( ינוציח חוקל ההזמ string ClientApiIdentity
+אסמכתא של הלקוח string ClientReference
+הערה כללית string Comment
+4 הערה string Comment4
+שם החברה string CompanyName
+EzCount)( ךמסמה קתעהל רושיק string CopyDoc
+מספר קופון string CouponNumber
+שם חברת האשראי string CreditCardCompany
+קוד תשובה מחברת האשראי number CreditStatus
+)סוג עסקת האשראי (לדוגמה: אשראי רגיל string CreditType
+)שם המטבע (לדוגמה: שקל string Currency
+false)true( הקסעה גוס boolean DealType
+מספר הפקדה string DepositNumber
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+פרטים נוספים string Details
+מספר מסמך string DocNumber
+PdfLinkCopy-וDocNumber, PdfLink  םעDocumentDetails  ךרעמ ליכמה טקיבוא object DocumentsDetails
+כניסה string Entrance
+YYMM טמרופב סיטרכה ףקות string ExpireDate
+שם פרטי string FirstName
+סכום תשלום ראשון number FirstPayment
+מתנה string Gift
+מזהה פנימי של העסקה string Id
+האם זו העסקה הראשונה boolean IsFirstTran
+שם מנפיק הכרטיס string Issuer
+שם משפחה string LastName
+שם נייד string MobileName
+סכום תשלום חודשי number MonthPayment
+שם מלא string Name
+מספר כרטיס ממוסך string NumCard
+מספר בית string NumHouse
+מספר תשלומים number NumPayments
+מספר עסקה ייחודי string NumTransaction
+OK)( רושיא רפסמ string OKNum
+) = ללא הגבלה9999( מספר תשלומים בהוראת קבע number ObligationNumPayment
+אסמכתא להוראת קבע string ObligationReference
+קישור למסמך המקורי string OriginalDoc
+האם הכרטיס מחו'ל boolean OverseasCard
+מספר דף תשלום string PaymentPage
+שם דף התשלום string PaymentPageName
+טלפון נוסף string Phone2
+שם הפרויקט string ProjectName
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+מספר הפרויקט string ProjectNum
+שם בעל הקבלה string ReceiptName
+)מקור העסקה (לדוגמה: ניהול לקוחות string Service
+)סטטוס העסקה (תיאור מילולי string Status
+צוות string Team
+מספר המסוף string TerminalNumber
+טוקן הכרטיס string Token
+סכום העסקה number Total
+ISO 8601)( הקסעה תעשו ךיראת string TranDate
+)סוג העסקה (חובה/זיכוי string TransactionType
+מזהה ייחודי שנשלח ע'י המפתח string Uniq
+המשתמש שביצע את העסקה string User
+דוח התחייבויות
+שליפת רשימת הוראות קבע
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.שליפת רשימת התחייבויות (הוראות קבע) שנקלטו במערכת
+פרמטרים
+תיאורחובה סוגשם 
+GetObligations. :עובק ךרעחובה string func
+json. חולשל שיחובה string format
+yyyy.ddmm הנבמב הלחתה ךיראתחובה string fromDate
+yyyy.ddmm הנבמב םויס ךיראתחובה string toDate
+.אסמכתת התחייבות מסוימת לשליפהאופציונלי string obligationRef
+6202  ביולי7 • נוצר אוטומטית
+שדות תשובה
+תיאורסוג שם
+Reference string Reference
+InsertDate string InsertDate
+StartDate / EndDate string StartDate / EndDate
+NumPayments string NumPayments
+Sum string Sum
+TotalSum string TotalSum
+Currency string Currency
+IsLinkageCurrency string IsLinkageCurrency
+Day string Day
+StatusId / Status string StatusId / Status
+ObligationType string ObligationType
+ChargeOptionType string ChargeOptionType
+HasBankAuth string HasBankAuth
+BankAuthStatus string BankAuthStatus
+AccountOrNumCard string AccountOrNumCard
+ExpiryOrBranch string ExpiryOrBranch
+Name string Name
+ClientId string ClientId
+PassedPayments string PassedPayments
+FuturePayments string FuturePayments
+NotPassedPayments string NotPassedPayments
+LastTranDate string LastTranDate
+FinalSum string FinalSum
+SumPass string SumPass
+FutureSum string FutureSum
+Project string Project
+6202  ביולי7 • נוצר אוטומטית
+תיאורסוג שם
+Terminal string Terminal
+IsCharge string IsCharge
+CancelDate / CancelReason string CancelDate / CancelReason
+DynamicFields string DynamicFields
+תקינות כרטיס אשראי
+בדיקת תקינות כרטיס אשראי
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.בדיקת תקינות מספר הכרטיס וקבלת קודי סולק ומנפיק
+פרמטרים
+תיאורחובה סוגשם 
+CheckGetCreditCard. :עובק ךרעחובה string func
+.מספר הכרטיס לבדיקהחובה string CreditNum
+שדות תשובה
+תיאורסוג שם
+סולק, מנפיק, מספר כרטיס)sm( tiderc מחרוזת במבנה string String
+קבלת תיאור שגיאה
+קבלת תיאור מילולי עבור קוד סטטוס או שגיאה
+POST /api/v1/
+.)'לטקסט 'פעולה בוצעה בהצלחה449' ' (למשל, המרת קוד
+עבור קוד סטטוס או שגיאה מספרי שהתקבל מהמערכת noitpircseD txeT) ( קבלת תיאור מילולי
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+GetErrorValue :עובק ךרעחובה string func
+json :עובק ךרעחובה string format
+)"000" קוד השגיאה (למשלחובה string Code
+שדות תשובה
+תיאורסוג שם
+תיאור השגיאה בעברית (למשל "עסקה עברה בהצלחה") string Result
+6202  ביולי7 • נוצר אוטומטית
+אינטגרציות ותקשורת
+Webhook
+יצירת וובהוק להתממשקות עם מערכת קשר
+POST https://your-domain.com/webhook-endpoint
+בטבלאות הבאות תוכלו לראות את כל האובייקטים שחוזרים בהפעלת הוובהוק
+ כללי, ולהזין את הכתובת בשדה המתאים.MRC  הגדרות חברה  שירותי
+להאזנה, יש להיכנס ל: LRU -להפעלת הדיווח והזנת כתובת ה
+איך מגדירים וובהוק? SPTTH.
+ חייבת להיות מאובטחת ולתמוך בפרוטוקולLRU tniopdnE) ( לצורך אבטחת המידע, כתובת היעד
+דרישות טכניות: 
+-עסקאות
+-התחייבויות
+-לקוחות
+המערכת תשדר את הנתונים בכל יצירה של רשומה חדשה או עדכון של רשומה קיימת, עבור הישויות הבאות:
+באילו מקרים נשלח עדכון? 
+ייעודית בכל פעם שמתרחש שינוי במערכת.LRU  לכתובתHSUP) ( באמצעות הגדרה זו, תוכלו לקבל עדכון מיידי
+ לצורך קבלת התראות אוטומטיות וסנכרון מידע עם מערכות חיצוניות. skoohbeW המערכת מאפשרת עבודה מול מנגנון
+Transaction)( הקסע טקייבוא
+שדהסוג תיאור
+ProjectNumber String מספר פרויקט
+ChargeOption Integer )סוג אמצעי תשלום (ראה טבלת קודי אמצעי תשלום למטה
+ProjectName String שם פרויקט
+CardMumber String  ספרות אחרונות של הכרטיס4
+ExpairyDate String MMYY)( סיטרכ ףקות
+Bank String )מספר בנק (בעסקאות בנקאיות/צ'קים
+Branch String מספר סניף
+AccountNumber String מספר חשבון
+6202  ביולי7 • נוצר אוטומטית
+שדהסוג תיאור
+Sum Decimal .סכום העסקה. הערה: בעסקת תשלומים - סכום מלא. בהו"ק/חיוב חוזר - סכום חיוב חודשי
+Currency Integer =יורו879 ,=פאונד628 ,=דולר2 ,=שקל1 :מטבע
+NumPayments Integer null) תרחא ,דבלב םימולשת תקסעב( םימולשת רפסמ
+FirstPayment Decimal סכום תשלום ראשון
+TransactionType String )זיכויtiderc ( חיוב) אוtibed ( :סוג פעולה
+Comment1 String 1 הערה
+Comment2 String 2 הערה
+Comment3 String 3 הערה
+Comment5 String 5 הערה
+Details String פרטים נוספים, אופציונלי להגדרת מזהה עסקה ייחודי
+TransactionDate String yyyy HH:mm:ss)MMdd טמרופ( הקסע תעשו ךיראת
+Tz String תעודת זהות של המשלם
+OKNum String )מספר אישור (אסמכתא מחברת האשראי
+NumTransaction String מספר עסקה ייחודי במערכת קשר
+ReceiptName String שם להפקת מסמך
+ReceiptFor String עבור מה הופק המסמך
+DocumentsDetails Object מספר מסמךrebmuNcoD -     ,קישור להעתק מסמךypoCkniLfdP -     ,קישור למסמךkniLfdP -  לעסקה. מכיל
+רשימה של מסמכים
+ParamJ String J4, J5) לשמלJ ( רטמרפ
+Status String סטטוס מילולי של העסקה
+CreditStatus Object Code, Description, Status :ליכמ .יארשאה תרבח תבושת טקייבוא
+KesherStatus Integer )קוד סטטוס פנימי בקשר (ראה טבלת קודי סטטוס למטה
+Customer)( חוקל טקייבוא
+שדהתיאור 
+ClientRef אסמכתת הלקוח במערכת
+FirstName / LastName שם פרטי ומשפחה
+ClientDynamicFields מערך של שדות מותאמים אישית שהוגדרו עבור הלקוח
+6202  ביולי7 • נוצר אוטומטית
+Obligation)( עבק תוארוה טקייבוא
+שדהסוג תיאור
+ObligationReference String אסמכתת התחייבות
+ObligationApiIdentity String מזהה עסקה ייחודי שמוגדר ע"י הלקוח
+PaymentPage String דף תשלום משויך
+PaymentPageNum String מספר דף תשלום
+Gift String )מתנה (אם הוגדר
+StartDate String yyyy)MMdd( הלחתה ךיראת
+NumPayments Integer מספר תשלומים בהתחייבות
+ChargeDay Integer יום הגבייה בחודש
+ObligtionDynamicFields Array מערך שדות דינאמיים להתחייבות
+ObligationStatus Integer -שגיאת אתחול בשב"א9 ,-הסתיים8 ,-אמצ"ת בוטל7 ,-אישור בנק בוטל6 ,-ממתין לאישור בנק5 ,-אין אישור בנק4
+,-מבוטל3 ,-מושהה2 ,-פעיל1 :סטטוס התחייבות
+KesherStatus)( םיסוטטס תלבט
+קודסטטוס תיאור
+1 ממתין לשליחה
+2 עסקה שבוטלה לפני שידור
+4 עבר בהצלחה
+5 נתונים שגויים
+6 נכשל בשידור
+7 בוטל
+8 ממתין לסליקה
+9 חזר
+10 בבירור
+11 )עבר בהצלחה (וריאציה נוספת
+14 עסקה שלא עברה והוסרה מהדוח
+15 נתונים שגויים
+16 לא יסלק
+6202  ביולי7 • נוצר אוטומטית
+קודסטטוס תיאור
+21 )ביט (ממתין לאישור המשלם
+22 אישור חלקי
+23 עסקה שבוטלה בשידור יזום
+חיבור לאיזיקאונט
+חיבור להפקת מסמכים באיזיקאונט
+GET https://kesherhk.info/KesherAPI/ConnectToEZCountService
+API.-ה תועצמאב )טנואקיזיאEzCount ( תרבח ךרד
+ביצוע חיבור והצטרפות לשירות הפקת מסמכים אוטומטית (חשבוניותקבלות) 
+פרמטרים
+תיאורחובה סוגשם 
+Bearer Token חובה string Authorization
+שדות תשובה
+תיאורסוג שם
+האם הפעולה הצליחה boolean Succeeded
+מספר סטטוס בקשה number Code
+תיאור סטטוס בקשה string Message
+שליחת צינתוק/קוד קולי
+שליחת צינתוק/קוד קולי
+GET https://kesherhk.info/KesherAPI/SendSMSCall?token=XXX&toPhone=XXX&code=XXX
+Query Params).( תבותכה תרושב םיחלשנ םירטמרפה
+משמש בדרך כלל לאימות מספרי טלפון או כניסה מאובטחת.
+שליחת שיחה קולית (צינתוק) למספר טלפון של לקוח לצורך השמעת קוד אימות. 
+6202  ביולי7 • נוצר אוטומטית
+פרמטרים
+תיאורחובה סוגשם 
+טוקן גישהחובה string token
+מספר טלפון ליעדחובה string toPhone
+ ספרות5 - הקוד להשמעהחובה string code
+שדות תשובה
+תיאורסוג שם
+האם הפעולה הצליחה boolean succeeded
+קוד התשובה number code
+תיאור התשובה string message
+דוגמת בקשה
+{
+  "code": "12345",
+  "token": "ABC123",
+  "toPhone": "0501234567"
+}
+דוגמת תשובה
+{
+  "code": 336,
+     " m e s s a g e " :   "Ô×ÜæÔÑ  ×Üéà  ÓÕç " ,
+  "succeeded": true
+}
+6202  ביולי7 • נוצר אוטומטית
+ניהול לקוחות
+עדכון פרטי לקוח
+עדכון פרטי לקוח
+POST https://kesherhk.info/ConnectToKesher/ConnectToKesher
+.שנשלח בפרמטריםytitnedIipA) ( העדכון מתבצע על בסיס מזהה הלקוח בתוכנה החיצונית
+הפונקציה מאפשרת לעדכן את הפרטים האישיים של לקוח קיים במערכת (כגון שם, כתובת, טלפון ומייל). 
+פרמטרים
+תיאורחובה סוגשם 
+UpdateCustomer :עובק ךרעחובה string func
+Json)-ה טקייבואל ץוחמjson ( :עובק ךרעחובה string format
+)מזהה לקוח בתוכנה חיצונית (לפיו מתבצע העדכוןחובה string customerDetails.ApiIdentity
+שם פרטיאופציונלי string customerDetails.CustomerInput.FirstName
+שם משפחהאופציונלי string customerDetails.CustomerInput.LastName
+תעודת זהותאופציונלי string customerDetails.CustomerInput.Tz
+כתובתאופציונלי string customerDetails.CustomerInput.Address
+מספר ביתאופציונלי string customerDetails.CustomerInput.NumHouse
+כניסהאופציונלי string customerDetails.CustomerInput.Entrance
+קומהאופציונלי string customerDetails.CustomerInput.Floor
+מספר דירהאופציונלי string customerDetails.CustomerInput.ApartmentNumber
+עיראופציונלי string customerDetails.CustomerInput.City
+ארץאופציונלי string customerDetails.CustomerInput.Country
+טלפוןאופציונלי string customerDetails.CustomerInput.Phone
+טלפון נוסףאופציונלי string customerDetails.CustomerInput.Phone2
+כתובת אימיילאופציונלי string customerDetails.CustomerInput.Mail
+פקסאופציונלי string customerDetails.CustomerInput.Fax
+הערהאופציונלי string customerDetails.CustomerInput.Comment
+6202  ביולי7 • נוצר אוטומטית
+שדות תשובה
+תיאורסוג שם
+האם הפעולה הצליחה boolean Succeeded
+קוד סטטוס בקשה number Code
+תיאור סטטוס בקשה string Message
+שנוצר עבור החברה החדשהyeKIPA string Entity.Key
+מספר הלקוח החדש במערכת קשר string Entity.KesherUniq
+הקמת חברה
+הקמת חברה
+POST https://kesherhk.info/KesherAPI/CreateCompany
+Companyid-ו ןקוטה םעAuthorization  רטמרפה תאHeader -ב ףיסוהל שי
+על מנת להשתמש בפונקציה זו, יש לבקש משירות הלקוחות להגדיר הרשאה מתאימה בהגדרות החברה הראשית שלכם
+שים לב:
+הפונקציה מגדירה את פרטי החברה, פרטי הקשר ואמצעי התשלום לחיוב. IPA. 
+-הקמת חברה חדשה במערכת באמצעות ה
+פרמטרים
+תיאורחובה סוגשם 
+שם החברהחובה string name
+מייל החברהחובה string mail
+מייל המפתחחובה string companyDeveloperMail
+ח.פ. חברה / עוסק מורשהחובה string numAssociation
+)612 קוד תחום עיסוק (למשלחובה number occupation
+סוג עסקחובה number companyType
+)=בנק2 ,=אשראי1( סוג אמצעי תשלוםחובה number chargeOption.type
+מספר חשבון או טוקן אשראיחובה string chargeOption.accountOrToken
+או מספר סניףMM )YY( תוקףחובה string chargeOption.expiryOrBranch
+6202  ביולי7 • נוצר אוטומטית
+תיאורחובה סוגשם 
+מספר בנק (חובה בבחירת בנק)אופציונלי number chargeOption.bank
+טלפוןאופציונלי string phone1
+כתובתאופציונלי string address
+עיראופציונלי string cityName
+ארץאופציונלי string country
+שדות תשובה
+תיאורסוג שם
+האם הפעולה הצליחה boolean Succeeded
+קוד סטטוס בקשה number Code
+תיאור סטטוס בקשה string Message
+שנוצר עבור החברה החדשהyeKIPA string Entity.Key
+מספר הלקוח החדש במערכת קשר string Entity.KesherUniq
+6202  ביולי7 • נוצר אוטומטית

@@ -1,0 +1,34 @@
+{
+  "sentPayload": {
+    "Json": {
+      "userName": "2180005WS9914",
+      "password": "SkYxnQyhzRM36uccztNYc5aQRR2ZmliFS0OBGQItfTf0yslqTR",
+      "func": "SendTransaction",
+      "format": "json",
+      "tran": {
+        "Address": "",
+        "City": "",
+        "CreditNum": "4580830003219458",
+        "Token": null,
+        "Expiry": "3009",
+        "Cvv2": "385",
+        "Total": 600,
+        "Currency": 1,
+        "CreditType": 10,
+        "NumPayment": 12,
+        "Phone": "052695465",
+        "ParamJ": "J4",
+        "TransactionType": "debit",
+        "Comment1": "טופס פנייה",
+        "FirstName": "בדיקה",
+        "LastName": "בדיקה",
+        "ProjectNumber": "000",
+        "Mail": "g@maik.com",
+        "DocumentType": 320,
+        "Id": ""
+      }
+    },
+    "format": "json"
+  },
+  "response": "{\"BitOutput\":null,\"BitUrl\":null,\"CardMumber\":\"458083******9458\",\"CardName\":\"חיוב מיידי2\",\"CardType\":\"DelekCard\",\"ChargeOptions\":null,\"CheckCVV\":\"NotInserted\",\"CheckIdentityNumber\":\"NotInserted\",\"City\":null,\"ClearingCompany\":\"LeumiCard\",\"ClubCode\":\"0\",\"Comment1\":\"טופס פנייה\",\"Comment2\":null,\"Comment3\":null,\"Comment4\":\"חיוב מיידי בהוראת קבע חדשה\",\"Comment5\":null,\"CompanyName\":\"פשוט מושלם\",\"CompanyTranId\":\"182\",\"ConfirmSource\":\"NoConfirm\",\"CurrencyISOValue\":\"376\",\"CurrencyName\":\"שקל\",\"CurrencySymbole\":\"₪\",\"Date\":\"2026-07-13T15:12:33.000Z\",\"DisplayInstructionsForChargeCard\":\"0\",\"DocumentsDetails\":{\"DocumentDetails\":[{\"DocNumber\":\"20106\",\"PdfLink\":\"https://files.ezcount.co.il/front/documents/get/26a93028-97d7-454e-85ee-8776fcf16744\",\"PdfLinkCopy\":\"https://files.ezcount.co.il/front/documents/get/26a93028-97d7-454e-85ee-8776fcf16744/copy\"}]},\"ExpairyDate\":\"3009\",\"FileNumber\":null,\"FirstName\":null,\"FirstPayment\":null,\"HashUser\":null,\"Id\":null,\"Intot\":\"0000000458083******945826000409300000000600000000000000000020130150000094177300000000000000000055001007     חיוב מיידי2\",\"IssuerCompany\":\"VisaCAL\",\"J5TranId\":null,\"LastName\":null,\"Mail\":\"g@maik.com\",\"MonthlyPayment\":null,\"Name\":\"בדיקה בדיקה\",\"NumPayment\":null,\"NumTransaction\":\"182\",\"OKNum\":\"0941773\",\"ObligationApiIdentity\":\"000170\",\"ObligationReference\":\"000170\",\"Phone\":\"052695465\",\"ProjectName\":\"פשוט מושלם\",\"ProjectNumber\":\"000\",\"ReciptName\":\"בדיקה בדיקה\",\"RequestResult\":{\"Code\":499,\"Data\":null,\"Description\":\"הוראת קבע נקלטה בהצלחה, עסקה ראשונה עברה בהצלחה\",\"Status\":true},\"Sum\":600,\"TerminalName\":\"יופיי\",\"TerminalNumber\":\"2180005\",\"Token\":\"4562635614539458\",\"TransactionCode\":\"50\",\"TransactionCreditType\":\"now\",\"TransactionType\":\"BlockedCard\",\"UniqNum\":null,\"UserData\":null}"
+}

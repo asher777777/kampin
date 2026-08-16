@@ -1,0 +1,186 @@
+.container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-color: #000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/edoffice/AdOffice.webp');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.5;
+  z-index: 0;
+}
+
+.edImage {
+  width: auto;
+  height: 70vh; /* Scaled down slightly to leave room for the chat UI */
+  max-width: 100%;
+  animation: breathe 4s ease-in-out infinite;
+  transform-origin: bottom center;
+  z-index: 1;
+  position: absolute;
+  bottom: 0;
+}
+
+@keyframes breathe {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02) translateY(-1%); }
+  100% { transform: scale(1); }
+}
+
+.chatOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%);
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.edMessage {
+  font-size: 1.25rem; /* Mobile first font size */
+  line-height: 1.4;
+  font-weight: 500;
+  color: white;
+  text-align: center;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 2rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 0 1rem;
+}
+
+@media (min-width: 768px) {
+  .edMessage {
+    font-size: 2rem; /* Larger font on desktop */
+    margin-bottom: 3rem;
+  }
+}
+
+.controlsContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 2rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.inputGroup {
+  display: flex;
+  width: 100%;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.textInput {
+  flex-grow: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  resize: none;
+  min-height: 50px;
+  max-height: 120px;
+}
+
+.textInput:focus {
+  border-color: rgba(255,255,255,0.5);
+}
+
+.micButton {
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.micButton:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.micButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.micButton.recording {
+  background: rgba(239, 68, 68, 0.8);
+  animation: pulse 1.5s infinite;
+}
+
+.sendButton {
+  background: white;
+  color: black;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .sendButton {
+    width: auto;
+  }
+}
+
+.sendButton:hover {
+  transform: scale(1.02);
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}

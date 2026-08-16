@@ -1,0 +1,313 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    /* Base colors using OKLCH for P3 Gamut support */
+    --background: oklch(0.98 0.005 260); /* Very light gray-blue background */
+    --foreground: oklch(0.15 0.05 260); /* Deep navy text */
+    
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.15 0.05 260);
+    
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.15 0.05 260);
+    
+    --primary: oklch(0.25 0.08 260); /* Deep Navy Blue */
+    --primary-foreground: oklch(0.985 0 0);
+    
+    --secondary: oklch(0.7 0.2 60); /* Orange-Fire / Warm Gold */
+    --secondary-foreground: oklch(0.985 0 0);
+    
+    --muted: oklch(0.92 0.01 260);
+    --muted-foreground: oklch(0.45 0.05 260);
+    
+    --accent: oklch(0.96 0.01 260);
+    --accent-foreground: oklch(0.25 0.08 260);
+    
+    --destructive: oklch(0.55 0.25 25);
+    --destructive-foreground: oklch(0.985 0 0);
+    
+    --success: oklch(0.65 0.25 150);
+    --success-foreground: oklch(0.985 0 0);
+
+    --border: oklch(0.9 0.02 260);
+    --input: oklch(0.9 0.02 260);
+    --ring: oklch(0.7 0.2 60); /* Ring uses CTA color for highlights */
+    
+    --radius: 2rem; /* Global radius for pill shapes */
+  }
+
+  .dark {
+    --background: oklch(0.12 0.03 260);
+    --foreground: oklch(0.98 0.01 260);
+    --card: oklch(0.15 0.04 260);
+    --card-foreground: oklch(0.98 0.01 260);
+    --popover: oklch(0.12 0.03 260);
+    --popover-foreground: oklch(0.98 0.01 260);
+    --primary: oklch(0.35 0.1 260);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.75 0.2 60);
+    --secondary-foreground: oklch(0.1 0.05 260);
+    --muted: oklch(0.2 0.05 260);
+    --muted-foreground: oklch(0.65 0.05 260);
+    --accent: oklch(0.2 0.05 260);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.45 0.2 25);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.2 0.05 260);
+    --input: oklch(0.2 0.05 260);
+    --ring: oklch(0.75 0.2 60);
+  }
+
+  /* --- Global Themes --- */
+  
+  .theme-navy {
+    /* Navy is default, fallback to root if needed, but we can explicitly set it here to be safe */
+    --primary: oklch(0.25 0.08 260); 
+    --secondary: oklch(0.7 0.2 60); 
+  }
+
+  .theme-emerald {
+    --primary: oklch(0.35 0.12 150); /* Emerald Deep Green */
+    --secondary: oklch(0.85 0.15 90); /* Yellow Gold */
+    --ring: var(--secondary);
+  }
+
+  .theme-rose {
+    --primary: oklch(0.35 0.15 15); /* Deep Rose Red */
+    --secondary: oklch(0.75 0.1 20); /* Soft Pink/Rose */
+    --ring: var(--secondary);
+  }
+
+  .theme-violet {
+    --primary: oklch(0.3 0.15 300); /* Royal Violet */
+    --secondary: oklch(0.8 0.15 80); /* Amber */
+    --ring: var(--secondary);
+  }
+
+  .theme-charcoal {
+    --primary: oklch(0.2 0 0); /* Dark Gray/Black */
+    --secondary: oklch(0.6 0.1 180); /* Teal Accent */
+    --ring: var(--secondary);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  /* Premium Background Gradients */
+  --background-image-brand-gradient: linear-gradient(135deg, var(--primary) 0%, oklch(0.15 0.05 260) 100%);
+  --background-image-gold-gradient: linear-gradient(135deg, var(--secondary) 0%, oklch(0.6 0.15 60) 100%);
+  --background-image-glass: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.4));
+
+  /* Glassmorphism Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 35, 102, 0.1);
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-heebo), sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Dynamic text color overrides based on branding settings */
+  h1, .h1 { color: var(--heading-1); }
+  h2, .h2 { color: var(--heading-2); }
+  h3, .h3 { color: var(--heading-3); }
+}
+
+/* Logical Properties helper for Hebrew/English */
+[dir="rtl"] {
+  text-align: right;
+}
+[dir="ltr"] {
+  text-align: left;
+}
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .text-gradient {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Global Form Icons */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(56%) sepia(82%) saturate(1637%) hue-rotate(352deg) brightness(97%) contrast(96%);
+  cursor: pointer;
+}
+  
+  /* Hide scrollbar utility */
+  @layer utilities {
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none; /* IE and Edge */
+      scrollbar-width: none; /* Firefox */
+    }
+  }
+  
+  /* Custom Scrollbar for modern look */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(203, 213, 225, 0.5); /* slate-300 with opacity */
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.8); /* slate-400 */
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(51, 65, 85, 0.5); /* slate-700 */
+  }
+
+.glass {
+  background: var(--background-image-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: var(--shadow-glass);
+}
+
+.bg-pattern {
+  background-image: url('/pattern.svg');
+}
+
+/* Rich Text Editor Placeholder */
+.rich-editor-box:empty::before {
+  content: attr(placeholder);
+  color: var(--color-muted-foreground);
+  opacity: 0.7;
+  pointer-events: none;
+  display: block;
+}
+
+/* Rich HTML Content Rendering */
+.rich-content {
+  text-align: right;
+  line-height: 1.8;
+}
+
+.rich-content p {
+  margin-bottom: 1.25rem;
+}
+
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 1.5rem;
+  margin: 2rem auto;
+  display: block;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
+}
+
+.rich-content img:hover {
+  transform: scale(1.01);
+}
+
+.rich-content ul {
+  list-style-type: disc;
+  padding-right: 1.75rem;
+  margin: 1.25rem 0;
+}
+
+.rich-content ol {
+  list-style-type: decimal;
+  padding-right: 1.75rem;
+  margin: 1.25rem 0;
+}
+
+.rich-content li {
+  margin-bottom: 0.5rem;
+}
+
+.rich-content strong, 
+.rich-content b {
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.rich-content a {
+  color: var(--color-secondary);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* Fix WebKit autofill styling for dark backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active{
+    -webkit-box-shadow: 0 0 0 30px #131316 inset !important;
+    -webkit-text-fill-color: white !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
