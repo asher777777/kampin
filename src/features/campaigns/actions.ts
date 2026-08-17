@@ -163,6 +163,9 @@ export async function recordDonationAction(data: {
   campaignId: string;
   donorName: string;
   amount: number;
+  monthlyAmount?: number;
+  recurringMonths?: number;
+  isRecurring?: boolean;
   dedication?: string;
   isAnonymous?: boolean;
   ambassadorId?: string | null;
@@ -172,7 +175,21 @@ export async function recordDonationAction(data: {
   email?: string;
 }): Promise<{ success: boolean; donationId?: string; error?: string }> {
   try {
-    const { campaignId, donorName, amount, dedication, isAnonymous, ambassadorId, ambassadorName, paymentMethod, phone, email } = data;
+    const {
+      campaignId,
+      donorName,
+      amount,
+      monthlyAmount,
+      recurringMonths,
+      isRecurring,
+      dedication,
+      isAnonymous,
+      ambassadorId,
+      ambassadorName,
+      paymentMethod,
+      phone,
+      email,
+    } = data;
     
     if (!campaignId || !amount || amount <= 0) {
       return { success: false, error: "סכום תרומה לא תקין" };
@@ -185,23 +202,34 @@ export async function recordDonationAction(data: {
       campaignId,
       donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
       amount: Number(amount),
+      monthlyAmount: monthlyAmount ? Number(monthlyAmount) : undefined,
+      recurringMonths: recurringMonths ? Number(recurringMonths) : undefined,
+      isRecurring: Boolean(isRecurring),
       dedication: dedication || "",
       isAnonymous: Boolean(isAnonymous),
       ambassadorId: ambassadorId || null,
       ambassadorName: ambassadorName || null,
       paymentStatus: "completed",
-      paymentMethod: paymentMethod || "credit_card",
+      paymentMethod: paymentMethod || (isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1"),
       createdAt: new Date().toISOString(),
     };
 
     // Transaction to update total raised & donor count atomically
     await adminDb.runTransaction(async (transaction) => {
-      // 1. Save donation
-      transaction.set(donationRef, donationData);
-
-      // 2. Increment campaign totals
+      // 1. ALL READS FIRST
       const campaignSnap = await transaction.get(campaignRef);
       const campData = campaignSnap.data() || {};
+
+      let ambSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+      let ambassadorRef: FirebaseFirestore.DocumentReference | null = null;
+      if (ambassadorId) {
+        ambassadorRef = campaignRef.collection("ambassadors").doc(ambassadorId);
+        ambSnap = await transaction.get(ambassadorRef);
+      }
+
+      // 2. ALL WRITES AFTER READS
+      transaction.set(donationRef, donationData);
+
       transaction.set(
         campaignRef,
         {
@@ -211,17 +239,12 @@ export async function recordDonationAction(data: {
         { merge: true }
       );
 
-      // 3. If ambassadorId provided, update ambassador totals
-      if (ambassadorId) {
-        const ambassadorRef = campaignRef.collection("ambassadors").doc(ambassadorId);
-        const ambSnap = await transaction.get(ambassadorRef);
-        if (ambSnap.exists) {
-          const ambData = ambSnap.data();
-          transaction.update(ambassadorRef, {
-            totalRaised: (ambData?.totalRaised || 0) + Number(amount),
-            donorCount: (ambData?.donorCount || 0) + 1,
-          });
-        }
+      if (ambassadorRef && ambSnap && ambSnap.exists) {
+        const ambData = ambSnap.data();
+        transaction.update(ambassadorRef, {
+          totalRaised: (ambData?.totalRaised || 0) + Number(amount),
+          donorCount: (ambData?.donorCount || 0) + 1,
+        });
       }
     });
 
@@ -237,28 +260,32 @@ export async function recordDonationAction(data: {
         conta_name: isAnonymous ? "אנונימי" : (donorName || "תורם קמפיין"),
         conta_phone: phone || "",
         email: email || "",
-        lead_source: `תורם בקמפיין: ${campaignTitle}`,
+        lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
         campaign_role: "donor",
         campaign_id: campaignId,
         campaign_title: campaignTitle,
-        total_donated: Number(amount),
-        last_donation_date: new Date().toISOString(),
-        dedication: dedication || "",
         referred_by_ambassador: ambassadorName || null,
+        total_donated: Number(amount),
+        monthly_amount: monthlyAmount || null,
+        is_standing_order: Boolean(isRecurring),
+        dedication: dedication || "",
         payments: [
           {
-            date: new Date().toISOString(),
             amount: Number(amount),
-            paymentType: paymentMethod || "credit_card",
-            receiptType: "תרומה קמפיין",
-          }
+            monthlyAmount: monthlyAmount || null,
+            isRecurring: Boolean(isRecurring),
+            date: new Date().toISOString(),
+            method: paymentMethod || "kesher_api",
+            status: "success",
+          },
         ],
         events: [
           {
-            time: new Date().toISOString(),
-            title: "תרומה חדשה התקבלה",
-            text: `תרומה בסך ₪${amount} בקמפיין ${campaignTitle}${ambassadorName ? ` ע"י ${ambassadorName}` : ""}`,
-          }
+            title: `תרומה בקמפיין ${campaignTitle}`,
+            type: "donation",
+            amount: Number(amount),
+            date: new Date().toISOString(),
+          },
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

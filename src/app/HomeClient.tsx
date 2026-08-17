@@ -437,6 +437,9 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         isOpen={isDonationDrawerOpen}
         onClose={() => setIsDonationDrawerOpen(false)}
         campaignId={pageId || "default-campaign"}
+        configTiers={config.campaignDonors?.tiers}
+        configDonationType={config.campaignDonors?.donationType}
+        configRecurringMonths={config.campaignDonors?.recurringMonths}
       />
 
       <Footer />

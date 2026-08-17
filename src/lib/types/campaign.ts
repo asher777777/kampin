@@ -37,11 +37,24 @@ export interface Donation {
   ambassadorName?: string | null;
   donorName: string;
   amount: number;
+  monthlyAmount?: number;
+  recurringMonths?: number;
+  isRecurring?: boolean;
   dedication?: string;
   isAnonymous?: boolean;
   paymentStatus: "completed" | "pending" | "failed";
   paymentMethod?: string;
   createdAt: any;
+}
+
+export interface DonationTier {
+  id: string;
+  title: string;
+  monthlyAmount: number;
+  subtitle?: string;
+  imageSrc?: string;
+  imageShape?: "circle" | "square" | "rounded";
+  isDefault?: boolean;
 }
 
 export interface CampaignHeaderConfig {
@@ -73,6 +86,10 @@ export interface CampaignDonorsConfig {
   cardBorderColor?: string;
   cardBadgeBgColor?: string;
   cardStyle?: "shadow" | "bordered" | "flat" | "glassmorphism";
+  donationType?: "one_time" | "recurring" | "both";
+  recurringMonths?: number;
+  tiers?: DonationTier[];
+  allowCustomAmount?: boolean;
   primaryColor?: string;
   backgroundColor?: string;
   anchorId?: string;

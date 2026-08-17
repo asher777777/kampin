@@ -3049,7 +3049,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 const isMobileHidden = config.mobileHiddenSections?.includes(sectionId) || false;
                 const sectionLabels: Record<string, string> = {
                   campaignHeader: "קמפיין: מד התקדמות וגרף",
-                  campaignDonors: "קמפיין: אזור תורמים ושגרירים",
+                  campaignDonors: "קמפיין: טופס תרומה, תורמים ושגרירים (הוראות קבע)",
                   hero: "אזור ראשי (Hero)",
                   mainContent: "תוכן מרכזי",
                   services: "שירותים",
