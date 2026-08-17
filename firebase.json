@@ -11,7 +11,9 @@
         "**/.*",
         "**/node_modules/**"
       ],
-      "frameworksBackend": {}
+      "frameworksBackend": {
+        "region": "europe-west1"
+      }
     }
   ]
 }

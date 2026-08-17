@@ -21,6 +21,10 @@ import { ImageListingSection } from "@/components/sections/ImageListingSection";
 import { ImageListingEditor } from "@/components/sections/ImageListingEditor";
 import { FaqSection } from "@/components/sections/FaqSection";
 import { FaqSectionEditor } from "@/components/sections/FaqSectionEditor";
+import { CampaignHeaderSection } from "@/components/sections/CampaignHeaderSection";
+import { CampaignHeaderEditor } from "@/components/sections/CampaignHeaderEditor";
+import { CampaignDonorsSection } from "@/components/sections/CampaignDonorsSection";
+import { CampaignDonorsEditor } from "@/components/sections/CampaignDonorsEditor";
 import { HomePageConfig, savePageConfig, getAllSitePages } from "@/features/home/actions";
 import { GlobalSettings, saveGlobalSettings } from "@/features/settings/actions";
 import { generateSeoTagsWithAI, generateSeoImageWithAI } from "@/features/ai/actions";
@@ -354,7 +358,7 @@ export function HomeEditor({
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  const allAvailableSections = ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
+  const allAvailableSections = ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
   const currentSectionOrder = Array.from(new Set([...(config.sectionOrder || []), ...allAvailableSections]));
 
   const availableAnchors = [
@@ -371,36 +375,49 @@ export function HomeEditor({
   ];
 
   useEffect(() => {
-    if (!config.faq) {
-      setConfig(prev => ({
-        ...prev,
-        faq: {
-          visible: true,
-          title: "שאלות ותשובות נפוצות",
-          subtitle: "תשובות לכל השאלות שרציתם לשאול על השירותים והפלטפורמה שלנו",
-          anchorId: "faq",
-          backgroundColor: "transparent",
-          items: [
-            {
-              id: "1",
-              question: "איך מתחילים לעבוד עם המערכת?",
-              answer: "נרשמים בקלות, בוחרים תבנית עיצוב או מתחילים מאפס, ומעצבים את העמוד בעזרת עורך הבית הוויזואלי הנוח."
-            },
-            {
-              id: "2",
-              question: "האם ניתן לחבר דומיין מותאם אישית?",
-              answer: "בהחלט! המערכת תומכת בחיבור דומיין פרטי לכל עמוד, קמפיין או דף נחיתה שתקימו."
-            },
-            {
-              id: "3",
-              question: "איך עובד הסנכרון עם מערכת ה-CRM?",
-              answer: "כל פנייה דרך הטפסים בעמוד נשמרת ומוזרמת באופן אוטומטי לכרטיסיות הלידים במערכת ה-CRM."
-            }
-          ]
-        }
-      }));
+    let updated = false;
+    const newConfig = { ...config };
+
+    if (!newConfig.campaignHeader) {
+      newConfig.campaignHeader = { visible: true, title: "הסכום שהושג", targetGoal: 500000, totalRaised: 45556, svgTrendPreset: "curve_up" };
+      updated = true;
     }
-  }, [config.faq]);
+    if (!newConfig.campaignDonors) {
+      newConfig.campaignDonors = { visible: true, defaultTab: "donors", showSearch: true, showSort: true, cardLayout: "grid-2" };
+      updated = true;
+    }
+    if (!newConfig.faq) {
+      newConfig.faq = {
+        visible: true,
+        title: "שאלות ותשובות נפוצות",
+        subtitle: "תשובות לכל השאלות שרציתם לשאול על השירותים והפלטפורמה שלנו",
+        anchorId: "faq",
+        backgroundColor: "transparent",
+        items: [
+          {
+            id: "1",
+            question: "איך מתחילים לעבוד עם המערכת?",
+            answer: "נרשמים בקלות, בוחרים תבנית עיצוב או מתחילים מאפס, ומעצבים את העמוד בעזרת עורך הבית הוויזואלי הנוח."
+          },
+          {
+            id: "2",
+            question: "האם ניתן לחבר דומיין מותאם אישית?",
+            answer: "בהחלט! המערכת תומכת בחיבור דומיין פרטי לכל עמוד, קמפיין או דף נחיתה שתקימו."
+          },
+          {
+            id: "3",
+            question: "איך עובד הסנכרון עם מערכת ה-CRM?",
+            answer: "כל פנייה דרך הטפסים בעמוד נשמרת ומוזרמת באופן אוטומטי לכרטיסיות הלידים במערכת ה-CRM."
+          }
+        ]
+      };
+      updated = true;
+    }
+
+    if (updated) {
+      setConfig(newConfig);
+    }
+  }, [config.faq, config.campaignHeader, config.campaignDonors]);
 
   // Load site pages and restore scroll on mount
   useEffect(() => {
@@ -647,6 +664,52 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
 
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
+      case "campaignHeader": {
+        const campaignHeaderConfig = config.campaignHeader || { visible: true, title: "הסכום שהושג", targetGoal: 500000, totalRaised: 45556, svgTrendPreset: "curve_up" };
+        const campaignHeaderContentNode = (
+          <CampaignHeaderEditor
+            config={campaignHeaderConfig}
+            onChange={(newConf) => setConfig({ ...config, campaignHeader: newConf })}
+          />
+        );
+        const campaignHeaderPreviewNode = (
+          <div className="pointer-events-none opacity-90">
+            <CampaignHeaderSection config={campaignHeaderConfig} />
+          </div>
+        );
+        return {
+          previewNode: campaignHeaderPreviewNode,
+          contentNode: campaignHeaderContentNode,
+          designNode: (
+            <div className="text-xs text-slate-400 p-2 text-right dir-rtl">
+              ניתן להגדיר מזהה עוגן וצבע רקע בהגדרות התוכן
+            </div>
+          )
+        };
+      }
+      case "campaignDonors": {
+        const campaignDonorsConfig = config.campaignDonors || { visible: true, defaultTab: "donors", showSearch: true, showSort: true, cardLayout: "grid-2" };
+        const campaignDonorsContentNode = (
+          <CampaignDonorsEditor
+            config={campaignDonorsConfig}
+            onChange={(newConf) => setConfig({ ...config, campaignDonors: newConf })}
+          />
+        );
+        const campaignDonorsPreviewNode = (
+          <div className="pointer-events-none opacity-90">
+            <CampaignDonorsSection config={campaignDonorsConfig} />
+          </div>
+        );
+        return {
+          previewNode: campaignDonorsPreviewNode,
+          contentNode: campaignDonorsContentNode,
+          designNode: (
+            <div className="text-xs text-slate-400 p-2 text-right dir-rtl">
+              הגדרות הפריסה וצבעי הכרטיסיות מנוהלים בלשונית הגדרות תוכן
+            </div>
+          )
+        };
+      }
       case "hero":
         if (!config.hero) return null;
         
@@ -1981,6 +2044,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
 
   const renderSectionPreview = (sectionId: string) => {
     switch (sectionId) {
+      case "campaignHeader":
+        if (!config.campaignHeader || config.campaignHeader.visible === false || String(config.campaignHeader.visible) === "false") return null;
+        return <CampaignHeaderSection config={config.campaignHeader} />;
+      case "campaignDonors":
+        if (!config.campaignDonors || config.campaignDonors.visible === false || String(config.campaignDonors.visible) === "false") return null;
+        return <CampaignDonorsSection config={config.campaignDonors} />;
       case "hero":
         if (!config.hero || config.hero.visible === false || String(config.hero.visible) === "false") return null;
         return (
@@ -2979,6 +3048,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 const isLast = index === currentSectionOrder.length - 1;
                 const isMobileHidden = config.mobileHiddenSections?.includes(sectionId) || false;
                 const sectionLabels: Record<string, string> = {
+                  campaignHeader: "קמפיין: מד התקדמות וגרף",
+                  campaignDonors: "קמפיין: אזור תורמים ושגרירים",
                   hero: "אזור ראשי (Hero)",
                   mainContent: "תוכן מרכזי",
                   services: "שירותים",

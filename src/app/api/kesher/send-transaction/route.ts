@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       paymentFrequency, // "one-time" | "recurring" | "user-choice"
       documentType,
       id,
+      currency,
       userId: requestUserId 
     } = body;
 
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
           Expiry: finalExpiry, // YYMM required by Kesher
           Cvv2: cvv2,
           Total: Math.round(Number(amount) * 100), // Required format: Agorot (e.g. 1 ILS = 100)
-          Currency: 1, // 1 = ILS
+          Currency: currency || 1, // Default to 1 (ILS) if not provided
           CreditType: creditType,
           NumPayment: numPayments,
           Phone: phone || "",

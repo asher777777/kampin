@@ -16,6 +16,11 @@ const TimerSection = dynamic(() => import("@/components/sections/TimerSection").
 const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(m => m.PricingSection), { ssr: true });
 const CourseBanner = dynamic(() => import("@/components/sections/CourseBanner").then(m => m.CourseBanner), { ssr: true });
 const FaqSection = dynamic(() => import("@/components/sections/FaqSection").then(m => m.FaqSection), { ssr: true });
+const CampaignHeaderSection = dynamic(() => import("@/components/sections/CampaignHeaderSection").then(m => m.CampaignHeaderSection), { ssr: true });
+const CampaignDonorsSection = dynamic(() => import("@/components/sections/CampaignDonorsSection").then(m => m.CampaignDonorsSection), { ssr: true });
+const CampaignStickyBar = dynamic(() => import("@/components/sections/CampaignStickyBar").then(m => m.CampaignStickyBar), { ssr: true });
+import { AmbassadorModal } from "@/components/campaigns/AmbassadorModal";
+import { DonationDrawer } from "@/components/campaigns/DonationDrawer";
 import { HomePageConfig } from "@/features/home/actions";
 import { GlobalSettings } from "@/features/settings/actions";
 import { Edit3 } from "lucide-react";
@@ -38,6 +43,8 @@ interface HomeClientProps {
 export function HomeClient({ initialConfig, initialGlobalSettings, pageId, collectionName, canEdit }: HomeClientProps) {
   const { isAuthenticated } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [isAmbassadorModalOpen, setIsAmbassadorModalOpen] = useState(false);
+  const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
   const [config, setConfig] = useState<HomePageConfig>(initialConfig);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     ...(initialGlobalSettings || { siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] }),
@@ -111,7 +118,6 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   // By default, if canEdit is not passed, we default to false for safety
   const allowedToEdit = isAuthenticated && (canEdit ?? false);
 
-  // If in editing mode, swap out for the dynamic editor component
   if (allowedToEdit && isEditing) {
     return (
       <HomeEditor
@@ -130,6 +136,22 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
 
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
+      case "campaignHeader":
+        if (!config.campaignHeader || config.campaignHeader.visible === false || String(config.campaignHeader.visible) === "false") return null;
+        return (
+          <CampaignHeaderSection
+            config={config.campaignHeader}
+          />
+        );
+      case "campaignDonors":
+        if (!config.campaignDonors || config.campaignDonors.visible === false || String(config.campaignDonors.visible) === "false") return null;
+        return (
+          <CampaignDonorsSection
+            config={config.campaignDonors}
+            campaignId={pageId || "default-campaign"}
+            onOpenAmbassadorModal={() => setIsAmbassadorModalOpen(true)}
+          />
+        );
       case "hero":
         if (!config.hero || config.hero.visible === false || String(config.hero.visible) === "false") return null;
         return (
@@ -228,7 +250,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             subtitle={config.timer.subtitle}
             targetDate={config.timer.targetDate}
             layout={config.timer.layout}
-            backgroundColor={config.timer.backgroundColor}
+            backgroundColor={config.timer.backgroundColor || globalSettings.backgroundColor}
             titleColor={config.timer.titleColor}
             subtitleColor={config.timer.subtitleColor}
             boxBackgroundColor={config.timer.boxBackgroundColor}
@@ -245,6 +267,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             title={config.pricing.title}
             subtitle={config.pricing.subtitle}
             description={config.pricing.description}
+            packages={config.pricing.packages}
             isEditing={false}
           />
         );
@@ -353,7 +376,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   } as React.CSSProperties;
 
   return (
-    <div className={`flex flex-col min-h-screen ${globalSettings.theme ? `theme-${globalSettings.theme}` : "theme-navy"}`} style={customStyle}>
+    <div className={`flex flex-col min-h-screen pb-16 ${globalSettings.theme ? `theme-${globalSettings.theme}` : "theme-navy"}`} style={customStyle}>
       {((config as any).isHeaderVisible ?? true) && (
         <Navbar 
           layout={globalSettings.headerLayout} 
@@ -385,7 +408,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       <main className="flex-grow">
         {pageId && <PageViewTracker slug={pageId} collectionName={collectionName || "services"} />}
         <div className="flex flex-col w-full">
-          {(config.sectionOrder || ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent"]).map((sectionId) => {
+          {(config.sectionOrder || ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent"]).map((sectionId) => {
             const isHiddenOnMobile = config.mobileHiddenSections?.includes(sectionId);
             return (
               <div key={sectionId} className={isHiddenOnMobile ? "max-sm:hidden" : undefined}>
@@ -395,6 +418,26 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           })}
         </div>
       </main>
+
+      {/* Sticky Bottom Bar for Campaign */}
+      {(config.campaignHeader?.visible !== false || config.campaignDonors?.visible !== false) && (
+        <CampaignStickyBar
+          onOpenDonate={() => setIsDonationDrawerOpen(true)}
+        />
+      )}
+
+      {/* Modals */}
+      <AmbassadorModal
+        isOpen={isAmbassadorModalOpen}
+        onClose={() => setIsAmbassadorModalOpen(false)}
+        campaignId={pageId || "default-campaign"}
+      />
+
+      <DonationDrawer
+        isOpen={isDonationDrawerOpen}
+        onClose={() => setIsDonationDrawerOpen(false)}
+        campaignId={pageId || "default-campaign"}
+      />
 
       <Footer />
       <WhatsAppButton 

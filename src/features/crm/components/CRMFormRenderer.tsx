@@ -239,8 +239,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
       })();
 
       if (logicallyVisible && !f._isStepDivider) {
-        if (f.map_to === "payment_amount" || f.type === "fixed_amount") {
-          let valStr = formData[f.label];
+        if (f.map_to === "payment_amount" || f.type === "fixed_amount" || f.type === "donation_widget") {
+          let valStr = f.type === "donation_widget" ? (formData["donation_amount"] || f.default_value || "100") : formData[f.label];
           if (f.type === "calculated") {
             valStr = String(evaluateFormula(f.calc_formula || "", formData));
           }
@@ -573,6 +573,10 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           const expiry = `${ccData.expiryYear.padStart(2, "0")}${ccData.expiryMonth.padStart(2, "0")}`;
           const freq = effectiveMethod === "recurring" ? "recurring" : "one-time";
 
+          const currencyStr = formData["donation_currency"] || "ILS";
+          const currencyMap: Record<string, number> = { "ILS": 1, "USD": 2, "EUR": 3, "GBP": 4 };
+          const currencyCode = currencyMap[currencyStr] || 1;
+
           const payloadBody = {
             amount,
             creditNumber: ccData.creditNumber,
@@ -585,6 +589,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             transactionId: formTitle,
             installments: effectiveInstallments,
             paymentFrequency: freq,
+            currency: currencyCode,
             documentType: (summaryField as any)?.payment_doc_type || "320"
           };
 
@@ -860,6 +865,96 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   </div>
                 ) : field.type === "rich_text_display" ? (
                   <div className="prose prose-invert prose-sm max-w-none text-slate-300 my-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 leading-relaxed" dangerouslySetInnerHTML={{ __html: field.default_value }} />
+                ) : field.type === "donation_widget" ? (
+                  <div className="bg-white p-6 sm:p-8 rounded-[2rem] border shadow-xl mb-6 relative overflow-hidden" style={customFieldStyle}>
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-xl font-bold text-slate-800">תרומתך:</label>
+                        <div className="relative group flex">
+                          <input
+                            type="number"
+                            value={formData["donation_amount"] || field.default_value || "100"}
+                            onChange={(e) => {
+                              handleInputChange("donation_amount", e.target.value);
+                              // Sync to payment amount if mapped
+                              if (field.map_to === "payment_amount") {
+                                handleInputChange(field.label, e.target.value);
+                              }
+                            }}
+                            className="w-full h-16 ps-14 pe-4 rounded-r-full bg-slate-50 border-2 border-l-0 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 text-2xl font-black text-slate-800 transition-all text-left"
+                            dir="ltr"
+                          />
+                          <div className="absolute inset-y-0 left-6 flex items-center text-slate-400 group-focus-within:text-indigo-500 transition-colors z-10 pointer-events-none">
+                            <span className="text-2xl font-black">{formData["donation_currency"] === "USD" ? "$" : formData["donation_currency"] === "EUR" ? "€" : formData["donation_currency"] === "GBP" ? "£" : "₪"}</span>
+                          </div>
+                          <select
+                            value={formData["donation_currency"] || "ILS"}
+                            onChange={(e) => handleInputChange("donation_currency", e.target.value)}
+                            className="h-16 px-4 bg-slate-100 border-2 border-r-0 rounded-l-full text-sm font-bold text-slate-600 focus:outline-none focus:border-indigo-500 hover:bg-slate-200 transition-colors cursor-pointer outline-none appearance-none"
+                            style={{ minWidth: "90px" }}
+                          >
+                            <option value="ILS">₪ ILS</option>
+                            <option value="USD">$ USD</option>
+                            <option value="EUR">€ EUR</option>
+                            <option value="GBP">£ GBP</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 border-t border-slate-100">
+                        <label className="flex items-center justify-between cursor-pointer group mb-4">
+                          <span className="text-lg font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">תרומה חודשית בהוראת קבע</span>
+                          <div className={cn(
+                            "relative inline-flex h-7 w-14 items-center rounded-full transition-colors",
+                            ccData.paymentMethod === "recurring" ? 'bg-indigo-600' : 'bg-slate-200'
+                          )}>
+                            <span
+                              className={cn(
+                                "inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm",
+                                ccData.paymentMethod === "recurring" ? '-translate-x-8' : '-translate-x-1'
+                              )}
+                            />
+                          </div>
+                          {/* Invisible checkbox to handle click properly */}
+                          <input 
+                            type="checkbox" 
+                            className="hidden" 
+                            checked={ccData.paymentMethod === "recurring"} 
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setCcData({...ccData, paymentMethod: "recurring", installments: 12});
+                              } else {
+                                setCcData({...ccData, paymentMethod: "one-time", installments: 1});
+                              }
+                            }} 
+                          />
+                        </label>
+                        
+                        {ccData.paymentMethod === "recurring" && (
+                          <div className="space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                            <select
+                              value={ccData.installments}
+                              onChange={(e) => setCcData({...ccData, installments: Number(e.target.value)})}
+                              className="w-full h-14 px-4 bg-slate-50 border-2 rounded-2xl text-slate-700 font-bold focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all appearance-none"
+                            >
+                              <option value={9999}>ללא הגבלה (חיוב מתחדש קבוע)</option>
+                              {Array.from({length: 36}).map((_, i) => (
+                                <option key={i+1} value={i+1}>{i+1} חודשים</option>
+                              ))}
+                            </select>
+                            
+                            <div className="bg-indigo-50 text-indigo-700 p-4 rounded-2xl font-medium text-center">
+                              {ccData.installments === 9999 ? (
+                                <span>חיוב חודשי על סך <strong className="font-black text-indigo-900">{formData["donation_currency"] === "USD" ? "$" : formData["donation_currency"] === "EUR" ? "€" : formData["donation_currency"] === "GBP" ? "£" : "₪"}{formData["donation_amount"] || field.default_value || "100"}</strong> יבוצע באופן קבוע.</span>
+                              ) : (
+                                <span><strong className="font-black text-indigo-900">{formData["donation_currency"] === "USD" ? "$" : formData["donation_currency"] === "EUR" ? "€" : formData["donation_currency"] === "GBP" ? "£" : "₪"}{(Number(formData["donation_amount"] || field.default_value || "100") * ccData.installments).toLocaleString()}</strong> במשך {ccData.installments} חודשים</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ) : field.type === "payment_summary" ? (
                   <div className="bg-zinc-900/40 p-4 sm:p-6 rounded-2xl border mb-6" style={customFieldStyle}>
                     <div className="text-xl font-bold mb-4 text-[var(--field-focus)]" style={customFieldStyle}>תשלום מאובטח</div>

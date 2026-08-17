@@ -215,7 +215,8 @@ const FIELD_TYPES = [
   { id: "rich_text_display", label: "טקסט מעוצב (WYSIWYG) לתצוגה" },
   { id: "step", label: "--- חוצץ שלב חדש ---" },
   { id: "payment_summary", label: "שלב תשלום: סיכום ועריכת נתונים" },
-  { id: "payment_cc", label: "שלב תשלום: נתוני אשראי" }
+  { id: "payment_cc", label: "שלב תשלום: נתוני אשראי" },
+  { id: "donation_widget", label: "וידג'ט תרומה מתקדם (סכום + תדירות)" }
 ];
 
 function SearchableSelect({ value, onChange, options, placeholder = "חפש שדה למיפוי..." }: { value: string, onChange: (v: string) => void, options: {value: string, label: string, group?: string}[], placeholder?: string }) {

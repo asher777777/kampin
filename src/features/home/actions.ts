@@ -229,6 +229,8 @@ export interface HomePageConfig {
     tabBorderColor?: string;
     effect?: "glassmorphism" | "glow" | "lift" | "gradient-border" | "minimal";
   };
+  campaignHeader?: any;
+  campaignDonors?: any;
   mobileHiddenSections?: string[];
   sectionOrder: string[];
   seo?: {
