@@ -85,18 +85,20 @@ try {
         projectId,
         storageBucket,
       });
-    } else if (process.env.NODE_ENV === "production" && (process.env.K_SERVICE || process.env.GCP_PROJECT)) {
-      // In production Cloud Functions / Cloud Run environment with IAM role ADC
-      app = initializeApp({
-        projectId,
-        storageBucket
-      });
     } else {
-      throw new Error("Missing Firebase Admin credentials (FIREBASE_ADMIN_CLIENT_EMAIL & FIREBASE_ADMIN_PRIVATE_KEY_B64/FIREBASE_ADMIN_PRIVATE_KEY) in local environment.");
+      // In production Cloud Functions / Cloud Run environment with IAM role ADC
+      try {
+        app = initializeApp({
+          projectId: projectId || "c-g-ltd",
+          storageBucket: storageBucket || "c-g-ltd.firebasestorage.app"
+        });
+      } catch (e) {
+        app = initializeApp();
+      }
     }
   }
 
-  adminDb = getFirestore(app, "default");
+  adminDb = getFirestore(app);
   adminAuth = getAuth(app);
   adminStorage = getStorage(app);
 } catch (error: any) {

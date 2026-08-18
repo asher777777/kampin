@@ -20,6 +20,12 @@ jobs:
         run: |
           cat << 'EOF' > .env.production
           ${{ secrets.ENV_PRODUCTION }}
+          AUTH_SECRET=4c30c8df634f19b22a6bbffeb5e4d2938a16dbd76eaef6b3992b158021b777a8
+          AUTH_TRUST_HOST=true
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=c-g-ltd
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=c-g-ltd.firebasestorage.app
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=c-g-ltd.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAhqcOjsn9Vq2xpmhtw1IdFwP3-zn3cD7I
           EOF
 
       - name: Install dependencies
