@@ -26,7 +26,6 @@
     "extract-colors": "^4.2.1",
     "firebase": "^12.14.0",
     "firebase-admin": "^12.0.0",
-    "firebase-admin-a14c8a5423a75469": "npm:firebase-admin@^12.0.0",
     "framer-motion": "^12.40.0",
     "googleapis": "^173.0.0",
     "jodit": "^4.12.17",
