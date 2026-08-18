@@ -9,7 +9,9 @@ const nextConfig: NextConfig = {
         "hakel.club",
         "www.hakel.club",
         "c-g-ltd.web.app",
-        "c-g-ltd.firebaseapp.com"
+        "c-g-ltd.firebaseapp.com",
+        "kampin.web.app",
+        "kampin.firebaseapp.com"
       ]
     }
   },
@@ -38,10 +40,6 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: [
     "firebase-admin",
-    "firebase-admin/app",
-    "firebase-admin/firestore",
-    "firebase-admin/auth",
-    "firebase-admin/storage",
     "@google-cloud/firestore"
   ],
 };
