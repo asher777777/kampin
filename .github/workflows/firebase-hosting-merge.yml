@@ -31,6 +31,6 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_C_G_LTD }}
 
       - name: Deploy to Firebase Hosting
-        run: npx firebase-tools deploy --only hosting:kampin --non-interactive --project c-g-ltd
+        run: npx firebase-tools deploy --only hosting:kampin --non-interactive --project c-g-ltd --debug
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
