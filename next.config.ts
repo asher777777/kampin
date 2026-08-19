@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
       allowedOrigins: [
         "hakel.club",
         "www.hakel.club",
+        "kampin.web.app",
+        "kampin.firebaseapp.com",
         "c-g-ltd.web.app",
         "c-g-ltd.firebaseapp.com"
       ]
@@ -38,11 +39,8 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: [
     "firebase-admin",
-    "firebase-admin/app",
-    "firebase-admin/firestore",
-    "firebase-admin/auth",
-    "firebase-admin/storage",
-    "@google-cloud/firestore"
+    "@google-cloud/firestore",
+    "@google-cloud/text-to-speech"
   ],
 };
 
