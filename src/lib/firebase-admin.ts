@@ -1,4 +1,18 @@
-﻿import admin from "firebase-admin";
+// Dynamic loader to prevent Turbopack from creating hashed external references (firebase-admin-a14c8a5423a75469)
+const loadFirebaseAdmin = () => {
+  try {
+    const req = typeof module !== 'undefined' && module.require ? module.require : (eval('require') as NodeRequire);
+    return req('firebase-admin');
+  } catch {
+    try {
+      return eval('require')('firebase-admin');
+    } catch (err) {
+      return null;
+    }
+  }
+};
+
+const admin: any = loadFirebaseAdmin();
 
 let app: any;
 let adminDb: any;
@@ -51,6 +65,10 @@ const createMockDb = () => {
 };
 
 try {
+  if (!admin) {
+    throw new Error("firebase-admin package could not be required in current environment");
+  }
+
   if (admin.apps && admin.apps.length > 0) {
     app = admin.app();
   } else {
@@ -106,6 +124,14 @@ try {
     }),
   };
 }
+
+export const FieldValue = admin?.firestore?.FieldValue || {
+  serverTimestamp: () => new Date().toISOString(),
+  delete: () => ({}),
+  arrayUnion: (...args: any[]) => args,
+  arrayRemove: (...args: any[]) => args,
+  increment: (n: number) => n,
+};
 
 export const getUserDb = (userId: string) => {
   if (!userId) throw new Error("getUserDb requires a valid userId");

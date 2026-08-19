@@ -1,7 +1,6 @@
 "use server";
 
-import { adminDb, adminStorage } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminDb, adminStorage, FieldValue } from "@/lib/firebase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { revalidatePath } from "next/cache";
 import { getAiSettings } from "@/features/ai/actions";

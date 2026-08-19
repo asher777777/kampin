@@ -1,7 +1,6 @@
 "use server";
 
-import { adminDb, getUserDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminDb, getUserDb, FieldValue } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { Contact } from "./types";
 import { revalidatePath } from "next/cache";
