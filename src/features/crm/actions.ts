@@ -1333,12 +1333,12 @@ export async function getCalendarEvents(contactId?: string) {
     const allEvents: any[] = [];
 
     // 1. Fetch Calendar Events (Tasks / Reminders)
-    let calQuery: FirebaseFirestore.Query = adminDb.collection("calendar_events").where("userId", "==", userId);
+    let calQuery: any = adminDb.collection("calendar_events").where("userId", "==", userId);
     if (contactId) {
       calQuery = calQuery.where("contactId", "==", contactId);
     }
     const calSnap = await calQuery.get();
-    calSnap.docs.forEach(doc => {
+    calSnap.docs.forEach((doc: any) => {
       const data = doc.data();
       allEvents.push({
         id: doc.id,
@@ -1348,7 +1348,7 @@ export async function getCalendarEvents(contactId?: string) {
     });
 
     // 2. Fetch Contact Interactions (Forms, WhatsApp)
-    let contactsQuery: FirebaseFirestore.Query = adminDb.collection("contacts").where("ownerId", "==", userId);
+    let contactsQuery: any = adminDb.collection("contacts").where("ownerId", "==", userId);
     if (contactId) {
       // Not optimally querying by single ID if using ownerId, but it's fine for small scope or we just get doc.
       // Actually if contactId is provided, we only need that contact.

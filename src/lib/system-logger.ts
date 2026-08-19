@@ -35,7 +35,7 @@ export async function logSystemEvent(log: SystemLog) {
 
 export async function getSystemLogs(options?: { ownerId?: string; module?: LogModule; limit?: number }) {
   try {
-    let query: FirebaseFirestore.Query = adminDb.collection("system_logs");
+    let query: any = adminDb.collection("system_logs");
     
     if (options?.ownerId) {
       query = query.where("ownerId", "==", options.ownerId);

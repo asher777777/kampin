@@ -220,8 +220,8 @@ export async function recordDonationAction(data: {
       const campaignSnap = await transaction.get(campaignRef);
       const campData = campaignSnap.data() || {};
 
-      let ambSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-      let ambassadorRef: FirebaseFirestore.DocumentReference | null = null;
+      let ambSnap: any = null;
+      let ambassadorRef: any = null;
       if (ambassadorId) {
         ambassadorRef = campaignRef.collection("ambassadors").doc(ambassadorId);
         ambSnap = await transaction.get(ambassadorRef);
