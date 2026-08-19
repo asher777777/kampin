@@ -1,7 +1,4 @@
-﻿import { initializeApp, getApp, cert, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-import { getStorage } from "firebase-admin/storage";
+﻿import admin from "firebase-admin";
 
 let app: any;
 let adminDb: any;
@@ -10,47 +7,42 @@ let adminStorage: any;
 
 const createMockDb = () => {
   const memoryStore = new Map<string, any>();
+  const getDocObj = (path: string) => ({
+    get: async () => {
+      const data = memoryStore.get(path);
+      return { exists: !!data, id: path.split("/").pop() || "mock-id", data: () => data || {} };
+    },
+    set: async (newData: any, options?: any) => {
+      const existing = options?.merge ? (memoryStore.get(path) || {}) : {};
+      memoryStore.set(path, { ...existing, ...newData });
+      return {};
+    },
+    update: async (newData: any) => {
+      const existing = memoryStore.get(path) || {};
+      memoryStore.set(path, { ...existing, ...newData });
+      return {};
+    },
+    delete: async () => {
+      memoryStore.delete(path);
+      return {};
+    },
+    collection: (colName: string) => getColObj(`${path}/${colName}`),
+  });
 
-  const getDocObj = (path: string) => {
-    return {
-      get: async () => {
-        const data = memoryStore.get(path);
-        return { exists: !!data, id: path.split("/").pop() || "mock-id", data: () => data || {} };
-      },
-      set: async (newData: any, options?: any) => {
-        const existing = options?.merge ? (memoryStore.get(path) || {}) : {};
-        memoryStore.set(path, { ...existing, ...newData });
-        return {};
-      },
-      update: async (newData: any) => {
-        const existing = memoryStore.get(path) || {};
-        memoryStore.set(path, { ...existing, ...newData });
-        return {};
-      },
-      delete: async () => {
-        memoryStore.delete(path);
-        return {};
-      },
-      collection: (colName: string) => getColObj(`${path}/${colName}`),
-    };
-  };
-
-  const getColObj = (path: string) => {
-    return {
-      doc: (docId?: string) => getDocObj(`${path}/${docId || "default"}`),
-      add: async (data: any) => {
-        const id = "mock_" + Date.now();
-        memoryStore.set(`${path}/${id}`, data);
-        return { id };
-      },
-      where: () => getColObj(path),
-      orderBy: () => getColObj(path),
-      limit: () => getColObj(path),
-      get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
-      collection: (colName: string) => getColObj(`${path}/${colName}`),
-      count: () => ({ get: async () => ({ data: () => ({ count: 0 }) }) }),
-    };
-  };
+  const getColObj = (path: string): any => ({
+    doc: (docId?: string) => getDocObj(`${path}/${docId || "default"}`),
+    add: async (data: any) => {
+      const id = "mock_" + Date.now();
+      memoryStore.set(`${path}/${id}`, data);
+      return { id };
+    },
+    where: () => getColObj(path),
+    orderBy: () => getColObj(path),
+    limit: () => getColObj(path),
+    get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
+    collection: (colName: string) => getColObj(`${path}/${colName}`),
+    count: () => ({ get: async () => ({ data: () => ({ count: 0 }) }) }),
+  });
 
   return {
     collection: (colName: string) => getColObj(colName),
@@ -59,12 +51,11 @@ const createMockDb = () => {
 };
 
 try {
-  if (getApps().length > 0) {
-    app = getApp();
+  if (admin.apps && admin.apps.length > 0) {
+    app = admin.app();
   } else {
     const privateKeyB64 = process.env.FIREBASE_ADMIN_PRIVATE_KEY_B64;
     let privateKey = "";
-    
     if (privateKeyB64) {
       privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf8');
     } else if (process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
@@ -76,8 +67,8 @@ try {
     const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "c-g-ltd.firebasestorage.app";
 
     if (projectId && clientEmail && privateKey) {
-      app = initializeApp({
-        credential: cert({
+      app = admin.initializeApp({
+        credential: admin.credential.cert({
           projectId,
           clientEmail,
           privateKey,
@@ -85,25 +76,21 @@ try {
         projectId,
         storageBucket,
       });
+    } else if (process.env.NODE_ENV === "production" && (process.env.K_SERVICE || process.env.GCP_PROJECT)) {
+      app = admin.initializeApp({
+        projectId,
+        storageBucket
+      });
     } else {
-      // In production Cloud Functions / Cloud Run environment with IAM role ADC
-      try {
-        app = initializeApp({
-          projectId: projectId || "c-g-ltd",
-          storageBucket: storageBucket || "c-g-ltd.firebasestorage.app"
-        });
-      } catch (e) {
-        app = initializeApp();
-      }
+      throw new Error("Missing Firebase Admin credentials in local environment.");
     }
   }
 
-  adminDb = getFirestore(app);
-  adminAuth = getAuth(app);
-  adminStorage = getStorage(app);
+  adminDb = admin.firestore();
+  adminAuth = admin.auth();
+  adminStorage = admin.storage();
 } catch (error: any) {
   console.warn("Notice: Firebase Admin initialized with mock fallback:", error?.message || error);
-  
   adminDb = createMockDb();
   adminAuth = {
     getUser: async () => ({ uid: "mock-user" }),
@@ -122,7 +109,6 @@ try {
 
 export const getUserDb = (userId: string) => {
   if (!userId) throw new Error("getUserDb requires a valid userId");
-  
   return {
     collection: (colPath: string) => adminDb.collection("users").doc(userId).collection(colPath),
     doc: (docPath: string) => {
@@ -135,5 +121,4 @@ export const getUserDb = (userId: string) => {
 };
 
 export { adminDb, adminAuth, adminStorage };
-
-
+export default admin;
