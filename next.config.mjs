@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+﻿/** @type {import('next').NextConfig} */
+const nextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
@@ -11,10 +10,8 @@ const nextConfig: NextConfig = {
         "kampin.firebaseapp.com",
         "c-g-ltd.web.app",
         "c-g-ltd.firebaseapp.com",
-        "kampin.web.app",
-        "kampin.firebaseapp.com"
-      ]
-    }
+      ],
+    },
   },
   images: {
     unoptimized: true,
@@ -22,19 +19,16 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",
-        port: "",
         pathname: "/**",
       },
       {
         protocol: "https",
         hostname: "storage.googleapis.com",
-        port: "",
         pathname: "/**",
       },
       {
         protocol: "https",
         hostname: "images.unsplash.com",
-        port: "",
         pathname: "/**",
       },
     ],
@@ -42,7 +36,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "firebase-admin",
     "@google-cloud/firestore",
-    "@google-cloud/text-to-speech"
+    "@google-cloud/text-to-speech",
   ],
 };
 
