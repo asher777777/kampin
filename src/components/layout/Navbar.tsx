@@ -16,9 +16,21 @@ interface NavbarProps {
   navLinks?: Array<{ name: string; href: string }>;
   companyName?: string;
   slogan?: string;
+  headerBgColor?: string;
+  headerTitleColor?: string;
+  headerSloganColor?: string;
 }
 
-export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slogan }: NavbarProps) => {
+export const Navbar = ({ 
+  layout = "classic", 
+  logoUrl, 
+  navLinks, 
+  companyName, 
+  slogan,
+  headerBgColor,
+  headerTitleColor,
+  headerSloganColor
+}: NavbarProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -55,10 +67,16 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
         <BrandIcon icon={Heart} size={32} />
       )}
       <div className="flex flex-col">
-        <span className="text-xl font-bold tracking-tight text-primary leading-none">
+        <span 
+          className="text-xl font-bold tracking-tight leading-none"
+          style={{ color: headerTitleColor || "var(--primary)" }}
+        >
           {companyName || "מחולל הקהילות"}
         </span>
-        <span className="text-[10px] font-medium text-secondary-foreground tracking-widest uppercase">
+        <span 
+          className="text-[10px] font-medium tracking-widest uppercase mt-0.5"
+          style={{ color: headerSloganColor || "var(--secondary-foreground, #64748b)" }}
+        >
           {slogan || "מערכת חכמה לניהול"}
         </span>
       </div>
@@ -129,9 +147,14 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-6 py-4",
         isScrolled
-          ? "bg-background/90 backdrop-blur-md border-b shadow-sm py-3"
-          : "bg-transparent"
+          ? "border-b shadow-sm py-3 backdrop-blur-md"
+          : (headerBgColor ? "backdrop-blur-md" : "")
       )}
+      style={{
+        backgroundColor: headerBgColor
+          ? headerBgColor
+          : (isScrolled ? "var(--background, rgba(255, 255, 255, 0.9))" : "transparent"),
+      }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {layout === "classic" && (

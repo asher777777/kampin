@@ -32,6 +32,11 @@ export interface GlobalSettings {
   customGoals?: string[];
   whatToGenerate?: string[];
   
+  // Header Colors & Styling
+  headerBgColor?: string;
+  headerTitleColor?: string;
+  headerSloganColor?: string;
+
   // Global Colors
   primaryColor?: string;
   secondaryColor?: string;
@@ -97,6 +102,9 @@ const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
     { name: "צור קשר", href: "/contact" },
   ],
   customAudiences: [],
+  headerBgColor: "",
+  headerTitleColor: "",
+  headerSloganColor: "",
   primaryColor: "#d8435d",
   secondaryColor: "#10354b",
   backgroundColor: "#f8f9fa",
@@ -142,6 +150,11 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         customAudiences: data?.customAudiences || [],
         customGoals: data?.customGoals || [],
         
+        // Header Colors
+        headerBgColor: data?.headerBgColor || "",
+        headerTitleColor: data?.headerTitleColor || "",
+        headerSloganColor: data?.headerSloganColor || "",
+
         // Global Colors
         primaryColor: data?.primaryColor || "",
         secondaryColor: data?.secondaryColor || "",
@@ -213,6 +226,9 @@ export async function saveGlobalSettings(settings: Partial<GlobalSettings>) {
     const userUpdate: any = {};
     if (settings.companyName !== undefined) userUpdate.companyName = settings.companyName;
     if (settings.slogan !== undefined) userUpdate.slogan = settings.slogan;
+    if (settings.headerBgColor !== undefined) userUpdate.headerBgColor = settings.headerBgColor;
+    if (settings.headerTitleColor !== undefined) userUpdate.headerTitleColor = settings.headerTitleColor;
+    if (settings.headerSloganColor !== undefined) userUpdate.headerSloganColor = settings.headerSloganColor;
     if (settings.organizationPurpose !== undefined) userUpdate.organizationPurpose = settings.organizationPurpose;
     if (settings.memberCount !== undefined) userUpdate.memberCount = settings.memberCount;
     if (settings.contactFacebook !== undefined) userUpdate.contactFacebook = settings.contactFacebook;

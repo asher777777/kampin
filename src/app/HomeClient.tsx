@@ -384,6 +384,9 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           navLinks={globalSettings.navLinks} 
           companyName={globalSettings.companyName}
           slogan={globalSettings.slogan}
+          headerBgColor={globalSettings.headerBgColor}
+          headerTitleColor={globalSettings.headerTitleColor}
+          headerSloganColor={globalSettings.headerSloganColor}
         />
       )}
       

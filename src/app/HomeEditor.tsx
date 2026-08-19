@@ -2306,6 +2306,9 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           navLinks={globalSettings.navLinks}
           companyName={globalSettings.companyName}
           slogan={globalSettings.slogan}
+          headerBgColor={globalSettings.headerBgColor}
+          headerTitleColor={globalSettings.headerTitleColor}
+          headerSloganColor={globalSettings.headerSloganColor}
         />
       )}
       
@@ -2564,7 +2567,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
+                {/* Title and Title Color */}
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-600 block">כותרת האתר (ליד הלוגו)</label>
                   <input 
                     type="text" 
@@ -2573,10 +2577,61 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                     value={globalSettings.companyName || ""}
                     onChange={(e) => setGlobalSettings({ ...globalSettings, companyName: e.target.value })}
                   />
-                  <p className="text-[11px] text-slate-400">מופיע ככותרת הראשית לצד הלוגו בתפריט העליון</p>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 block">צבע כותרת האתר</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="color" 
+                        className="w-9 h-9 p-0.5 border border-slate-200 rounded-lg cursor-pointer bg-white" 
+                        value={globalSettings.headerTitleColor || "#10354b"} 
+                        onChange={(e) => setGlobalSettings({ ...globalSettings, headerTitleColor: e.target.value })} 
+                      />
+                      <input 
+                        type="text" 
+                        className="flex-1 border border-slate-200 rounded-lg p-2 text-left text-xs uppercase" dir="ltr"
+                        placeholder="ברירת מחדל"
+                        value={globalSettings.headerTitleColor || ""} 
+                        onChange={(e) => setGlobalSettings({ ...globalSettings, headerTitleColor: e.target.value })} 
+                      />
+                    </div>
+                    {/* Quick Palette */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { label: "איפוס", color: "" },
+                        { label: "נייבי", color: "#10354b" },
+                        { label: "זהב", color: "#f59e0b" },
+                        { label: "לבן", color: "#ffffff" },
+                        { label: "שחור", color: "#0f172a" },
+                        { label: "אדום", color: "#d8435d" },
+                        { label: "כחול", color: "#2563eb" },
+                        { label: "ירוק", color: "#10b981" }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setGlobalSettings({ ...globalSettings, headerTitleColor: item.color })}
+                          className={cn(
+                            "px-2 py-0.5 text-[10px] rounded border flex items-center gap-1 transition-all cursor-pointer",
+                            globalSettings.headerTitleColor === item.color
+                              ? "border-indigo-600 bg-indigo-50 text-indigo-700 font-bold"
+                              : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                          )}
+                        >
+                          {item.color && (
+                            <span 
+                              className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block" 
+                              style={{ backgroundColor: item.color }} 
+                            />
+                          )}
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
+                {/* Slogan and Slogan Color */}
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-600 block">סלוגן / תת-כותרת (ליד הלוגו)</label>
                   <input 
                     type="text" 
@@ -2585,7 +2640,110 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                     value={globalSettings.slogan || ""}
                     onChange={(e) => setGlobalSettings({ ...globalSettings, slogan: e.target.value })}
                   />
-                  <p className="text-[11px] text-slate-400">מופיע באותיות קטנות מתחת לכותרת האתר בהדר</p>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 block">צבע סלוגן</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="color" 
+                        className="w-9 h-9 p-0.5 border border-slate-200 rounded-lg cursor-pointer bg-white" 
+                        value={globalSettings.headerSloganColor || "#64748b"} 
+                        onChange={(e) => setGlobalSettings({ ...globalSettings, headerSloganColor: e.target.value })} 
+                      />
+                      <input 
+                        type="text" 
+                        className="flex-1 border border-slate-200 rounded-lg p-2 text-left text-xs uppercase" dir="ltr"
+                        placeholder="ברירת מחדל"
+                        value={globalSettings.headerSloganColor || ""} 
+                        onChange={(e) => setGlobalSettings({ ...globalSettings, headerSloganColor: e.target.value })} 
+                      />
+                    </div>
+                    {/* Quick Palette */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { label: "איפוס", color: "" },
+                        { label: "אפור", color: "#64748b" },
+                        { label: "אפור בהיר", color: "#94a3b8" },
+                        { label: "זהב", color: "#f59e0b" },
+                        { label: "לבן", color: "#ffffff" },
+                        { label: "שחור", color: "#0f172a" },
+                        { label: "תכלת", color: "#0ea5e9" }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setGlobalSettings({ ...globalSettings, headerSloganColor: item.color })}
+                          className={cn(
+                            "px-2 py-0.5 text-[10px] rounded border flex items-center gap-1 transition-all cursor-pointer",
+                            globalSettings.headerSloganColor === item.color
+                              ? "border-indigo-600 bg-indigo-50 text-indigo-700 font-bold"
+                              : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                          )}
+                        >
+                          {item.color && (
+                            <span 
+                              className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block" 
+                              style={{ backgroundColor: item.color }} 
+                            />
+                          )}
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Header Background Color */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-600 block">צבע רקע להדר (תפריט עליון)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      className="w-9 h-9 p-0.5 border border-slate-200 rounded-lg cursor-pointer bg-white" 
+                      value={globalSettings.headerBgColor === "transparent" || !globalSettings.headerBgColor ? "#ffffff" : globalSettings.headerBgColor} 
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, headerBgColor: e.target.value })} 
+                    />
+                    <input 
+                      type="text" 
+                      className="flex-1 border border-slate-200 rounded-lg p-2 text-left text-xs uppercase" dir="ltr"
+                      placeholder="שקוף (ברירת מחדל)"
+                      value={globalSettings.headerBgColor || ""} 
+                      onChange={(e) => setGlobalSettings({ ...globalSettings, headerBgColor: e.target.value })} 
+                    />
+                  </div>
+                  {/* Quick Palette for Background */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[
+                      { label: "שקוף", color: "transparent" },
+                      { label: "לבן נקי", color: "#ffffff" },
+                      { label: "שחור כהה", color: "#0f172a" },
+                      { label: "כחול נייבי", color: "#10354b" },
+                      { label: "אפור בהיר", color: "#f8fafc" },
+                      { label: "זהב עדין", color: "#fef3c7" },
+                      { label: "אפור כהה", color: "#1e293b" }
+                    ].map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => setGlobalSettings({ ...globalSettings, headerBgColor: item.color })}
+                        className={cn(
+                          "px-2 py-0.5 text-[10px] rounded border flex items-center gap-1 transition-all cursor-pointer",
+                          globalSettings.headerBgColor === item.color
+                            ? "border-indigo-600 bg-indigo-50 text-indigo-700 font-bold"
+                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {item.color !== "transparent" ? (
+                          <span 
+                            className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block" 
+                            style={{ backgroundColor: item.color }} 
+                          />
+                        ) : (
+                          <span className="w-2.5 h-2.5 rounded-full border border-dashed border-slate-400 inline-block" />
+                        )}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
