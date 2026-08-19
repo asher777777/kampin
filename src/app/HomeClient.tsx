@@ -283,8 +283,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "videoGallery":
-        const vGalleryConf = config.videoGallery || { visible: false, images: [], videoUrl: "", videoType: "youtube" as const, effect: "none" as const };
-        if (!vGalleryConf.visible) return null;
+        if (!config.videoGallery || config.videoGallery.visible === false || String(config.videoGallery.visible) === "false") return null;
+        const vGalleryConf = config.videoGallery;
         return (
           <VideoGallery
             id={vGalleryConf.anchorId || "videoGallery"}
@@ -408,7 +408,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       <main className="flex-grow">
         {pageId && <PageViewTracker slug={pageId} collectionName={collectionName || "services"} />}
         <div className="flex flex-col w-full">
-          {(config.sectionOrder || ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent"]).map((sectionId) => {
+          {(config.sectionOrder || ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"]).map((sectionId) => {
             const isHiddenOnMobile = config.mobileHiddenSections?.includes(sectionId);
             return (
               <div key={sectionId} className={isHiddenOnMobile ? "max-sm:hidden" : undefined}>

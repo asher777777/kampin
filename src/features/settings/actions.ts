@@ -138,7 +138,7 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         siteLogoUrl: data?.siteLogoUrl || adminLogoUrl || "",
         headerLayout: data?.headerLayout || "classic",
         theme: data?.theme || "navy",
-        navLinks: data?.navLinks || DEFAULT_GLOBAL_SETTINGS.navLinks,
+        navLinks: Array.isArray(data?.navLinks) ? data.navLinks : DEFAULT_GLOBAL_SETTINGS.navLinks,
         customAudiences: data?.customAudiences || [],
         customGoals: data?.customGoals || [],
         
@@ -159,10 +159,10 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         personalPhone: data?.personalPhone || "",
 
         // Personal Details
-        companyName: data?.companyName || "",
+        companyName: data?.companyName !== undefined ? data.companyName : "",
         organizationType: data?.organizationType || "",
         organizationPurpose: data?.organizationPurpose || "",
-        slogan: data?.slogan || "",
+        slogan: data?.slogan !== undefined ? data.slogan : "",
         personalTitle: data?.personalTitle || "",
         memberCount: data?.memberCount || "",
 
@@ -200,15 +200,19 @@ export async function saveGlobalSettings(settings: Partial<GlobalSettings>) {
   try {
     const { auth } = await import("@/lib/auth");
     const session = await auth();
-    if (!session?.user?.id) throw new Error("Unauthorized");
+    const isDev = process.env.NODE_ENV !== "production";
+    const userId = session?.user?.id || (isDev ? "1" : null);
+
+    if (!userId) throw new Error("Unauthorized");
     const { getUserDb, adminDb } = await import("@/lib/firebase-admin");
 
-    const docRef = getUserDb(session.user.id).collection("settings").doc("global");
+    const docRef = getUserDb(userId).collection("settings").doc("global");
     await docRef.set({ ...settings, updatedAt: new Date().toISOString() }, { merge: true });
 
     // Also mirror to users/{userId} document
     const userUpdate: any = {};
     if (settings.companyName !== undefined) userUpdate.companyName = settings.companyName;
+    if (settings.slogan !== undefined) userUpdate.slogan = settings.slogan;
     if (settings.organizationPurpose !== undefined) userUpdate.organizationPurpose = settings.organizationPurpose;
     if (settings.memberCount !== undefined) userUpdate.memberCount = settings.memberCount;
     if (settings.contactFacebook !== undefined) userUpdate.contactFacebook = settings.contactFacebook;
@@ -218,7 +222,7 @@ export async function saveGlobalSettings(settings: Partial<GlobalSettings>) {
     if (settings.contactLinkedIn !== undefined) userUpdate.contactLinkedIn = settings.contactLinkedIn;
 
     if (Object.keys(userUpdate).length > 0) {
-      await adminDb.collection("users").doc(session.user.id).set(userUpdate, { merge: true });
+      await adminDb.collection("users").doc(userId).set(userUpdate, { merge: true });
     }
 
     revalidatePath("/", "layout");

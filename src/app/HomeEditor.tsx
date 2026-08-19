@@ -459,6 +459,17 @@ export function HomeEditor({
 
   const [lastSavedConfigStr, setLastSavedConfigStr] = useState<string>(() => JSON.stringify(initialConfig));
 
+  useEffect(() => {
+    const initialSectionData: Record<string, string> = {};
+    allAvailableSections.forEach((secId) => {
+      initialSectionData[secId] = JSON.stringify((initialConfig as any)?.[secId] || {});
+    });
+    setConfig(prev => ({
+      ...prev,
+      lastSavedSectionData: initialSectionData
+    } as any));
+  }, []);
+
   const hasGlobalChanges = useMemo(() => {
     // Strip purely local UI state like activeEditSection or mobileHiddenSections if they exist on config
     const cleanConfig = { ...config };
@@ -489,12 +500,22 @@ export function HomeEditor({
       }
       sessionStorage.setItem("home_editor_scroll", window.scrollY.toString());
       setLastSavedConfigStr(JSON.stringify(cleanConfig));
+
+      const updatedSectionData: Record<string, string> = {};
+      allAvailableSections.forEach((secId) => {
+        updatedSectionData[secId] = JSON.stringify(cleanConfig[secId as keyof HomePageConfig] || {});
+      });
+      setConfig(prev => ({
+        ...prev,
+        lastSavedSectionData: updatedSectionData
+      } as any));
+
       if (exitEditor) {
         setIsEditing(false);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to save home page config", e);
-      alert("שגיאה בשמירה ל-Firebase.");
+      alert("שגיאה בשמירה ל-Firebase: " + (e?.message || e));
     } finally {
       setSaving(false);
     }
@@ -2541,6 +2562,30 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                       onSelect={(url) => setGlobalSettings({ ...globalSettings, siteLogoUrl: url })}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 block">כותרת האתר (ליד הלוגו)</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:border-indigo-500 focus:outline-none bg-slate-50/50"
+                    placeholder="מחולל הקהילות"
+                    value={globalSettings.companyName || ""}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, companyName: e.target.value })}
+                  />
+                  <p className="text-[11px] text-slate-400">מופיע ככותרת הראשית לצד הלוגו בתפריט העליון</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 block">סלוגן / תת-כותרת (ליד הלוגו)</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:border-indigo-500 focus:outline-none bg-slate-50/50"
+                    placeholder="מערכת חכמה לניהול"
+                    value={globalSettings.slogan || ""}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, slogan: e.target.value })}
+                  />
+                  <p className="text-[11px] text-slate-400">מופיע באותיות קטנות מתחת לכותרת האתר בהדר</p>
                 </div>
 
                 <div className="space-y-2">

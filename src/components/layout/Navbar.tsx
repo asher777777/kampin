@@ -34,7 +34,7 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
     { name: "צור קשר", href: "/contact" },
   ];
 
-  const linksToUse = navLinks && navLinks.length > 0 ? navLinks : defaultNavLinks;
+  const linksToUse = Array.isArray(navLinks) ? navLinks : defaultNavLinks;
 
   useEffect(() => {
     setMounted(true);
@@ -65,19 +65,22 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
     </Link>
   );
 
-  const NavLinksSection = () => (
-    <div className="hidden md:flex items-center justify-center gap-8 flex-1">
-      {linksToUse.map((link) => (
-        <Link
-          key={link.name}
-          href={link.href}
-          className="text-sm font-bold text-foreground/80 hover:text-primary transition-colors animate-in fade-in duration-200"
-        >
-          {link.name}
-        </Link>
-      ))}
-    </div>
-  );
+  const NavLinksSection = () => {
+    if (linksToUse.length === 0) return <div className="flex-1" />;
+    return (
+      <div className="hidden md:flex items-center justify-center gap-8 flex-1">
+        {linksToUse.map((link) => (
+          <Link
+            key={link.name}
+            href={link.href}
+            className="text-sm font-bold text-foreground/80 hover:text-primary transition-colors animate-in fade-in duration-200"
+          >
+            {link.name}
+          </Link>
+        ))}
+      </div>
+    );
+  };
 
   const ActionsSection = () => (
     <div className="hidden md:flex items-center gap-3 shrink-0">
