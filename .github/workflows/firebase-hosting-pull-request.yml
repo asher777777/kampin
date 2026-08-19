@@ -26,6 +26,10 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
 
       - name: Build Next.js
         run: npm run build
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
