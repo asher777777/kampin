@@ -1840,12 +1840,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto px-0 pb-8 mt-4 text-right" dir="rtl">
             <div className="w-full pt-2">
               <h5 className="text-sm font-bold text-white mb-4">ניהול גלריית וידאו</h5>
-              <div className="bg-white rounded-xl overflow-hidden p-4">
-                <VideoGalleryEditor
-                  config={vGalleryConf}
-                  onChange={(newConf) => setConfig({ ...config, videoGallery: newConf })}
-                />
-              </div>
+              <VideoGalleryEditor
+                config={vGalleryConf}
+                onChange={(newConf) => setConfig({ ...config, videoGallery: newConf })}
+              />
             </div>
           </div>
         );

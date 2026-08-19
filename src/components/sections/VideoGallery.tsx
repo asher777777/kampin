@@ -15,6 +15,19 @@ interface VideoGalleryProps {
   backgroundColor?: string;
 }
 
+const isDirectVideoUrl = (url: string) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes(".mp4") ||
+    lower.includes(".webm") ||
+    lower.includes(".mov") ||
+    lower.includes(".quicktime") ||
+    lower.includes("firebasestorage.googleapis.com") ||
+    lower.startsWith("blob:")
+  );
+};
+
 const getDriveDirectUrl = (url: string) => {
   try {
     const fileIdMatch = url.match(/[-\w]{25,}/);
@@ -30,7 +43,7 @@ const getDriveDirectUrl = (url: string) => {
 const getEmbedUrl = (url: string) => {
   if (url.includes("youtube.com") || url.includes("youtu.be")) {
     const videoId = url.split("v=")[1]?.split("&")[0] || url.split("youtu.be/")[1];
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&enablejsapi=1&rel=0`;
   }
   if (url.includes("drive.google.com")) {
     const fileIdMatch = url.match(/[-\w]{25,}/);
@@ -64,16 +77,6 @@ export const VideoGallery = ({
     return () => clearInterval(interval);
   }, [images, isModalOpen]);
 
-  // Determine actual video type to use
-  let actualVideoType = videoType;
-  if (actualVideoType === "auto") {
-    if (videoUrl.includes("drive.google.com")) {
-      actualVideoType = "drive-direct";
-    } else {
-      actualVideoType = "iframe";
-    }
-  }
-
   // Handle modal close
   const handleClose = () => {
     if (videoRef.current) {
@@ -88,9 +91,48 @@ export const VideoGallery = ({
     setIsModalOpen(true);
   };
 
+  // Handle Escape key and body scroll lock
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalOpen) {
+        handleClose();
+      }
+    };
+    if (isModalOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "unset";
+    };
+  }, [isModalOpen]);
+
+  // Auto-play direct video whenever modal opens
+  useEffect(() => {
+    if (isModalOpen && videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Autoplay was prevented by browser:", err);
+        });
+      }
+    }
+  }, [isModalOpen]);
+
+  // Determine actual video type to use
+  let actualVideoType = videoType;
+  if (actualVideoType === "auto") {
+    if (isDirectVideoUrl(videoUrl) || videoUrl.includes("drive.google.com")) {
+      actualVideoType = "drive-direct";
+    } else {
+      actualVideoType = "iframe";
+    }
+  }
+
   const renderVideoPlayer = () => {
     if (actualVideoType === "drive-direct") {
-      const src = getDriveDirectUrl(videoUrl);
+      const src = isDirectVideoUrl(videoUrl) ? videoUrl : getDriveDirectUrl(videoUrl);
       return (
         <div className="w-full h-full flex items-center justify-center bg-black">
           <video
@@ -99,9 +141,13 @@ export const VideoGallery = ({
             className="w-full max-h-[85vh] outline-none"
             controls
             autoPlay
+            playsInline
             onLoadedMetadata={() => {
-              if (videoRef.current && savedTime > 0) {
-                videoRef.current.currentTime = savedTime;
+              if (videoRef.current) {
+                if (savedTime > 0) {
+                  videoRef.current.currentTime = savedTime;
+                }
+                videoRef.current.play().catch(() => {});
               }
             }}
           />
@@ -109,14 +155,14 @@ export const VideoGallery = ({
       );
     }
     
-    // Fallback to iframe (cannot track time)
+    // Fallback to iframe (YouTube / Google Drive Preview)
     const embedSrc = getEmbedUrl(videoUrl);
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
         <iframe
           src={embedSrc}
           className="w-full h-[85vh] md:h-[75vh]"
-          allow="autoplay; fullscreen; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           style={{ border: 'none' }}
         />
@@ -159,7 +205,7 @@ export const VideoGallery = ({
                        animate={{ opacity: 0 }}
                        transition={{ 
                          duration: 0.8, 
-                         delay: Math.random() * 0.5,
+                         delay: Math.random() * 0.5, 
                          ease: "easeOut"
                        }}
                        className="bg-black/50"
@@ -208,8 +254,10 @@ export const VideoGallery = ({
       {/* Center Play Button */}
       {videoUrl && (
         <button
+          type="button"
           onClick={handleOpen}
-          className="relative z-20 group/btn flex items-center justify-center"
+          className="relative z-20 group/btn flex items-center justify-center cursor-pointer"
+          aria-label="הפעל וידאו"
         >
           <div className="absolute inset-0 bg-white/20 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
           <div className="relative w-24 h-24 md:w-32 md:h-32 bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-full flex items-center justify-center hover:bg-white/20 hover:scale-110 transition-all duration-300 shadow-2xl">
@@ -220,15 +268,26 @@ export const VideoGallery = ({
 
       {/* Video Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="relative w-full h-full max-w-6xl mx-auto flex flex-col justify-center p-4 md:p-8">
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
+          onClick={handleClose}
+        >
+          <div 
+            className="relative w-full h-full max-w-6xl mx-auto flex flex-col justify-center p-4 md:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
             <button
+              type="button"
               onClick={handleClose}
-              className="absolute top-4 right-4 md:top-8 md:right-8 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-[10000]"
+              className="absolute top-4 left-4 md:top-6 md:left-6 w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all duration-200 z-[100000] shadow-xl cursor-pointer border border-white/20 hover:scale-110 active:scale-95"
+              aria-label="סגור חלון"
+              title="סגור חלון (ESC)"
             >
-              <X className="w-6 h-6" />
+              <X className="w-7 h-7 stroke-[2.5]" />
             </button>
-            <div className="w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
+
+            <div className="w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative bg-black">
                {renderVideoPlayer()}
             </div>
           </div>
