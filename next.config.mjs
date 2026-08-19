@@ -33,11 +33,6 @@ const nextConfig = {
       },
     ],
   },
-  serverExternalPackages: [
-    "firebase-admin",
-    "@google-cloud/firestore",
-    "@google-cloud/text-to-speech",
-  ],
 };
 
 export default nextConfig;
