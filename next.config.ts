@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
         "kampin.web.app",
         "kampin.firebaseapp.com",
         "c-g-ltd.web.app",
-        "c-g-ltd.firebaseapp.com"
+        "c-g-ltd.firebaseapp.com",
+        "kampin.web.app",
+        "kampin.firebaseapp.com"
       ]
     }
   },

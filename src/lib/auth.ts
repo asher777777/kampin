@@ -17,7 +17,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET || "4c30c8df634f19b22a6bbffeb5e4d2938a16dbd76eaef6b3992b158021b777a8",
+  trustHost: true,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "4c30c8df634f19b22a6bbffeb5e4d2938a16dbd76eaef6b3992b158021b777a8",
   session: { strategy: "jwt" },
   cookies: {
     sessionToken: {
