@@ -28,6 +28,7 @@ import {
   getMediaFileMetadata,
   uploadMediaFile
 } from "@/features/media/actions";
+import { cn } from "@/lib/utils";
 
 interface ImageUploadProps {
   onSelect: (url: any) => void;
@@ -41,6 +42,8 @@ interface ImageUploadProps {
 
 export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false, multiple = false, size = 'default', customTrigger }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
@@ -143,15 +146,26 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
     }
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const processFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
+    const validFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (validFiles.length === 0) {
+      alert("אנא בחר או גרור קבצי תמונה או וידאו תקינים בלבד.");
+      return;
+    }
+
+    const filesToUpload = multiple ? validFiles : [validFiles[0]];
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: filesToUpload.length });
+
     try {
       const uploadedUrls: string[] = [];
       
-      for (const file of files) {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgress({ current: i + 1, total: filesToUpload.length });
+
         const isVideo = file.type.startsWith('video/');
         let fileToUpload: File | Blob = file;
         let extension = file.name.split('.').pop()?.toLowerCase() || '';
@@ -192,27 +206,49 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
             extension = 'webp';
           }
         }
-        
-        // 2. Upload to Firebase Storage via Server Action
         const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-        const formData = new FormData();
-        formData.append("file", fileToUpload, `${baseName}.${extension}`);
         
-        const uploadRes = await uploadMediaFile(formData);
-        if (!uploadRes.success || !uploadRes.url) {
-          throw new Error(uploadRes.error || "Upload failed on server");
+        // 2. Upload to Firebase Storage (Server Action with Client fallback)
+        let url = "";
+        try {
+          const formData = new FormData();
+          formData.append("file", fileToUpload, `${baseName}.${extension}`);
+          const uploadRes = await uploadMediaFile(formData);
+          if (uploadRes?.success && uploadRes.url) {
+            url = uploadRes.url;
+          }
+        } catch (serverErr) {
+          console.warn("Server action upload failed, using client Firebase Storage fallback:", serverErr);
         }
-        const url = uploadRes.url;
+
+        if (!url) {
+          // Direct client-side upload to Firebase Storage
+          const storageRef = ref(storage, `uploads/${Date.now()}_${baseName}.${extension}`);
+          const snapshot = await uploadBytes(storageRef, fileToUpload);
+          url = await getDownloadURL(snapshot.ref);
+        }
+
+        if (!url) {
+          throw new Error("לא ניתן היה להעלות את הקובץ");
+        }
 
         // 3. Add to Media Library
         const libraryName = isVideo ? file.name : `${baseName}.${extension}`;
-        await addMediaToLibrary(url, libraryName);
+        try {
+          await addMediaToLibrary(url, libraryName);
+        } catch (libErr) {
+          console.warn("Could not save to library collection:", libErr);
+        }
         uploadedUrls.push(url);
       }
       
       // Reload library to show new items
-      const items = await getMediaLibrary();
-      setMediaItems(items || []);
+      try {
+        const items = await getMediaLibrary();
+        setMediaItems(items || []);
+      } catch (e) {
+        console.warn("Failed to reload media library:", e);
+      }
       
       if (multiple) {
         onSelect(uploadedUrls);
@@ -224,7 +260,35 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
       alert("העלאה נכשלה. וודא שחוקי ה-Storage ב-Firebase מאפשרים כתיבה.");
     } finally {
       setIsUploading(false);
-      e.target.value = "";
+      setUploadProgress(null);
+    }
+  };
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    processFiles(files);
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      processFiles(files);
     }
   };
 
@@ -422,7 +486,19 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
       ) : (
         <div className={`flex ${compact ? "flex-col" : "gap-2"}`}>
           <div className="flex gap-2">
-            <div className={`relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary transition-colors flex flex-col items-center justify-center bg-muted/30 ${compact ? "h-16 w-full max-w-xs" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"}`}>
+            <div 
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center select-none",
+                isDragging 
+                  ? "border-amber-500 bg-amber-500/15 scale-105 ring-2 ring-amber-500/40" 
+                  : "border-primary/20 hover:border-secondary bg-muted/30",
+                compact ? "h-16 w-full max-w-xs" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"
+              )}
+            >
               <input
                 type="file"
                 accept="image/*,video/mp4,video/webm,video/quicktime"
@@ -432,21 +508,36 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                 disabled={isUploading}
               />
               {isUploading ? (
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="animate-spin text-secondary" />
-                  <span className="text-[8px] font-bold text-secondary animate-pulse">מעבד...</span>
+                <div className="flex flex-col items-center gap-1.5 p-2 text-center">
+                  <Loader2 className="animate-spin text-secondary h-5 w-5" />
+                  <span className="text-[9px] font-bold text-secondary animate-pulse">
+                    {uploadProgress && uploadProgress.total > 1
+                      ? `מעלה ${uploadProgress.current}/${uploadProgress.total}...`
+                      : "מעבד..."}
+                  </span>
+                </div>
+              ) : isDragging ? (
+                <div className="flex flex-col items-center gap-1 text-center animate-pulse">
+                  <ImagePlus className="text-amber-500 h-6 w-6" />
+                  <span className="text-[9px] font-extrabold text-amber-500">שחרר קבצים!</span>
                 </div>
               ) : (
                 <>
                   <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact || size === 'sm' ? "h-4 w-4" : ""}`} />
-                  <span className={`font-bold mt-1 uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px] mt-2"}`}>העלאה<br className={size === 'sm' ? 'block' : 'hidden'}/>חדשה</span>
+                  <span className={`font-bold mt-1 uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px] mt-2"}`}>
+                    העלאה<br className={size === 'sm' ? 'block' : 'hidden'}/>חדשה
+                    {multiple && size !== 'sm' && !compact && (
+                      <span className="block text-[8px] font-normal text-muted-foreground normal-case mt-0.5">(או גרור קבצים)</span>
+                    )}
+                  </span>
                 </>
               )}
             </div>
 
             <Button
+              type="button"
               variant="outline"
-              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 ${compact ? "h-16 w-full max-w-xs gap-1" : size === 'sm' ? "h-20 w-20 gap-1" : "h-32 w-32 gap-2"}`}
+              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 cursor-pointer ${compact ? "h-16 w-full max-w-xs gap-1" : size === 'sm' ? "h-20 w-20 gap-1" : "h-32 w-32 gap-2"}`}
               onClick={() => setShowGallery(true)}
               disabled={isUploading}
             >
