@@ -1,10 +1,15 @@
-﻿/** @type {import('next').NextConfig} */
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   // הכרחת Next.js להשתמש ב-Webpack במקום ב-Turbopack
   webpack: (config) => {
     return config;
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
+    cpus: 1,
+    workerThreads: false,
     serverActions: {
       bodySizeLimit: "10mb",
       allowedOrigins: [

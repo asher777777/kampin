@@ -11,7 +11,6 @@ import { ContactSection } from "@/components/sections/ContactSection";
 import { getGlobalSettings } from "@/features/settings/actions";
 import { Metadata } from "next";
 import { HomeClient } from "@/app/HomeClient";
-import DottyChatClient from "../dotty/DottyChatClient";
 import { auth } from "@/lib/auth";
 
 export const revalidate = 3600; // Revalidate every hour
@@ -30,16 +29,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return {
         title: data?.seo?.title || data?.hero?.title || "עמוד נחיתה",
         description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
-      };
-    }
-
-    // Check smart_workers
-    const agentDoc = await adminDb.collection("smart_workers").doc(id).get();
-    if (agentDoc.exists) {
-      const data = agentDoc.data();
-      return {
-        title: data?.name || "סוכן חכם",
-        description: data?.role || "סוכן דיגיטלי חכם",
       };
     }
   } catch (e) {}
@@ -63,34 +52,8 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const isPreview = resolvedSearchParams.preview === "true";
   const session = await auth();
-
-  // 1. Check if this is a system-level smart worker (e.g., betty) or office
-  try {
-    let agentDoc = await adminDb.collection("smart_workers").doc(id).get();
-    if (!agentDoc.exists) {
-      agentDoc = await adminDb.collection("smart_workers").doc(id.toUpperCase()).get();
-    }
-    if (agentDoc.exists) {
-      const isSuperAdmin = session?.user?.role === "SUPERADMIN";
-      const userRole = isSuperAdmin ? "MASTER_ADMIN" : "END_USER";
-      const userId = session?.user?.id || null;
-
-      return (
-        <div className="flex flex-col h-screen w-full relative">
-          <div className="flex-grow relative">
-            <DottyChatClient userRole={userRole} userId={userId} agentId={id} />
-          </div>
-        </div>
-      );
-    }
-
-    const officeDoc = await adminDb.collection("offices").doc(id).get();
-    if (officeDoc.exists) {
-      redirect(`/office/${id}`);
-    }
-  } catch (e) {}
   
-  // 2. Fetch landing / custom page configuration
+  // 1. Fetch landing / custom page configuration
   let pageConfig: any = null;
 
   try {
