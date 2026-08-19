@@ -1,5 +1,9 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
+  // הכרחת Next.js להשתמש ב-Webpack במקום ב-Turbopack
+  webpack: (config) => {
+    return config;
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
