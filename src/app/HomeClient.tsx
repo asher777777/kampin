@@ -18,11 +18,13 @@ const CourseBanner = dynamic(() => import("@/components/sections/CourseBanner").
 const FaqSection = dynamic(() => import("@/components/sections/FaqSection").then(m => m.FaqSection), { ssr: true });
 const CampaignHeaderSection = dynamic(() => import("@/components/sections/CampaignHeaderSection").then(m => m.CampaignHeaderSection), { ssr: true });
 const CampaignDonorsSection = dynamic(() => import("@/components/sections/CampaignDonorsSection").then(m => m.CampaignDonorsSection), { ssr: true });
+const CampaignTiersSection = dynamic(() => import("@/components/sections/CampaignTiersSection").then(m => m.CampaignTiersSection), { ssr: true });
 const CampaignStickyBar = dynamic(() => import("@/components/sections/CampaignStickyBar").then(m => m.CampaignStickyBar), { ssr: true });
 import { AmbassadorModal } from "@/components/campaigns/AmbassadorModal";
 import { DonationDrawer } from "@/components/campaigns/DonationDrawer";
 import { HomePageConfig } from "@/features/home/actions";
 import { GlobalSettings } from "@/features/settings/actions";
+import { getAllCampaigns } from "@/features/campaigns/actions";
 import { Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -45,6 +47,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const [isEditing, setIsEditing] = useState(false);
   const [isAmbassadorModalOpen, setIsAmbassadorModalOpen] = useState(false);
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
+  const [selectedTierIdForDrawer, setSelectedTierIdForDrawer] = useState<string | undefined>();
   const [config, setConfig] = useState<HomePageConfig>(initialConfig);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     ...(initialGlobalSettings || { siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] }),
@@ -114,6 +117,35 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
     }
   }, [isEditing]);
 
+  const rawConfigCampId = (config.campaignDonors?.campaignId && config.campaignDonors.campaignId !== "default-campaign")
+    ? config.campaignDonors.campaignId
+    : (config.campaignHeader?.campaignId && config.campaignHeader.campaignId !== "default-campaign")
+    ? config.campaignHeader.campaignId
+    : (pageId && pageId !== "home" ? pageId : "home");
+
+  const [activeCampaignId, setActiveCampaignId] = useState<string>(rawConfigCampId);
+
+  const handleOpenDonationDrawer = (tierId?: string) => {
+    setSelectedTierIdForDrawer(tierId);
+    setIsDonationDrawerOpen(true);
+  };
+
+  useEffect(() => {
+    const configuredId = (config.campaignDonors?.campaignId && config.campaignDonors.campaignId !== "default-campaign")
+      ? config.campaignDonors.campaignId
+      : (config.campaignHeader?.campaignId && config.campaignHeader.campaignId !== "default-campaign")
+      ? config.campaignHeader.campaignId
+      : null;
+
+    if (configuredId) {
+      setActiveCampaignId(configuredId);
+    } else if (pageId && pageId !== "home") {
+      setActiveCampaignId(pageId);
+    } else {
+      setActiveCampaignId("home");
+    }
+  }, [config.campaignDonors?.campaignId, config.campaignHeader?.campaignId, pageId]);
+
   // Determine if the user is allowed to edit this page
   // By default, if canEdit is not passed, we default to false for safety
   const allowedToEdit = isAuthenticated && (canEdit ?? false);
@@ -134,6 +166,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
     );
   }
 
+
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
       case "campaignHeader":
@@ -141,6 +174,22 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         return (
           <CampaignHeaderSection
             config={config.campaignHeader}
+            campaignId={activeCampaignId}
+          />
+        );
+      case "campaignTiers":
+        const tiersConf = config.campaignTiers || { 
+          visible: config.campaignDonors?.visible ?? true, 
+          tiers: config.campaignDonors?.tiers, 
+          donationType: config.campaignDonors?.donationType 
+        };
+        if (tiersConf.visible === false || String(tiersConf.visible) === "false") return null;
+        return (
+          <CampaignTiersSection
+            config={tiersConf}
+            tiers={tiersConf.tiers}
+            donationMode={tiersConf.donationType}
+            onSelectTier={handleOpenDonationDrawer}
           />
         );
       case "campaignDonors":
@@ -148,7 +197,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         return (
           <CampaignDonorsSection
             config={config.campaignDonors}
-            campaignId={pageId || "default-campaign"}
+            campaignId={activeCampaignId}
             onOpenAmbassadorModal={() => setIsAmbassadorModalOpen(true)}
           />
         );
@@ -411,21 +460,33 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       <main className="flex-grow">
         {pageId && <PageViewTracker slug={pageId} collectionName={collectionName || "services"} />}
         <div className="flex flex-col w-full">
-          {(config.sectionOrder || ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"]).map((sectionId) => {
-            const isHiddenOnMobile = config.mobileHiddenSections?.includes(sectionId);
-            return (
-              <div key={sectionId} className={isHiddenOnMobile ? "max-sm:hidden" : undefined}>
-                {renderSection(sectionId)}
-              </div>
-            );
-          })}
+          {(() => {
+            const defaultOrder = ["campaignHeader", "campaignTiers", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"];
+            let renderOrder = config.sectionOrder || defaultOrder;
+            if (config.sectionOrder && !config.sectionOrder.includes("campaignTiers")) {
+              const headerIdx = renderOrder.indexOf("campaignHeader");
+              if (headerIdx !== -1) {
+                renderOrder = [...renderOrder.slice(0, headerIdx + 1), "campaignTiers", ...renderOrder.slice(headerIdx + 1)];
+              } else {
+                renderOrder = ["campaignTiers", ...renderOrder];
+              }
+            }
+            return renderOrder.map((sectionId) => {
+              const isHiddenOnMobile = config.mobileHiddenSections?.includes(sectionId);
+              return (
+                <div key={sectionId} className={isHiddenOnMobile ? "max-sm:hidden" : undefined}>
+                  {renderSection(sectionId)}
+                </div>
+              );
+            });
+          })()}
         </div>
       </main>
 
       {/* Sticky Bottom Bar for Campaign */}
       {(config.campaignHeader?.visible !== false || config.campaignDonors?.visible !== false) && (
         <CampaignStickyBar
-          onOpenDonate={() => setIsDonationDrawerOpen(true)}
+          onOpenDonate={() => handleOpenDonationDrawer()}
         />
       )}
 
@@ -433,17 +494,20 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       <AmbassadorModal
         isOpen={isAmbassadorModalOpen}
         onClose={() => setIsAmbassadorModalOpen(false)}
-        campaignId={pageId || "default-campaign"}
+        campaignId={activeCampaignId}
       />
 
       <DonationDrawer
         isOpen={isDonationDrawerOpen}
         onClose={() => setIsDonationDrawerOpen(false)}
-        campaignId={pageId || "default-campaign"}
-        configTiers={config.campaignDonors?.tiers}
-        configDonationType={config.campaignDonors?.donationType}
-        configRecurringMonths={config.campaignDonors?.recurringMonths}
+        campaignId={activeCampaignId}
+        configTiers={config.campaignTiers?.tiers}
+        configDonationType={config.campaignTiers?.donationType}
+        configRecurringMonths={config.campaignTiers?.recurringMonths}
+        initialSelectedTierId={selectedTierIdForDrawer}
       />
+
+
 
       <Footer />
       {globalSettings.showFloatingContactButton !== false && (

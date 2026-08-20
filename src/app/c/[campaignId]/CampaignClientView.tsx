@@ -24,8 +24,8 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
   const [isAmbassadorModalOpen, setIsAmbassadorModalOpen] = useState(false);
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
 
-  const totalRaised = initialCampaign?.totalRaised ?? 45556;
-  const targetGoal = initialCampaign?.targetGoal ?? 500000;
+  const totalRaised = initialCampaign?.totalRaised ?? 0;
+  const targetGoal = initialCampaign?.targetGoal ?? 100000;
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-20 dir-rtl">

@@ -2,8 +2,9 @@
 
 import React, { useState } from "react";
 import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2 } from "lucide-react";
-import { recordDonationAction } from "@/features/campaigns/actions";
+import { recordPendingDonationAction, completeDonationAction, failDonationAction, recordDonationAction } from "@/features/campaigns/actions";
 import { DonationTier } from "@/lib/types/campaign";
+import { CampaignTiersList, defaultTiers } from "./CampaignTiersList";
 
 interface DonationDrawerProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface DonationDrawerProps {
   configTiers?: DonationTier[];
   configDonationType?: "one_time" | "recurring" | "both";
   configRecurringMonths?: number;
+  initialSelectedTierId?: string;
 }
 
 export const DonationDrawer: React.FC<DonationDrawerProps> = ({
@@ -27,16 +29,8 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   configTiers,
   configDonationType = "both",
   configRecurringMonths = 12,
+  initialSelectedTierId,
 }) => {
-  const defaultTiers: DonationTier[] = [
-    { id: "t1", title: "שותף", monthlyAmount: 100, subtitle: "₪100 לחודש ל-12 חודשים", imageShape: "circle" },
-    { id: "t2", title: "תומך", monthlyAmount: 180, subtitle: "₪180 לחודש ל-12 חודשים", imageShape: "circle" },
-    { id: "t3", title: "ידיד", monthlyAmount: 360, subtitle: "₪360 לחודש ל-12 חודשים", imageShape: "circle", isDefault: true },
-    { id: "t4", title: "משפחה", monthlyAmount: 500, subtitle: "₪500 לחודש ל-12 חודשים", imageShape: "circle" },
-    { id: "t5", title: "שותף אמת", monthlyAmount: 770, subtitle: "₪770 לחודש ל-12 חודשים", imageShape: "circle" },
-    { id: "t6", title: "מייסד", monthlyAmount: 1600, subtitle: "₪1,600 לחודש ל-12 חודשים", imageShape: "circle" },
-  ];
-
   const tiers = configTiers && configTiers.length > 0 ? configTiers : defaultTiers;
 
   const [step, setStep] = useState<"details" | "payment" | "success">("details");
@@ -46,10 +40,26 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   );
 
   const defaultTierAmount = tiers.find(t => t.isDefault)?.monthlyAmount || tiers[0]?.monthlyAmount || 360;
-  const [selectedTierId, setSelectedTierId] = useState<string>(tiers.find(t => t.isDefault)?.id || tiers[0]?.id || "");
+  const [selectedTierId, setSelectedTierId] = useState<string>(initialSelectedTierId || tiers.find(t => t.isDefault)?.id || tiers[0]?.id || "");
   const [monthlyAmount, setMonthlyAmount] = useState<number | "">(defaultTierAmount);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [months, setMonths] = useState<number>(configRecurringMonths || 12);
+
+  React.useEffect(() => {
+    if (isOpen && initialSelectedTierId) {
+      if (initialSelectedTierId === "custom") {
+        setSelectedTierId("custom");
+        setMonthlyAmount("");
+      } else {
+        const t = tiers.find(x => x.id === initialSelectedTierId);
+        if (t) {
+          setSelectedTierId(t.id);
+          setMonthlyAmount(t.monthlyAmount);
+          setCustomAmount("");
+        }
+      }
+    }
+  }, [isOpen, initialSelectedTierId, tiers]);
 
   // Donor Details
   const [donorName, setDonorName] = useState("");
@@ -57,6 +67,10 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
+
+  // Pending donation tracking
+  const [pendingDonationId, setPendingDonationId] = useState("");
+  const [pendingContactId, setPendingContactId] = useState("");
 
   // Credit Card Details
   const [ccData, setCcData] = useState({
@@ -95,7 +109,8 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     setSelectedTierId("custom");
   };
 
-  const handleProceedToPayment = (e: React.FormEvent) => {
+  // STEP 1: Record pending donor details in CRM & DB when proceeding to payment
+  const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentMonthly || currentMonthly <= 0) {
       setError("אנא בחר סכום תרומה תקין");
@@ -110,9 +125,43 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
       return;
     }
     setError("");
-    setStep("payment");
+    setLoading(true);
+
+    try {
+      const selectedTierObj = tiers.find(t => t.id === selectedTierId);
+      const res = await recordPendingDonationAction({
+        campaignId,
+        donorName: isAnonymous ? "אנונימי" : donorName,
+        amount: calculatedTotal,
+        monthlyAmount: donationMode === "recurring" ? currentMonthly : undefined,
+        recurringMonths: donationMode === "recurring" ? months : 1,
+        isRecurring: donationMode === "recurring",
+        tier: selectedTierObj?.title || (selectedTierId === "custom" ? "סכום אישי" : ""),
+        dedication,
+        isAnonymous,
+        ambassadorId: ambassadorId || null,
+        ambassadorName: ambassadorName || null,
+        phone,
+        email,
+      });
+
+      if (res.success) {
+        if (res.donationId) setPendingDonationId(res.donationId);
+        if (res.contactId) setPendingContactId(res.contactId);
+        setStep("payment");
+      } else {
+        setError(res.error || "שגיאה ברישום פרטי התורם במערכת");
+      }
+    } catch (err: any) {
+      console.error("Error creating pending donation:", err);
+      // Even if network warning, allow proceeding to payment
+      setStep("payment");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // STEP 2: Process Kesher payment and complete donation upon success
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -166,33 +215,79 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         setTransactionId(tranNum);
         setReceiptUrl(pdf);
 
-        // Record donation in Firestore
-        await recordDonationAction({
-          campaignId,
-          donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
-          amount: calculatedTotal,
-          monthlyAmount: isRecurring ? currentMonthly : undefined,
-          recurringMonths: isRecurring ? months : 1,
-          isRecurring,
-          dedication,
-          isAnonymous,
-          ambassadorId: ambassadorId || null,
-          ambassadorName: ambassadorName || null,
-          paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
-          phone,
-          email,
-        });
+        // Complete donation in Firestore & CRM (Atomically adds to campaign totalRaised & donorCount!)
+        if (pendingDonationId) {
+          await completeDonationAction({
+            campaignId,
+            donationId: pendingDonationId,
+            contactId: pendingContactId,
+            amount: calculatedTotal,
+            monthlyAmount: isRecurring ? currentMonthly : undefined,
+            recurringMonths: isRecurring ? months : 1,
+            isRecurring,
+            dedication,
+            isAnonymous,
+            ambassadorId: ambassadorId || null,
+            ambassadorName: ambassadorName || null,
+            transactionId: tranNum,
+            receiptUrl: pdf,
+            paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
+            donorName: isAnonymous ? "אנונימי" : donorName,
+            phone,
+            email,
+          });
+        } else {
+          // Fallback direct record if pending ID not present
+          await recordDonationAction({
+            campaignId,
+            donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
+            amount: calculatedTotal,
+            monthlyAmount: isRecurring ? currentMonthly : undefined,
+            recurringMonths: isRecurring ? months : 1,
+            isRecurring,
+            dedication,
+            isAnonymous,
+            ambassadorId: ambassadorId || null,
+            ambassadorName: ambassadorName || null,
+            transactionId: tranNum,
+            receiptUrl: pdf,
+            paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
+            phone,
+            email,
+          });
+        }
 
         setStep("success");
         if (onDonationCompleted) {
           onDonationCompleted();
         }
       } else {
-        setError(data.error || "שגיאה בביצוע התשלום בכרטיס האשראי. אנא ודא את פרטי הכרטיס ונסה שנית.");
+        const errorMsg = data.error || "שגיאה בביצוע התשלום בכרטיס האשראי. אנא ודא את פרטי הכרטיס ונסה שנית.";
+        setError(errorMsg);
+
+        // Record failure in pending donation & CRM
+        if (pendingDonationId) {
+          await failDonationAction({
+            campaignId,
+            donationId: pendingDonationId,
+            contactId: pendingContactId,
+            error: errorMsg,
+          });
+        }
       }
     } catch (err: any) {
       console.error("Payment error:", err);
-      setError(err.message || "שגיאת תקשורת עם שרתי הסליקה");
+      const errorMsg = err.message || "שגיאת תקשורת עם שרתי הסליקה";
+      setError(errorMsg);
+
+      if (pendingDonationId) {
+        await failDonationAction({
+          campaignId,
+          donationId: pendingDonationId,
+          contactId: pendingContactId,
+          error: errorMsg,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -204,6 +299,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     setLoading(false);
     onClose();
   };
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 dir-rtl overflow-y-auto">
@@ -277,56 +373,14 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   {donationMode === "recurring" ? "בחר מדרגת תרומה חודשית (הוראת קבע)" : "בחר סכום תרומה"}
                 </label>
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                  {tiers.map((t) => {
-                    const isSelected = selectedTierId === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => handleSelectTier(t)}
-                        className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all border text-center group cursor-pointer ${
-                          isSelected
-                            ? "bg-emerald-800/80 border-emerald-500 shadow-lg shadow-emerald-900/40 scale-105"
-                            : "bg-slate-800/70 border-slate-700/80 hover:bg-slate-800 hover:border-slate-600"
-                        }`}
-                      >
-                        <div className="w-12 h-12 rounded-full bg-emerald-900/80 border-2 border-emerald-400/60 flex flex-col items-center justify-center mb-1 text-[10px] font-black text-emerald-100 shadow-md group-hover:scale-105 transition-transform overflow-hidden relative">
-                          {t.imageSrc ? (
-                            <img src={t.imageSrc} alt={t.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <>
-                              <span className="leading-tight text-[11px] font-bold text-white">{t.title}</span>
-                              <span className="text-[9px] text-emerald-300">₪{t.monthlyAmount}</span>
-                            </>
-                          )}
-                        </div>
-
-                        <span className="font-bold text-[11px] text-white line-clamp-1">{t.title}</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">
-                          ₪{t.monthlyAmount}{donationMode === "recurring" ? "/חודש" : ""}
-                        </span>
-                      </button>
-                    );
-                  })}
-
-                  {/* Custom Amount Button */}
-                  <button
-                    type="button"
-                    onClick={handleSelectCustomTier}
-                    className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all border text-center cursor-pointer ${
-                      selectedTierId === "custom"
-                        ? "bg-emerald-800/80 border-emerald-500 shadow-lg scale-105"
-                        : "bg-slate-800/70 border-slate-700/80 hover:bg-slate-800"
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-sky-900/80 border-2 border-sky-400/60 flex items-center justify-center mb-1 text-[11px] font-bold text-sky-100 shadow-md">
-                      סכום אחר
-                    </div>
-                    <span className="font-bold text-[11px] text-white">אחר</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">חופשי</span>
-                  </button>
-                </div>
+                <CampaignTiersList
+                  tiers={tiers}
+                  donationMode={donationMode === "recurring" ? "recurring" : "one_time"}
+                  selectedTierId={selectedTierId}
+                  onSelectTier={handleSelectTier}
+                  onSelectCustomTier={handleSelectCustomTier}
+                  theme="dark"
+                />
               </div>
 
               {/* Display & Manual Amount Input Box */}

@@ -1,12 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Award, Target, Sparkles } from "lucide-react";
-import { CampaignHeaderConfig } from "@/lib/types/campaign";
+import { Campaign, CampaignHeaderConfig, DonationTier } from "@/lib/types/campaign";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getCampaignData } from "@/features/campaigns/actions";
 
 interface CampaignHeaderSectionProps {
   config?: CampaignHeaderConfig;
+  campaignId?: string;
   totalRaised?: number;
   targetGoal?: number;
   currency?: string;
@@ -17,15 +21,50 @@ interface CampaignHeaderSectionProps {
 
 export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
   config,
-  totalRaised = 45556,
-  targetGoal = 500000,
+  campaignId,
+  totalRaised = 0,
+  targetGoal = 100000,
   currency = "₪",
   ambassadorName,
   ambassadorGoal,
   ambassadorRaised,
+  tiers,
+  donationMode,
+  onSelectTier,
 }) => {
-  const currentRaised = ambassadorRaised !== undefined ? ambassadorRaised : (config?.totalRaised ?? totalRaised);
-  const currentGoal = ambassadorGoal !== undefined ? ambassadorGoal : (config?.targetGoal ?? targetGoal);
+  const rawId = (config?.campaignId && config.campaignId !== "default-campaign") ? config.campaignId : (campaignId || "home");
+  const targetCampaignId = rawId === "default-campaign" ? "home" : rawId;
+  const [liveCampaign, setLiveCampaign] = useState<Campaign | null>(null);
+
+  // 1. Initial direct fetch via Server Action
+  useEffect(() => {
+    if (!targetCampaignId) return;
+    getCampaignData(targetCampaignId).then((camp) => {
+      if (camp) setLiveCampaign(camp);
+    }).catch(err => console.warn("Failed to fetch initial campaign data:", err));
+  }, [targetCampaignId]);
+
+  // 2. Real-time Firestore Listener
+  useEffect(() => {
+    if (!targetCampaignId) return;
+    const unsub = onSnapshot(doc(db, "campaigns", targetCampaignId), (docSnap) => {
+      if (docSnap.exists()) {
+        setLiveCampaign({ id: docSnap.id, ...docSnap.data() } as Campaign);
+      }
+    }, (err) => {
+      console.warn("CampaignHeaderSection live listener:", err);
+    });
+
+    return () => unsub();
+  }, [targetCampaignId]);
+
+  const currentRaised = ambassadorRaised !== undefined 
+    ? ambassadorRaised 
+    : (liveCampaign?.totalRaised ?? config?.totalRaised ?? totalRaised);
+
+  const currentGoal = ambassadorGoal !== undefined 
+    ? ambassadorGoal 
+    : (liveCampaign?.targetGoal ?? config?.targetGoal ?? targetGoal);
 
   const percentage = Math.min(100, Math.round((currentRaised / (currentGoal || 1)) * 100));
 
@@ -159,12 +198,14 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
         </motion.div>
 
         {/* Goal Percentage Subtitle */}
-        <div className="flex items-center justify-center gap-2 text-base md:text-lg font-semibold text-slate-600 dir-rtl">
+        <div className="flex items-center justify-center gap-2 text-base md:text-lg font-semibold text-slate-600 dir-rtl mb-6">
           <span className="bg-emerald-100 text-emerald-900 px-3 py-0.5 rounded-full font-bold text-sm">
             {percentage}% מהיעד
           </span>
           <span>{currency}{formatAmount(currentGoal)}</span>
         </div>
+
+        {/* Removed Tiers List since it's its own section now */}
       </div>
     </section>
   );

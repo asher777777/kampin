@@ -131,6 +131,43 @@ export interface Contact {
     imageUrl?: string;
   }[];
 
+  // Campaign Fields
+  campaign_id?: string;
+  campaign_title?: string;
+  campaign_role?: "donor" | "ambassador" | "leader" | string;
+  campaign_donation_mode?: "recurring" | "one_time" | string;
+  campaign_amount?: number;
+  campaign_monthly_amount?: number;
+  campaign_recurring_months?: number;
+  campaign_tier?: string;
+  campaign_is_anonymous?: boolean;
+  campaign_dedication?: string;
+  campaign_ambassador_name?: string;
+  campaign_payment_status?: "pending" | "completed" | "failed" | string;
+  campaign_payment_method?: string;
+  campaign_transaction_id?: string;
+  campaign_receipt_url?: string;
+  campaign_target_goal?: number;
+  campaign_total_raised?: number;
+  campaign_donations_history?: {
+    id?: string;
+    campaignId?: string;
+    campaignTitle?: string;
+    amount: number;
+    monthlyAmount?: number;
+    recurringMonths?: number;
+    isRecurring?: boolean;
+    tier?: string;
+    dedication?: string;
+    isAnonymous?: boolean;
+    ambassadorName?: string;
+    paymentStatus: "pending" | "completed" | "failed" | string;
+    paymentMethod?: string;
+    transactionId?: string;
+    receiptUrl?: string;
+    date: string;
+  }[];
+
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
@@ -138,3 +175,4 @@ export interface Contact {
   // Dynamic custom fields
   [key: string]: any;
 }
+

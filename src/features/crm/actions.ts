@@ -4,6 +4,7 @@ import { adminDb, getUserDb, FieldValue } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { Contact } from "./types";
 import { revalidatePath } from "next/cache";
+import { syncContactToCampaign } from "@/features/campaigns/actions";
 
 // Helper to normalize phone numbers globally
 function normalizePhone(phone?: string) {
@@ -268,13 +269,14 @@ export async function createContact(contactData: Partial<Contact>) {
       last_form_page: contactData.last_form_page || "",
       last_form_submission_date: contactData.last_form_submission_date || "",
       last_message_read_status: contactData.last_message_read_status || "unknown",
-      total_spent: contactData.total_spent || 0,
-      order_count: contactData.order_count || 0,
-      last_order_date: contactData.last_order_date || "",
+      total_spent: contactData.total_spent || (contactData.campaign_amount ? Number(contactData.campaign_amount) : 0),
+      order_count: contactData.order_count || (contactData.campaign_amount ? 1 : 0),
+      last_order_date: contactData.last_order_date || (contactData.campaign_amount ? new Date().toISOString() : ""),
       payment_details: contactData.payment_details || {},
       communityIds: contactData.communityIds || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...contactData,
     } as any;
 
     // Append any dynamic custom fields
@@ -296,6 +298,12 @@ export async function createContact(contactData: Partial<Contact>) {
     }
 
     const docRef = await adminDb.collection("contacts").add(newContact);
+
+    // Sync to campaign subcollections and counters if campaign fields exist
+    if (contactData.campaign_id) {
+      await syncContactToCampaign(docRef.id, { ...newContact, id: docRef.id });
+    }
+
     revalidatePath("/dashboard/crm");
     return { success: true, id: docRef.id };
   } catch (error: any) {
@@ -344,6 +352,13 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
     }
 
     await docRef.update(updatedFields);
+
+    // Sync to campaign subcollections and counters if campaign fields exist
+    const mergedData = { ...docSnap.data(), ...updatedFields };
+    if (mergedData.campaign_id) {
+      await syncContactToCampaign(id, mergedData);
+    }
+
     revalidatePath("/dashboard/crm");
     return { success: true };
   } catch (error: any) {
@@ -351,6 +366,7 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
     return { success: false, error: error.message || String(error) };
   }
 }
+
 
 // 5. Delete contact
 export async function deleteContact(id: string) {

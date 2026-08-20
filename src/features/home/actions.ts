@@ -230,6 +230,7 @@ export interface HomePageConfig {
     effect?: "glassmorphism" | "glow" | "lift" | "gradient-border" | "minimal";
   };
   campaignHeader?: any;
+  campaignTiers?: any;
   campaignDonors?: any;
   mobileHiddenSections?: string[];
   sectionOrder: string[];

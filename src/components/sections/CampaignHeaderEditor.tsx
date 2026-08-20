@@ -17,11 +17,23 @@ export const CampaignHeaderEditor: React.FC<CampaignHeaderEditorProps> = ({
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
-    getAllCampaigns().then((res) => {
-      if (res && res.length > 0) {
-        setCampaigns(res);
-      }
-    });
+    fetch("/api/campaigns")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.items)) {
+          setCampaigns(data.items);
+        } else {
+          getAllCampaigns().then(camps => {
+            if (Array.isArray(camps)) setCampaigns(camps);
+          });
+        }
+      })
+      .catch(err => {
+        console.warn("GET /api/campaigns error:", err);
+        getAllCampaigns().then(camps => {
+          if (Array.isArray(camps)) setCampaigns(camps);
+        });
+      });
   }, []);
 
   return (
@@ -31,21 +43,42 @@ export const CampaignHeaderEditor: React.FC<CampaignHeaderEditorProps> = ({
       <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-2">
         <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
           <Database className="w-4 h-4" />
-          <span>בחירת קמפיין / ספריית DB מהמערכת</span>
+          <span>בחירת קמפיין / עמוד מקושר מהמערכת</span>
         </div>
         <select
           value={config.campaignId || "default-campaign"}
-          onChange={(e) => onChange({ ...config, campaignId: e.target.value })}
+          onChange={(e) => {
+            const val = e.target.value;
+            const selected = campaigns.find(c => c.id === val);
+            onChange({
+              ...config,
+              campaignId: val,
+              targetGoal: selected?.targetGoal ?? config.targetGoal,
+              totalRaised: selected?.totalRaised ?? config.totalRaised,
+            });
+          }}
           className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-semibold"
         >
           <option value="default-campaign">קמפיין ברירת מחדל (Default Campaign)</option>
-          {campaigns.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title} (ID: {c.id})
-            </option>
+          {Object.entries(
+            campaigns.reduce((acc: Record<string, any[]>, item: any) => {
+              const cat = item.category || "קמפיינים";
+              if (!acc[cat]) acc[cat] = [];
+              acc[cat].push(item);
+              return acc;
+            }, {})
+          ).map(([category, items]) => (
+            <optgroup key={category} label={category} className="bg-slate-800 text-amber-400 font-bold">
+              {items.map((c) => (
+                <option key={c.id} value={c.id} className="bg-slate-900 text-white font-normal">
+                  {c.title} {c.id !== "home" ? `(${c.id})` : ""}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>
+
 
       <div>
         <label className="block text-xs font-semibold mb-1 text-slate-300">כותרת הסקשן</label>
@@ -63,7 +96,7 @@ export const CampaignHeaderEditor: React.FC<CampaignHeaderEditorProps> = ({
           <label className="block text-xs font-semibold mb-1 text-slate-300">סכום יעד הקמפיין (₪)</label>
           <input
             type="number"
-            value={config.targetGoal || 500000}
+            value={config.targetGoal ?? 100000}
             onChange={(e) => onChange({ ...config, targetGoal: Number(e.target.value) })}
             className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
           />
@@ -72,12 +105,13 @@ export const CampaignHeaderEditor: React.FC<CampaignHeaderEditorProps> = ({
           <label className="block text-xs font-semibold mb-1 text-slate-300">סכום נוכחי שהושג (₪)</label>
           <input
             type="number"
-            value={config.totalRaised || 45556}
+            value={config.totalRaised ?? 0}
             onChange={(e) => onChange({ ...config, totalRaised: Number(e.target.value) })}
             className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
           />
         </div>
       </div>
+
 
       <div>
         <label className="block text-xs font-semibold mb-1 text-slate-300">סגנון/תבנית גרף SVG הטרנד</label>

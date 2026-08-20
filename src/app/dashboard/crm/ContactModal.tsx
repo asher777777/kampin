@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
 import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField } from "@/features/crm/actions";
+import { getAllCampaigns } from "@/features/campaigns/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap } from "lucide-react";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle } from "lucide-react";
 import { InteractionsList } from "@/components/ui/InteractionsList";
 import { getUserCoins, adminUpdateUserCoins } from "@/features/credits/actions";
 
@@ -186,6 +187,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   };
 
   // Form fields state
+
   const [contaName, setContaName] = useState("");
   const [fM, setFM] = useState("");
   const [contaPhone, setContaPhone] = useState("");
@@ -208,7 +210,26 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   const [workPhone, setWorkPhone] = useState("");
   const [website, setWebsite] = useState("");
 
-
+  // Campaign Fields State
+  const [campaignId, setCampaignId] = useState("");
+  const [campaignTitle, setCampaignTitle] = useState("");
+  const [campaignRole, setCampaignRole] = useState("donor");
+  const [campaignDonationMode, setCampaignDonationMode] = useState<"recurring" | "one_time">("recurring");
+  const [campaignAmount, setCampaignAmount] = useState<number | "">("");
+  const [campaignMonthlyAmount, setCampaignMonthlyAmount] = useState<number | "">("");
+  const [campaignRecurringMonths, setCampaignRecurringMonths] = useState<number | "">(12);
+  const [campaignTier, setCampaignTier] = useState("");
+  const [campaignIsAnonymous, setCampaignIsAnonymous] = useState(false);
+  const [campaignDedication, setCampaignDedication] = useState("");
+  const [campaignAmbassadorName, setCampaignAmbassadorName] = useState("");
+  const [campaignPaymentStatus, setCampaignPaymentStatus] = useState<"pending" | "completed" | "failed">("completed");
+  const [campaignPaymentMethod, setCampaignPaymentMethod] = useState("kesher_credit_card");
+  const [campaignTransactionId, setCampaignTransactionId] = useState("");
+  const [campaignReceiptUrl, setCampaignReceiptUrl] = useState("");
+  const [campaignTargetGoal, setCampaignTargetGoal] = useState<number | "">("");
+  const [campaignTotalRaised, setCampaignTotalRaised] = useState<number | "">("");
+  const [campaignDonationsHistory, setCampaignDonationsHistory] = useState<any[]>([]);
+  const [availableCampaigns, setAvailableCampaigns] = useState<any[]>([]);
 
   // Repeater states
   const [events, setEvents] = useState<ContactEvent[]>([]);
@@ -239,7 +260,27 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
     getCustomFields().then(setCustomFieldsConfig);
     checkIsSuperAdmin().then(setIsSuperAdmin).catch(() => setIsSuperAdmin(false));
     getSystemFieldLabels().then(setSystemLabels);
+    
+    // Fetch all system pages and campaigns via GET API
+    fetch("/api/campaigns")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.items)) {
+          setAvailableCampaigns(data.items);
+        } else {
+          getAllCampaigns().then(camps => {
+            if (Array.isArray(camps)) setAvailableCampaigns(camps);
+          });
+        }
+      })
+      .catch(err => {
+        console.warn("GET /api/campaigns error:", err);
+        getAllCampaigns().then(camps => {
+          if (Array.isArray(camps)) setAvailableCampaigns(camps);
+        });
+      });
   }, []);
+
 
   const loadCustomTabs = async () => {
     const tabsRes = await getCustomTabs();
@@ -294,8 +335,26 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setLastFormName(contact.last_form_name || "");
         setWorkPhone(contact.work_phone || "");
         setWebsite(contact.website || "");
-        
 
+        // Initialize Campaign Fields
+        setCampaignId(contact.campaign_id || "");
+        setCampaignTitle(contact.campaign_title || "");
+        setCampaignRole(contact.campaign_role || "donor");
+        setCampaignDonationMode((contact.campaign_donation_mode as any) || (contact.is_standing_order ? "recurring" : "one_time"));
+        setCampaignAmount(contact.campaign_amount ?? contact.total_donated ?? "");
+        setCampaignMonthlyAmount(contact.campaign_monthly_amount ?? contact.monthly_amount ?? "");
+        setCampaignRecurringMonths(contact.campaign_recurring_months ?? 12);
+        setCampaignTier(contact.campaign_tier || "");
+        setCampaignIsAnonymous(Boolean(contact.campaign_is_anonymous || contact.is_anonymous));
+        setCampaignDedication(contact.campaign_dedication || contact.dedication || "");
+        setCampaignAmbassadorName(contact.campaign_ambassador_name || contact.referred_by_ambassador || "");
+        setCampaignPaymentStatus((contact.campaign_payment_status as any) || (contact.payment_status as any) || "completed");
+        setCampaignPaymentMethod(contact.campaign_payment_method || "kesher_credit_card");
+        setCampaignTransactionId(contact.campaign_transaction_id || "");
+        setCampaignReceiptUrl(contact.campaign_receipt_url || "");
+        setCampaignTargetGoal(contact.campaign_target_goal ?? "");
+        setCampaignTotalRaised(contact.campaign_total_raised ?? "");
+        setCampaignDonationsHistory(contact.campaign_donations_history || []);
 
         setEvents(contact.events || []);
 
@@ -326,7 +385,25 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setWorkPhone("");
         setWebsite("");
 
-
+        // Reset Campaign Fields
+        setCampaignId("");
+        setCampaignTitle("");
+        setCampaignRole("donor");
+        setCampaignDonationMode("recurring");
+        setCampaignAmount("");
+        setCampaignMonthlyAmount("");
+        setCampaignRecurringMonths(12);
+        setCampaignTier("");
+        setCampaignIsAnonymous(false);
+        setCampaignDedication("");
+        setCampaignAmbassadorName("");
+        setCampaignPaymentStatus("completed");
+        setCampaignPaymentMethod("kesher_credit_card");
+        setCampaignTransactionId("");
+        setCampaignReceiptUrl("");
+        setCampaignTargetGoal("");
+        setCampaignTotalRaised("");
+        setCampaignDonationsHistory([]);
 
         setEvents([]);
         setCustomFieldsValues({});
@@ -364,8 +441,28 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       work_phone: workPhone,
       website: website,
       events,
+      // Campaign Fields
+      campaign_id: campaignId || undefined,
+      campaign_title: campaignTitle || (availableCampaigns.find(c => c.id === campaignId)?.title || undefined),
+      campaign_role: campaignRole,
+      campaign_donation_mode: campaignDonationMode,
+      campaign_amount: campaignAmount !== "" ? Number(campaignAmount) : undefined,
+      campaign_monthly_amount: campaignMonthlyAmount !== "" ? Number(campaignMonthlyAmount) : undefined,
+      campaign_recurring_months: campaignRecurringMonths !== "" ? Number(campaignRecurringMonths) : undefined,
+      campaign_tier: campaignTier || undefined,
+      campaign_is_anonymous: Boolean(campaignIsAnonymous),
+      campaign_dedication: campaignDedication,
+      campaign_ambassador_name: campaignAmbassadorName || undefined,
+      campaign_payment_status: campaignPaymentStatus,
+      campaign_payment_method: campaignPaymentMethod,
+      campaign_transaction_id: campaignTransactionId,
+      campaign_receipt_url: campaignReceiptUrl,
+      campaign_target_goal: campaignTargetGoal !== "" ? Number(campaignTargetGoal) : undefined,
+      campaign_total_raised: campaignTotalRaised !== "" ? Number(campaignTotalRaised) : undefined,
+      campaign_donations_history: campaignDonationsHistory,
       ...customFieldsValues,
     };
+
 
     try {
       if (isEdit && contact?.id) {
@@ -1110,6 +1207,368 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
             )}
           </div>
 
+          {/* Tab Content: Campaigns */}
+          <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+            <button
+              type="button"
+              id="tab-camp"
+              onClick={() => handleTabClick("camp")}
+              className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "camp" ? "ring-1 ring-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] z-10 relative" : "border-b border-white/5"}`}
+            >
+              <div className="flex items-center gap-3 text-white">
+                <Heart className="w-4 h-4 text-rose-400 fill-rose-500/20" />
+                <span className="font-bold">קמפיינים ותרומות</span>
+                {campaignAmount !== "" && (
+                  <span className="text-[11px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                    ₪{Number(campaignAmount).toLocaleString()} • {campaignPaymentStatus === "pending" ? "ממתין לתשלום" : campaignPaymentStatus === "completed" ? "הושלם" : "נכשל"}
+                  </span>
+                )}
+              </div>
+              {activeTab === "camp" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+            </button>
+            {activeTab === "camp" && (
+              <div className="p-6 bg-[#111] animate-in fade-in duration-200">
+                <div className="space-y-6 animate-in fade-in">
+                  
+                  {/* Campaign Association & Role */}
+                  <div>
+                    <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">שיוך וסטטוס קמפיין</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">קמפיין מקושר</label>
+                        <select
+                          value={campaignId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCampaignId(val);
+                            const selectedCamp = availableCampaigns.find(c => c.id === val);
+                            if (selectedCamp) setCampaignTitle(selectedCamp.title);
+                          }}
+                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium"
+                        >
+                          <option value="">בחר עמוד / קמפיין מקושר...</option>
+                          {Object.entries(
+                            availableCampaigns.reduce((acc: Record<string, any[]>, item: any) => {
+                              const cat = item.category || "קמפיינים";
+                              if (!acc[cat]) acc[cat] = [];
+                              acc[cat].push(item);
+                              return acc;
+                            }, {})
+                          ).map(([category, items]) => (
+                            <optgroup key={category} label={category} className="bg-[#181818] text-amber-400 font-bold">
+                              {items.map((c) => (
+                                <option key={c.id} value={c.id} className="bg-[#0a0a0a] text-white font-normal">
+                                  {c.title} {c.id !== "home" ? `(${c.id})` : ""}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">תפקיד בקמפיין</label>
+                        <select
+                          value={campaignRole}
+                          onChange={(e) => setCampaignRole(e.target.value)}
+                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                        >
+                          <option value="donor">תורם</option>
+                          <option value="ambassador">שגריר / מוביל יעד</option>
+                          <option value="leader">ראש צוות / קבוצה</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">סטטוס תשלום</label>
+                        <select
+                          value={campaignPaymentStatus}
+                          onChange={(e) => setCampaignPaymentStatus(e.target.value as any)}
+                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-bold"
+                        >
+                          <option value="completed">הושלם (Completed)</option>
+                          <option value="pending">ממתין לתשלום (Pending)</option>
+                          <option value="failed">נכשל / בוטל (Failed)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">שגריר מיוחס / מפנה</label>
+                        <Input
+                          value={campaignAmbassadorName}
+                          onChange={(e) => setCampaignAmbassadorName(e.target.value)}
+                          placeholder="שם השגריר שהביא את התרומה..."
+                          className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Donation Amounts & Details */}
+                  <div>
+                    <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">סכום ומסלול תרומה</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">סוג תרומה</label>
+                        <select
+                          value={campaignDonationMode}
+                          onChange={(e) => setCampaignDonationMode(e.target.value as any)}
+                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                        >
+                          <option value="recurring">הוראת קבע חודשית</option>
+                          <option value="one_time">תרומה חד פעמית</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">סכום כולל (₪)</label>
+                        <Input
+                          type="number"
+                          value={campaignAmount}
+                          onChange={(e) => setCampaignAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                          placeholder="למשל: 360"
+                          className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 font-bold"
+                        />
+                      </div>
+
+                      {campaignDonationMode === "recurring" && (
+                        <>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-amber-500">סכום חודשי (₪)</label>
+                            <Input
+                              type="number"
+                              value={campaignMonthlyAmount}
+                              onChange={(e) => setCampaignMonthlyAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                              placeholder="למשל: 180"
+                              className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-amber-500">מספר חודשים</label>
+                            <Input
+                              type="number"
+                              value={campaignRecurringMonths}
+                              onChange={(e) => setCampaignRecurringMonths(e.target.value === "" ? "" : Number(e.target.value))}
+                              placeholder="12"
+                              className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">מדרגת תרומה</label>
+                        <Input
+                          value={campaignTier}
+                          onChange={(e) => setCampaignTier(e.target.value)}
+                          placeholder="למשל: שותף, תומך, ידיד..."
+                          className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dedication & Anonymity */}
+                  <div>
+                    <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">הקדשה ונראות פומבית</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="crmCampaignIsAnonymous"
+                          checked={campaignIsAnonymous}
+                          onChange={(e) => setCampaignIsAnonymous(e.target.checked)}
+                          className="w-4 h-4 rounded border-amber-500/50 bg-[#0a0a0a] text-amber-500 cursor-pointer accent-amber-500"
+                        />
+                        <label htmlFor="crmCampaignIsAnonymous" className="text-xs text-slate-300 font-semibold cursor-pointer">
+                          תרומה אנונימית (השם לא יוצג ברשימת התורמים הפומבית)
+                        </label>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">הקדשה / ברכה (מוצג בלוח התורמים)</label>
+                        <textarea
+                          value={campaignDedication}
+                          onChange={(e) => setCampaignDedication(e.target.value)}
+                          rows={3}
+                          placeholder="לזכות, לרפואת, לעילוי נשמת או ברכה מכל הלב..."
+                          className="flex w-full rounded-2xl bg-transparent border border-amber-500 text-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 placeholder:text-white/30"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment & Receipt Information */}
+                  <div>
+                    <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">פרטי סליקה, אסמכתא וקבלה</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">אמצעי תשלום</label>
+                        <select
+                          value={campaignPaymentMethod}
+                          onChange={(e) => setCampaignPaymentMethod(e.target.value)}
+                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                        >
+                          <option value="kesher_credit_card">כרטיס אשראי (Kesher API)</option>
+                          <option value="kesher_standing_order">הוראת קבע אשראי (Kesher API)</option>
+                          <option value="bank_transfer">העברה בנקאית</option>
+                          <option value="bit">ביט / PayBox</option>
+                          <option value="cash">מזומן</option>
+                          <option value="check">צ'ק</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">מספר אישור עסקה / אסמכתא</label>
+                        <Input
+                          value={campaignTransactionId}
+                          onChange={(e) => setCampaignTransactionId(e.target.value)}
+                          placeholder="Transaction ID / Ref..."
+                          className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 font-mono text-xs"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-amber-500">קישור לקבלה (PDF)</label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={campaignReceiptUrl}
+                            onChange={(e) => setCampaignReceiptUrl(e.target.value)}
+                            placeholder="https://..."
+                            className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 text-xs"
+                            dir="ltr"
+                          />
+                          {campaignReceiptUrl && (
+                            <a
+                              href={campaignReceiptUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2.5 bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 hover:bg-indigo-600 hover:text-white rounded-xl flex items-center justify-center transition-colors shrink-0"
+                              title="פתח קבלה"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ambassador Specific Target Info (if role is ambassador) */}
+                  {campaignRole === "ambassador" && (
+                    <div>
+                      <h4 className="text-sm font-black text-amber-500 mb-3 uppercase tracking-wider">יעדי שגריר אישיים</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-amber-500">יעד אישי לשגריר (₪)</label>
+                          <Input
+                            type="number"
+                            value={campaignTargetGoal}
+                            onChange={(e) => setCampaignTargetGoal(e.target.value === "" ? "" : Number(e.target.value))}
+                            placeholder="למשל: 10000"
+                            className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-amber-500">סך שגויס בפועל (₪)</label>
+                          <Input
+                            type="number"
+                            value={campaignTotalRaised}
+                            onChange={(e) => setCampaignTotalRaised(e.target.value === "" ? "" : Number(e.target.value))}
+                            placeholder="0"
+                            className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campaign Donations History List */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">היסטוריית תרומות בקמפיין</h4>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          const newRecord = {
+                            id: `man_${Date.now()}`,
+                            campaignId: campaignId || "default-campaign",
+                            campaignTitle: campaignTitle || "קמפיין ראשי",
+                            amount: 180,
+                            paymentStatus: "completed",
+                            paymentMethod: "kesher_credit_card",
+                            date: new Date().toISOString(),
+                          };
+                          setCampaignDonationsHistory([...campaignDonationsHistory, newRecord]);
+                        }}
+                        className="bg-transparent border border-amber-500/50 hover:bg-amber-500/10 text-amber-500 rounded-xl text-xs py-1 px-2.5 flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> הוסף תרומה לרשימה
+                      </Button>
+                    </div>
+
+                    {campaignDonationsHistory.length === 0 ? (
+                      <div className="p-6 text-center border border-white/5 rounded-2xl text-slate-500 text-xs bg-[#141414]">
+                        טרם נרשמו תרומות קמפיין נוספות לאיש קשר זה.
+                      </div>
+                    ) : (
+                      <div className="border border-white/5 rounded-2xl overflow-hidden bg-[#141414] max-h-[220px] overflow-y-auto">
+                        <table className="w-full text-right text-xs">
+                          <thead className="bg-[#1c1c1c] border-b border-white/5 font-bold text-amber-500 sticky top-0">
+                            <tr>
+                              <th className="p-3">סכום</th>
+                              <th className="p-3">קמפיין</th>
+                              <th className="p-3">תאריך</th>
+                              <th className="p-3">סטטוס</th>
+                              <th className="p-3 text-left">פעולות</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-slate-300">
+                            {campaignDonationsHistory.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-[#181818] transition-colors">
+                                <td className="p-3 font-bold text-white">₪{Number(item.amount || 0).toLocaleString()}</td>
+                                <td className="p-3 truncate max-w-[120px]">{item.campaignTitle || item.campaignId || "-"}</td>
+                                <td className="p-3">{item.date ? new Date(item.date).toLocaleDateString("he-IL") : "-"}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    item.paymentStatus === "completed"
+                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : item.paymentStatus === "pending"
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  }`}>
+                                    {item.paymentStatus === "completed" ? "הושלם" : item.paymentStatus === "pending" ? "ממתין לתשלום" : "נכשל"}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-left">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCampaignDonationsHistory(campaignDonationsHistory.filter((_, i) => i !== idx));
+                                    }}
+                                    className="text-slate-500 hover:text-rose-400 p-1"
+                                    title="מחק רשומה"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Tab Content: Payments */}
           <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
             <button
@@ -1118,6 +1577,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
               onClick={() => handleTabClick("payments")}
               className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "payments" ? "ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative" : "border-b border-white/5"}`}
             >
+
               <span className="flex items-center gap-3 text-white">
                 <CreditCard className="w-4 h-4" />
                 תשלומים

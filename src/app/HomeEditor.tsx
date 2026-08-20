@@ -25,6 +25,8 @@ import { CampaignHeaderSection } from "@/components/sections/CampaignHeaderSecti
 import { CampaignHeaderEditor } from "@/components/sections/CampaignHeaderEditor";
 import { CampaignDonorsSection } from "@/components/sections/CampaignDonorsSection";
 import { CampaignDonorsEditor } from "@/components/sections/CampaignDonorsEditor";
+import { CampaignTiersSection } from "@/components/sections/CampaignTiersSection";
+import { CampaignTiersEditor } from "@/components/sections/CampaignTiersEditor";
 import { HomePageConfig, savePageConfig, getAllSitePages } from "@/features/home/actions";
 import { GlobalSettings, saveGlobalSettings } from "@/features/settings/actions";
 import { generateSeoTagsWithAI, generateSeoImageWithAI } from "@/features/ai/actions";
@@ -358,7 +360,7 @@ export function HomeEditor({
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  const allAvailableSections = ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
+  const allAvailableSections = ["campaignHeader", "campaignTiers", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
   const currentSectionOrder = Array.from(new Set([...(config.sectionOrder || []), ...allAvailableSections]));
 
   const availableAnchors = [
@@ -379,7 +381,7 @@ export function HomeEditor({
     const newConfig = { ...config };
 
     if (!newConfig.campaignHeader) {
-      newConfig.campaignHeader = { visible: true, title: "הסכום שהושג", targetGoal: 500000, totalRaised: 45556, svgTrendPreset: "curve_up" };
+      newConfig.campaignHeader = { visible: true, title: "הסכום שהושג", targetGoal: 100000, totalRaised: 0, svgTrendPreset: "curve_up" };
       updated = true;
     }
     if (!newConfig.campaignDonors) {
@@ -686,16 +688,25 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
       case "campaignHeader": {
-        const campaignHeaderConfig = config.campaignHeader || { visible: true, title: "הסכום שהושג", targetGoal: 500000, totalRaised: 45556, svgTrendPreset: "curve_up" };
+        const campaignHeaderConfig = config.campaignHeader || { visible: true, title: "הסכום שהושג", targetGoal: 100000, totalRaised: 0, svgTrendPreset: "curve_up" };
         const campaignHeaderContentNode = (
           <CampaignHeaderEditor
             config={campaignHeaderConfig}
-            onChange={(newConf) => setConfig({ ...config, campaignHeader: newConf })}
+            onChange={(newConf) => {
+              const updatedConfig = { ...config, campaignHeader: newConf };
+              if (newConf.campaignId && (!config.campaignDonors?.campaignId || config.campaignDonors.campaignId !== newConf.campaignId)) {
+                updatedConfig.campaignDonors = { ...(config.campaignDonors || {}), campaignId: newConf.campaignId };
+              }
+              setConfig(updatedConfig);
+            }}
           />
         );
         const campaignHeaderPreviewNode = (
           <div className="pointer-events-none opacity-90">
-            <CampaignHeaderSection config={campaignHeaderConfig} />
+            <CampaignHeaderSection 
+              config={campaignHeaderConfig} 
+              campaignId={campaignHeaderConfig.campaignId} 
+            />
           </div>
         );
         return {
@@ -708,17 +719,61 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           )
         };
       }
+      case "campaignTiers": {
+        const campaignTiersConfig = config.campaignTiers || { visible: true };
+        const campaignTiersContentNode = (
+          <CampaignTiersEditor
+            config={campaignTiersConfig}
+            onChange={(newConf) => {
+              setConfig({ ...config, campaignTiers: newConf });
+            }}
+          />
+        );
+        const campaignTiersPreviewNode = (
+          <div className="pointer-events-none opacity-90">
+            <CampaignTiersSection 
+              config={campaignTiersConfig} 
+              tiers={campaignTiersConfig.tiers}
+              donationMode={campaignTiersConfig.donationType}
+            />
+          </div>
+        );
+        return {
+          previewNode: campaignTiersPreviewNode,
+          contentNode: campaignTiersContentNode,
+          designNode: (
+            <div className="text-xs text-slate-400 p-2 text-right dir-rtl">
+              הגדרות צבעי רגע ומזהה עוגן (Anchor ID) מנוהלים כאן.
+              <div className="mt-4">
+                <label className="block text-xs font-semibold mb-1 text-slate-300">צבע רקע</label>
+                <input
+                  type="color"
+                  value={campaignTiersConfig.backgroundColor || "#ffffff"}
+                  onChange={(e) => setConfig({ ...config, campaignTiers: { ...campaignTiersConfig, backgroundColor: e.target.value } })}
+                  className="w-full h-8 cursor-pointer rounded bg-slate-900 border border-slate-700"
+                />
+              </div>
+            </div>
+          )
+        };
+      }
       case "campaignDonors": {
         const campaignDonorsConfig = config.campaignDonors || { visible: true, defaultTab: "donors", showSearch: true, showSort: true, cardLayout: "grid-2" };
         const campaignDonorsContentNode = (
           <CampaignDonorsEditor
             config={campaignDonorsConfig}
-            onChange={(newConf) => setConfig({ ...config, campaignDonors: newConf })}
+            onChange={(newConf) => {
+              const updatedConfig = { ...config, campaignDonors: newConf };
+              if (newConf.campaignId && (!config.campaignHeader?.campaignId || config.campaignHeader.campaignId !== newConf.campaignId)) {
+                updatedConfig.campaignHeader = { ...(config.campaignHeader || {}), campaignId: newConf.campaignId };
+              }
+              setConfig(updatedConfig);
+            }}
           />
         );
         const campaignDonorsPreviewNode = (
           <div className="pointer-events-none opacity-90">
-            <CampaignDonorsSection config={campaignDonorsConfig} />
+            <CampaignDonorsSection config={campaignDonorsConfig} campaignId={campaignDonorsConfig.campaignId} />
           </div>
         );
         return {
@@ -3152,6 +3207,18 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                     placeholder="למשל: יצחק שדה 2, אזור"
                   />
                 </div>
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="homeEditorShowContactButton"
+                    checked={globalSettings.showFloatingContactButton !== false}
+                    onChange={(e) => setGlobalSettings({ ...globalSettings, showFloatingContactButton: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <label htmlFor="homeEditorShowContactButton" className="text-xs font-bold text-slate-600 cursor-pointer">
+                    הצג כפתור יצירת קשר צף ("אנחנו כאן")
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -3250,7 +3317,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 const isMobileHidden = config.mobileHiddenSections?.includes(sectionId) || false;
                 const sectionLabels: Record<string, string> = {
                   campaignHeader: "קמפיין: מד התקדמות וגרף",
-                  campaignDonors: "קמפיין: טופס תרומה, תורמים ושגרירים (הוראות קבע)",
+                  campaignTiers: "קמפיין: אזור כפתורי סכומים (מדרגות)",
+                  campaignDonors: "קמפיין: כרטיסיות תורמים ושגרירים (הוראות קבע)",
                   hero: "אזור ראשי (Hero)",
                   mainContent: "תוכן מרכזי",
                   services: "שירותים",

@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ChevronDown, Users, Target, Info, Share2, Plus, Sparkles, Heart } from "lucide-react";
-import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Ambassador, Donation, CampaignDonorsConfig } from "@/lib/types/campaign";
+import { getCampaignDonationsAction } from "@/features/campaigns/actions";
 import { formatDistanceToNow } from "date-fns";
 import { he } from "date-fns/locale";
 
@@ -20,7 +21,7 @@ interface CampaignDonorsSectionProps {
 
 export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   config,
-  campaignId = "default-campaign",
+  campaignId = "home",
   initialDonations = [],
   initialAmbassadors = [],
   onOpenAmbassadorModal,
@@ -33,27 +34,70 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   const [donations, setDonations] = useState<Donation[]>(initialDonations);
   const [ambassadors, setAmbassadors] = useState<Ambassador[]>(initialAmbassadors);
 
-  const targetCampaignId = config?.campaignId || campaignId || "default-campaign";
+  const rawId = (config?.campaignId && config.campaignId !== "default-campaign") ? config.campaignId : (campaignId || "home");
+  const targetCampaignId = rawId === "default-campaign" ? "home" : rawId;
 
-  // Firestore Real-time listeners for live updates
+  // 1. Initial direct fetch via Server Action
+  useEffect(() => {
+    if (!targetCampaignId) return;
+    getCampaignDonationsAction(targetCampaignId).then((res) => {
+      if (res.donations && res.donations.length > 0) {
+        setDonations(res.donations);
+      }
+      if (res.ambassadors && res.ambassadors.length > 0) {
+        setAmbassadors(res.ambassadors);
+      }
+    }).catch(err => console.warn("Failed to fetch initial campaign donations:", err));
+  }, [targetCampaignId]);
+
+  // 2. Firestore Real-time listeners for live updates
   useEffect(() => {
     if (!targetCampaignId) return;
 
-    // Listen for donations
+    // Listen for donations on primary campaign ID
     const donationsRef = collection(db, "campaigns", targetCampaignId, "donations");
-    const donationsQuery = query(donationsRef, orderBy("createdAt", "desc"), limit(100));
-
-    const unsubscribeDonations = onSnapshot(donationsQuery, (snapshot) => {
+    const unsubscribeDonations = onSnapshot(donationsRef, (snapshot) => {
       const liveDonations: Donation[] = [];
       snapshot.forEach((doc) => {
-        liveDonations.push({ id: doc.id, ...doc.data() } as Donation);
+        const data = doc.data() as Donation;
+        if (data.paymentStatus === "completed") {
+          liveDonations.push({ id: doc.id, ...data } as Donation);
+        }
       });
-      if (liveDonations.length > 0) {
-        setDonations(liveDonations);
-      }
+      setDonations((prev) => {
+        const merged = [...liveDonations];
+        prev.forEach(p => {
+          if (!merged.some(m => m.id === p.id)) merged.push(p);
+        });
+        return merged;
+      });
     }, (err) => {
       console.warn("Firestore live donations listener fallback to initial:", err);
     });
+
+    // If targetCampaignId is "home", ALSO listen to "default-campaign"
+    let unsubscribeFallback: (() => void) | null = null;
+    if (targetCampaignId === "home") {
+      const fallbackRef = collection(db, "campaigns", "default-campaign", "donations");
+      unsubscribeFallback = onSnapshot(fallbackRef, (snapshot) => {
+        const extraDonations: Donation[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data() as Donation;
+          if (data.paymentStatus === "completed") {
+            extraDonations.push({ id: doc.id, ...data } as Donation);
+          }
+        });
+        if (extraDonations.length > 0) {
+          setDonations((prev) => {
+            const merged = [...prev];
+            extraDonations.forEach(e => {
+              if (!merged.some(m => m.id === e.id)) merged.push(e);
+            });
+            return merged;
+          });
+        }
+      }, () => {});
+    }
 
     // Listen for ambassadors
     const ambassadorsRef = collection(db, "campaigns", targetCampaignId, "ambassadors");
@@ -62,27 +106,22 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
       snapshot.forEach((doc) => {
         liveAmbassadors.push({ id: doc.id, ...doc.data() } as Ambassador);
       });
-      if (liveAmbassadors.length > 0) {
-        setAmbassadors(liveAmbassadors);
-      }
+      setAmbassadors(liveAmbassadors);
     }, (err) => {
       console.warn("Firestore live ambassadors listener fallback to initial:", err);
     });
 
     return () => {
       unsubscribeDonations();
+      if (unsubscribeFallback) unsubscribeFallback();
       unsubscribeAmbassadors();
     };
   }, [targetCampaignId]);
 
-  // Mock initial data if empty for instant visual polish
+
+  // Display only real completed donations from database
   const displayDonations = useMemo(() => {
-    let list: Donation[] = donations.length > 0 ? donations : [
-      { id: "1", campaignId: targetCampaignId, donorName: "מושקא רוזנטל", amount: 180, dedication: "לזכות גאולה שלמה", ambassadorName: "לולי ברנס", createdAt: new Date(Date.now() - 54 * 60 * 1000).toISOString(), paymentStatus: "completed" as const },
-      { id: "2", campaignId: targetCampaignId, donorName: "ניצן כהן", amount: 180, dedication: "לזכות גאולה אמיתית שלמה פרטית וכללית והכהנים שלי", ambassadorName: "עדו צור", createdAt: new Date(Date.now() - 48 * 60 * 1000).toISOString(), paymentStatus: "completed" as const },
-      { id: "3", campaignId: targetCampaignId, donorName: "אנונימי", amount: 360, dedication: "לעילוי נשמת ר' יעקב יצחק הכהן פולק", ambassadorName: "טל זיו", isAnonymous: true, createdAt: new Date(Date.now() - 39 * 60 * 1000).toISOString(), paymentStatus: "completed" as const },
-      { id: "4", campaignId: targetCampaignId, donorName: "מיכל מושיאשוילי", amount: 100, dedication: "משפחתי אהובה ולכל עם ישראל", ambassadorName: "לולי ברנס", createdAt: new Date(Date.now() - 48 * 60 * 1000).toISOString(), paymentStatus: "completed" as const },
-    ];
+    let list: Donation[] = donations.filter(d => d.paymentStatus === "completed");
 
     if (ambassadorSlugFilter) {
       list = list.filter(d => d.ambassadorId === ambassadorSlugFilter || d.ambassadorName?.includes(ambassadorSlugFilter));
@@ -90,7 +129,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(d => d.donorName.toLowerCase().includes(q) || (d.dedication && d.dedication.toLowerCase().includes(q)));
+      list = list.filter(d => (d.donorName || "").toLowerCase().includes(q) || (d.dedication && d.dedication.toLowerCase().includes(q)));
     }
 
     if (sortBy === "oldest") {
@@ -102,15 +141,12 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     }
 
     return list as Donation[];
-  }, [donations, searchQuery, sortBy, ambassadorSlugFilter, targetCampaignId]);
+  }, [donations, searchQuery, sortBy, ambassadorSlugFilter]);
 
   const displayAmbassadors = useMemo(() => {
-    return ambassadors.length > 0 ? ambassadors : [
-      { id: "a1", campaignId: targetCampaignId, name: "לולי ברנס", slug: "loli-bernes", targetGoal: 10000, totalRaised: 3200, donorCount: 14, createdAt: new Date().toISOString() },
-      { id: "a2", campaignId: targetCampaignId, name: "עדו צור", slug: "ido-tzur", targetGoal: 5000, totalRaised: 1800, donorCount: 8, createdAt: new Date().toISOString() },
-      { id: "a3", campaignId: targetCampaignId, name: "טל זיו", slug: "tal-ziv", targetGoal: 15000, totalRaised: 7200, donorCount: 22, createdAt: new Date().toISOString() },
-    ];
-  }, [ambassadors, targetCampaignId]);
+    return ambassadors;
+  }, [ambassadors]);
+
 
   const getInitials = (name: string) => {
     if (!name) return "ת";
@@ -234,61 +270,73 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               )}
             </div>
 
-            {/* Donors Cards Grid */}
-            <div className={getGridClass()}>
-              <AnimatePresence>
-                {displayDonations.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className={`p-5 rounded-2xl transition-all flex flex-col justify-between gap-3 relative ${getCardStyleClass()}`}
-                    style={{
-                      backgroundColor: config?.cardBgColor || undefined,
-                      color: config?.cardTextColor || undefined,
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      {/* Donor Amount badge */}
-                      <div className="text-xl md:text-2xl font-black tracking-tight dir-rtl">
-                        ₪{item.amount.toLocaleString()}
-                      </div>
-
-                      <div className="flex items-center gap-3 text-left">
-                        <div className="text-right">
-                          <h4 className="font-bold text-base" style={{ color: config?.cardTextColor || undefined }}>
-                            {item.isAnonymous ? "אנונימי" : item.donorName}
-                          </h4>
-                          <span className="text-xs opacity-60">
-                            {getFormattedTime(item.createdAt)}
-                          </span>
+            {/* Donors Cards Grid or Empty State */}
+            {displayDonations.length === 0 ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1">
+                  <Heart className="w-8 h-8 fill-emerald-100 text-emerald-600" />
+                </div>
+                <h4 className="text-lg font-bold text-slate-800">היו הראשונים לתרום לקמפיין!</h4>
+                <p className="text-sm text-slate-500 max-w-sm">
+                  כל תרומה מקרבת אותנו להשגת היעד. תרומתכם תוצג כאן בלוח התורמים מיד עם השלמת התשלום.
+                </p>
+              </div>
+            ) : (
+              <div className={getGridClass()}>
+                <AnimatePresence>
+                  {displayDonations.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className={`p-5 rounded-2xl transition-all flex flex-col justify-between gap-3 relative ${getCardStyleClass()}`}
+                      style={{
+                        backgroundColor: config?.cardBgColor || undefined,
+                        color: config?.cardTextColor || undefined,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Donor Amount badge */}
+                        <div className="text-xl md:text-2xl font-black tracking-tight dir-rtl">
+                          ₪{item.amount.toLocaleString()}
                         </div>
-                        
-                        {/* Avatar circle */}
-                        <div className="w-10 h-10 rounded-full bg-emerald-900 text-emerald-100 flex items-center justify-center font-bold text-sm shrink-0">
-                          {getInitials(item.isAnonymous ? "אנונימי" : item.donorName)}
+
+                        <div className="flex items-center gap-3 text-left">
+                          <div className="text-right">
+                            <h4 className="font-bold text-base" style={{ color: config?.cardTextColor || undefined }}>
+                              {item.isAnonymous ? "אנונימי" : item.donorName}
+                            </h4>
+                            <span className="text-xs opacity-60">
+                              {getFormattedTime(item.createdAt)}
+                            </span>
+                          </div>
+                          
+                          {/* Avatar circle */}
+                          <div className="w-10 h-10 rounded-full bg-emerald-900 text-emerald-100 flex items-center justify-center font-bold text-sm shrink-0">
+                            {getInitials(item.isAnonymous ? "אנונימי" : item.donorName)}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Dedication text */}
-                    {item.dedication && (
-                      <p className="text-sm opacity-80 line-clamp-3 bg-black/5 p-2.5 rounded-lg border border-black/5 italic">
-                        "{item.dedication}"
-                      </p>
-                    )}
+                      {/* Dedication text */}
+                      {item.dedication && (
+                        <p className="text-sm opacity-80 line-clamp-3 bg-black/5 p-2.5 rounded-lg border border-black/5 italic">
+                          "{item.dedication}"
+                        </p>
+                      )}
 
-                    {/* Ambassador Attribution */}
-                    {item.ambassadorName && (
-                      <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1 self-end">
-                        <span>ע"י {item.ambassadorName}</span>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                      {/* Ambassador Attribution */}
+                      {item.ambassadorName && (
+                        <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1 self-end">
+                          <span>ע"י {item.ambassadorName}</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         )}
 
@@ -310,42 +358,52 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {displayAmbassadors.map((amb) => {
-                const ambPercentage = Math.min(100, Math.round((amb.totalRaised / (amb.targetGoal || 1)) * 100));
-                return (
-                  <div key={amb.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between gap-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                          {ambPercentage}% מהיעד
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-lg">{amb.name}</h4>
+            {displayAmbassadors.length === 0 ? (
+              <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+                <Users className="w-12 h-12 text-slate-300" />
+                <h4 className="text-base font-bold text-slate-700">עדיין לא הצטרפו שגרירים לקמפיין</h4>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  רוצים לפתוח יעד אישי ולהפוך לשגרירים? לחצו על "צור יעד אישי" והצטרפו!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {displayAmbassadors.map((amb) => {
+                  const ambPercentage = Math.min(100, Math.round((amb.totalRaised / (amb.targetGoal || 1)) * 100));
+                  return (
+                    <div key={amb.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between gap-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                            {ambPercentage}% מהיעד
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-lg">{amb.name}</h4>
+                        </div>
+
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden my-3">
+                          <div
+                            className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${ambPercentage}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                          <span>מתוך ₪{amb.targetGoal.toLocaleString()}</span>
+                          <span className="font-bold text-emerald-900">₪{amb.totalRaised.toLocaleString()}</span>
+                        </div>
                       </div>
 
-                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden my-3">
-                        <div
-                          className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${ambPercentage}%` }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-                        <span>מתוך ₪{amb.targetGoal.toLocaleString()}</span>
-                        <span className="font-bold text-emerald-900">₪{amb.totalRaised.toLocaleString()}</span>
-                      </div>
+                      <a
+                        href={`/c/${targetCampaignId}/${amb.slug}`}
+                        className="w-full py-2 bg-slate-100 hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 text-xs font-bold rounded-lg transition-colors text-center border border-slate-200"
+                      >
+                        צפה בעמוד השגריר
+                      </a>
                     </div>
-
-                    <a
-                      href={`/c/${targetCampaignId}/${amb.slug}`}
-                      className="w-full py-2 bg-slate-100 hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 text-xs font-bold rounded-lg transition-colors text-center border border-slate-200"
-                    >
-                      צפה בעמוד השגריר
-                    </a>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
