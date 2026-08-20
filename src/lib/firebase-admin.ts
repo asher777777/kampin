@@ -1,6 +1,25 @@
-import * as firebaseAdminModule from "firebase-admin";
+const loadFirebaseAdmin = () => {
+  try {
+    const { createRequire } = require("module");
+    const req = createRequire(process.cwd() + "/package.json");
+    const mod = req("firebase-admin");
+    return mod.default || mod;
+  } catch (e1) {
+    try {
+      const mod = eval("require")("firebase-admin");
+      return mod.default || mod;
+    } catch (e2) {
+      try {
+        const mod = require("firebase-admin");
+        return mod.default || mod;
+      } catch (e3) {
+        return null;
+      }
+    }
+  }
+};
 
-const admin: any = (firebaseAdminModule as any).default || firebaseAdminModule;
+const admin: any = loadFirebaseAdmin();
 
 let app: any;
 let adminDb: any;
