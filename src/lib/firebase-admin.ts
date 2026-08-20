@@ -1,4 +1,19 @@
-import admin from "firebase-admin";
+const loadAdmin = () => {
+  try {
+    const a = require("firebase-admin");
+    return a.default || a;
+  } catch {
+    try {
+      const mod = "firebase-admin";
+      const a = eval("require")(mod);
+      return a.default || a;
+    } catch {
+      return null;
+    }
+  }
+};
+
+const admin: any = loadAdmin();
 
 let app: any;
 let adminDb: any;

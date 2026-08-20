@@ -24,14 +24,33 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const config = await getHomePageConfig();
-  // Fetch Super Admin's global settings for the root page (user ID "1" or system fallback)
-  // We don't want the current regular user's settings to override the root page's branding.
-  const globalSettings = await getGlobalSettings("1");
+  let config: any;
+  let globalSettings: any;
 
-  const { auth } = await import("@/lib/auth");
-  const session = await auth();
-  const isAdmin = session?.user?.role === "SUPERADMIN" || session?.user?.id === "1";
+  try {
+    config = await getHomePageConfig();
+  } catch (e) {
+    console.error("Home page config fetch error:", e);
+    const { DEFAULT_HOME_CONFIG } = await import("@/features/home/actions");
+    config = DEFAULT_HOME_CONFIG;
+  }
+
+  try {
+    globalSettings = await getGlobalSettings("1");
+  } catch (e) {
+    console.error("Home global settings fetch error:", e);
+    const { DEFAULT_GLOBAL_SETTINGS } = await import("@/features/settings/actions");
+    globalSettings = DEFAULT_GLOBAL_SETTINGS;
+  }
+
+  let isAdmin = false;
+  try {
+    const { auth } = await import("@/lib/auth");
+    const session = await auth();
+    isAdmin = session?.user?.role === "SUPERADMIN" || session?.user?.id === "1";
+  } catch (e) {
+    console.warn("Auth check failed in Home page:", e);
+  }
 
   return (
     <HomeClient 
