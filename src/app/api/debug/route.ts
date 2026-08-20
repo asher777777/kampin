@@ -3,11 +3,23 @@ import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET() {
   try {
-    const usersRef = adminDb.collection("users");
-    const snapshot = await usersRef.limit(20).get();
-    const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return NextResponse.json({ users });
+    const collections = await adminDb.listCollections();
+    const collectionIds = collections.map((c: any) => c.id);
+
+    const pagesRef = adminDb.collection("pages").doc("home");
+    const pageSnap = await pagesRef.get();
+    const pageExists = pageSnap.exists;
+    const pageData = pageExists ? pageSnap.data() : null;
+
+    return NextResponse.json({
+      success: true,
+      projectId: adminDb.projectId || (adminDb as any)._projectId,
+      databaseId: adminDb.databaseId || (adminDb as any)._databaseId,
+      collections: collectionIds,
+      pageExists,
+      pageDataSample: pageData ? Object.keys(pageData) : null,
+    });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message });
+    return NextResponse.json({ success: false, error: e.message, stack: e.stack });
   }
 }

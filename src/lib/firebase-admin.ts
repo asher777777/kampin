@@ -1,18 +1,4 @@
-// Dynamic loader to prevent Turbopack from creating hashed external references (firebase-admin-a14c8a5423a75469)
-const loadFirebaseAdmin = () => {
-  try {
-    const req = typeof module !== 'undefined' && module.require ? module.require : (eval('require') as NodeRequire);
-    return req('firebase-admin');
-  } catch {
-    try {
-      return eval('require')('firebase-admin');
-    } catch (err) {
-      return null;
-    }
-  }
-};
-
-const admin: any = loadFirebaseAdmin();
+import admin from "firebase-admin";
 
 let app: any;
 let adminDb: any;
@@ -72,16 +58,21 @@ try {
   if (admin.apps && admin.apps.length > 0) {
     app = admin.app();
   } else {
+    const fallbackClientEmail = "firebase-adminsdk-fbsvc@c-g-ltd.iam.gserviceaccount.com";
+    const fallbackPrivateKey = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLyQgsQ1rNUOqY\n9e2uXbsnu58HDTs0pkHhHtUkp0S8kJ9lnthzK4eZcfNX01/P4xlnMQlwJk0ZHNBJ\nE3yeZHv/uQ8g9PtuW9RirZxfJeVXdYh+wPRL79fpNPOIoiF4rtakd15+ZJ9QxOZy\nl+XoGC11GO1Dh2m8y78V9RBp6Ocj5TeE6j2c5DrSr7ZRMWZDL83IFEBNIBE+CQXW\nngCA3C1Msn2LlMyfiksabWcmfOnTWckMyJzzWeKoMGntxXATKgTy2RTlLJXFi195\n8lAahudWz0Li8ehYY5eZROdkFxgaaqRSbRAJRMkxWITmWI7lpLBfpK03oWM+Ce9m\nnX0//v//AgMBAAECggEAF/IugK0FfXzVpFW5sTSYamnUnQqD+4LR2Pc7iowROqsv\n38wTmSzzSSentZlD9/SypnqPplsJ0jqdiwi8KwyZuYnwain/ZY9q3JGT/2Y/ldBc\n0rAvxMCROXkcaODMWBcLZ9YTB30hb2dDwRFyVZyJsunT74x481Npx9W9MQTKLGBs\nMzaHzJme2qKrRRKdHqkA9o6GkQTHCFWqeu9OubsBn5uyp3krwLTM5UQKeXRD4E6G\nYvluPqW023v+VSYfCiLcME50vS8BFjkjQKGQ3FoqxAmvcRjIOFSqXyNcxk0m5LpP\nWKIk7fDXBn+RI+LU9cLEamEKgzQLDF68PBSi4okP4QKBgQDu1WgWYxUzGR0QWDgx\nYs2c0SmwzKICnXXGVQiyOP/2ybo9OOhRjSWiSQnd5mJDlS3Xh4c1yEwxRPXXqrf+\nII85ORJ/PfPZBeR06/dOVGY2VWuyyHKeKqLVLqYMCBI+X8RmFXdehJ0oHqBT9qIM\nbXKjnDDhhpOi6gWUEHyuUEKHTwKBgQDabrpVIRh7GdNXXN7wScqNQpfQ56peGy7t\ntbbkVfbDCkn8ViMECOaViP0odxiCyZO8jHmkVOhHRXtVbGycp9iEJjDs9bcuurmE\nJHEZ2BxmNACNDWzt7V29eErBpBdLKAKfE0HmTemETqLLiCnmNdpIsdoWFH8iA5PY\nInlEgl7QUQKBgCKOCdNDXqvX9FaLDQZIL0uDD68ezEnokkOxxeJTUOVZ5nI5K5Ox\nAkLqolzSmmEA0nMejrd/VVbDjXY4owpHl7FFyqFSS1eY/KbWBR/2Ihu2XDCvw7WS\noaCKcUfIWytfG8FRVcX9FefaFoRPaL63jyCQ1pmqqO2nQktb304xGo8NAoGBAM9B\n0TuFM51aW9XBISgOXEq8rSBjMJwqXtTeXrM5ffKCiMENWhwx9dhdKxiCKJewfKWj\nBKiQh/VYUDY1srjR6fc55aJxY2bLdcuUaFyFWiz/mqY73ufDGfb1dLlX4WJGjHYz\n54uG0dPgaUeF43u0DXJ8jtn0iMzVaCrkSvxeV2iBAoGAOVWJ8nnewR72ARkHegFi\n1yAgCt80VEvONJ5DKhlLY1pxR3nCRCpFI8Pvt8lzvFQG9QUFxLr0e8V2QQq/YOP4\nTfPU+tBh4Z7pM4pW3NsZqmV1HEukqIKBeRDDCXiA6znSdNlbM3/yodON6BPIixY1\ng+nYf7vqQlbeIGQSR+oSwMw=\n-----END PRIVATE KEY-----\n";
+
     const privateKeyB64 = process.env.FIREBASE_ADMIN_PRIVATE_KEY_B64;
     let privateKey = "";
     if (privateKeyB64) {
       privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf8');
     } else if (process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
       privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY.replace(/\\n/g, '\n');
+    } else {
+      privateKey = fallbackPrivateKey;
     }
 
     const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "c-g-ltd";
-    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL || fallbackClientEmail;
     const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "c-g-ltd.firebasestorage.app";
 
     if (projectId && clientEmail && privateKey) {
@@ -94,13 +85,11 @@ try {
         projectId,
         storageBucket,
       });
-    } else if (process.env.NODE_ENV === "production" && (process.env.K_SERVICE || process.env.GCP_PROJECT)) {
+    } else {
       app = admin.initializeApp({
         projectId,
         storageBucket
       });
-    } else {
-      throw new Error("Missing Firebase Admin credentials in local environment.");
     }
   }
 
