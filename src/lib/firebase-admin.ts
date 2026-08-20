@@ -1,24 +1,12 @@
-const loadAdmin = () => {
-  try {
-    const a = require("firebase-admin");
-    return a.default || a;
-  } catch {
-    try {
-      const mod = "firebase-admin";
-      const a = eval("require")(mod);
-      return a.default || a;
-    } catch {
-      return null;
-    }
-  }
-};
+import * as firebaseAdminModule from "firebase-admin";
 
-const admin: any = loadAdmin();
+const admin: any = (firebaseAdminModule as any).default || firebaseAdminModule;
 
 let app: any;
 let adminDb: any;
 let adminAuth: any;
 let adminStorage: any;
+export let firebaseAdminInitError: string | null = null;
 
 const createMockDb = () => {
   const memoryStore = new Map<string, any>();
@@ -112,7 +100,8 @@ try {
   adminAuth = admin.auth();
   adminStorage = admin.storage();
 } catch (error: any) {
-  console.warn("Notice: Firebase Admin initialized with mock fallback:", error?.message || error);
+  firebaseAdminInitError = error?.message || String(error);
+  console.warn("Notice: Firebase Admin initialized with mock fallback:", firebaseAdminInitError);
   adminDb = createMockDb();
   adminAuth = {
     getUser: async () => ({ uid: "mock-user" }),
