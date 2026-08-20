@@ -70,6 +70,7 @@ export interface GlobalSettings {
   contactPhone?: string;
   contactEmail?: string;
   contactAddress?: string;
+  showFloatingContactButton?: boolean;
 
   // Social Networks
   contactFacebook?: string;
@@ -113,6 +114,7 @@ const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   contactEmail: "",
   contactFacebook: "",
   contactAddress: "",
+  showFloatingContactButton: true,
   contactInstagram: "",
   contactYouTube: "",
   contactWhatsApp: "",
@@ -183,6 +185,7 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         contactPhone: data?.contactPhone || DEFAULT_GLOBAL_SETTINGS.contactPhone,
         contactEmail: data?.contactEmail || DEFAULT_GLOBAL_SETTINGS.contactEmail,
         contactAddress: data?.contactAddress || DEFAULT_GLOBAL_SETTINGS.contactAddress,
+        showFloatingContactButton: data?.showFloatingContactButton !== false,
 
         // Social Networks
         contactFacebook: data?.contactFacebook || "",

@@ -32,6 +32,7 @@ export function ContactDetailsTab({
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactAddress, setContactAddress] = useState("");
+  const [showFloatingContactButton, setShowFloatingContactButton] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export function ContactDetailsTab({
       setContactPhone(propSettings.contactPhone || "");
       setContactEmail(propSettings.contactEmail || "");
       setContactAddress(propSettings.contactAddress || "");
+      setShowFloatingContactButton(propSettings.showFloatingContactButton !== false);
     }
   }, [propSettings]);
 
@@ -47,7 +49,8 @@ export function ContactDetailsTab({
     await saveGlobalSettings({
       contactPhone,
       contactEmail,
-      contactAddress
+      contactAddress,
+      showFloatingContactButton
     });
     setSaving(false);
     onSave?.();
@@ -118,6 +121,19 @@ export function ContactDetailsTab({
                   className="w-full bg-[#181818] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
                   placeholder="רחוב החדשנות 1, תל אביב"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 mt-4 text-right justify-start flex-row-reverse">
+                <input
+                  type="checkbox"
+                  id="showFloatingContactButton"
+                  checked={showFloatingContactButton}
+                  onChange={(e) => setShowFloatingContactButton(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/10 bg-black/40 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-gray-900"
+                />
+                <label htmlFor="showFloatingContactButton" className="text-sm font-semibold text-gray-300 cursor-pointer">
+                  הצג כפתור יצירת קשר צף ("אנחנו כאן")
+                </label>
               </div>
 
               <div className="flex justify-end pt-2">

@@ -446,12 +446,14 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       />
 
       <Footer />
-      <WhatsAppButton 
-        phoneNumber={finalWhatsApp}
-        defaultEmail={globalSettings.contactEmail || "info@example.com"}
-        facebookUrl={globalSettings.contactFacebook || "https://www.facebook.com/"}
-        address={globalSettings.contactAddress || "יצחק שדה 2, אזור"}
-      />
+      {globalSettings.showFloatingContactButton !== false && (
+        <WhatsAppButton 
+          phoneNumber={finalWhatsApp}
+          defaultEmail={globalSettings.contactEmail || "info@example.com"}
+          facebookUrl={globalSettings.contactFacebook || "https://www.facebook.com/"}
+          address={globalSettings.contactAddress || "יצחק שדה 2, אזור"}
+        />
+      )}
     </div>
   );
 }
