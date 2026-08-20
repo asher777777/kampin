@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     try {
       bucket = adminStorage.bucket();
     } catch (e) {
-      const projId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      const projId = process.env.FB_ADMIN_PROJECT_ID || process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
       if (projId) {
         bucket = adminStorage.bucket(`${projId}.appspot.com`);
       } else {
