@@ -197,6 +197,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          campaignId,
           amount: calculatedTotal,
           clientName: isAnonymous ? "אנונימי" : (donorName || "תורם קמפיין"),
           phone,
@@ -220,7 +221,6 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
       setLoading(false);
     }
   };
-
 
   // STEP 2: Process Kesher payment and complete donation upon success
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -252,6 +252,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          campaignId,
           amount: amountToCharge,
           creditNumber: cleanCC,
           expiry,
@@ -265,6 +266,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
           paymentFrequency: isRecurring ? "recurring" : "one-time",
         }),
       });
+
 
       const data = await res.json();
       console.log("Kesher payment response:", data);

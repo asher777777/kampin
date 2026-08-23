@@ -17,41 +17,74 @@ export async function POST(request: Request) {
       const userDoc = await adminDb.collection("users").doc(userId).get();
       if (userDoc.exists) {
         const userData = userDoc.data();
-        
-        // If user is marked to use admin Kesher, get global config
-        if (userData?.useAdminKesher) {
-          const globalDoc = await adminDb.collection("configs").doc("global").get();
-          const globalConfig = globalDoc.data() || {};
-          settings = {
-            userName: globalConfig.kesherUserName || "",
-            apiKey: globalConfig.kesherApiKey || "",
-            paymentPageId: globalConfig.kesherPaymentPageId || "",
-            ezCountToken: globalConfig.kesherEzCountToken || ""
-          };
-        } else if (userData?.kesherSettings?.userName || userData?.kesherSettings?.apiKey) {
-          settings = userData.kesherSettings;
-        } else if (userData?.settings?.kesher) {
-          settings = userData.settings.kesher;
+        if (userData?.useAdminKesher === false) {
+          const userKesherDoc = await adminDb.collection("users").doc(userId).collection("settings").doc("kesher").get();
+          if (userKesherDoc.exists) {
+            settings = userKesherDoc.data();
+          }
         }
       }
     }
 
-    // If no valid settings found at all, fall back to global admin settings
+    // Default for guest users and site-wide clearing: load from global settings
     if (!settings || (!settings.userName && !settings.apiKey)) {
+      // Check configs/global
       const globalDoc = await adminDb.collection("configs").doc("global").get();
-      const globalConfig = globalDoc.exists ? globalDoc.data() : null;
+      if (globalDoc.exists) {
+        const globalConfig = globalDoc.data() || {};
+        settings = {
+          userName: globalConfig.kesherUserName || globalConfig.userName || globalConfig.kesherSettings?.userName || "",
+          apiKey: globalConfig.kesherApiKey || globalConfig.apiKey || globalConfig.kesherSettings?.apiKey || "",
+          paymentPageId: globalConfig.kesherPaymentPageId || globalConfig.paymentPageId || globalConfig.kesherSettings?.paymentPageId || "",
+          ezCountToken: globalConfig.kesherEzCountToken || globalConfig.ezCountToken || globalConfig.kesherSettings?.ezCountToken || "",
+        };
+      }
 
-      settings = {
-        userName: globalConfig?.kesherUserName || "",
-        apiKey: globalConfig?.kesherApiKey || "",
-        paymentPageId: globalConfig?.kesherPaymentPageId || "",
-        ezCountToken: globalConfig?.kesherEzCountToken || ""
-      };
+      // Check root settings/kesher
+      if (!settings?.userName || !settings?.apiKey) {
+        const rootKesherDoc = await adminDb.collection("settings").doc("kesher").get();
+        if (rootKesherDoc.exists) {
+          const rData = rootKesherDoc.data() || {};
+          settings = {
+            userName: rData.userName || rData.kesherUserName || "",
+            apiKey: rData.apiKey || rData.kesherApiKey || "",
+            paymentPageId: rData.paymentPageId || rData.kesherPaymentPageId || "",
+            ezCountToken: rData.ezCountToken || rData.kesherEzCountToken || "",
+          };
+        }
+      }
+
+      // Check admin user settings
+      if (!settings?.userName || !settings?.apiKey) {
+        const adminKesher = await adminDb.collection("users").doc("1").collection("settings").doc("kesher").get();
+        if (adminKesher.exists) {
+          const aData = adminKesher.data() || {};
+          settings = {
+            userName: aData.userName || aData.kesherUserName || "",
+            apiKey: aData.apiKey || aData.kesherApiKey || "",
+            paymentPageId: aData.paymentPageId || aData.kesherPaymentPageId || "",
+            ezCountToken: aData.ezCountToken || aData.kesherEzCountToken || "",
+          };
+        }
+      }
+
+      // Fallback: Environment Variables
+      if (!settings?.userName || !settings?.apiKey) {
+        if (process.env.KESHER_USER_NAME && process.env.KESHER_API_KEY) {
+          settings = {
+            userName: process.env.KESHER_USER_NAME,
+            apiKey: process.env.KESHER_API_KEY,
+            paymentPageId: process.env.KESHER_PAYMENT_PAGE_ID || "",
+            ezCountToken: process.env.KESHER_EZCOUNT_TOKEN || "",
+          };
+        }
+      }
     }
 
     if (!settings || !settings.userName || !settings.apiKey || !settings.paymentPageId) {
       return NextResponse.json({ success: false, error: "כרגע לא ניתן להשתמש בשירות התשלומים. אנא פנה להנהלה." }, { status: 400 });
     }
+
 
     const payload = {
       Json: {
