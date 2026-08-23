@@ -202,13 +202,13 @@ export async function recordPendingDonationAction(data: {
     const crmOwnerId = campaignDoc.data()?.ownerId || "1";
 
     const donationRef = campaignRef.collection("donations").doc();
-    const donationData = {
+    const donationData: any = {
       campaignId,
       donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
       realDonorName: donorName || "",
       amount: Number(amount),
-      monthlyAmount: monthlyAmount ? Number(monthlyAmount) : undefined,
-      recurringMonths: recurringMonths ? Number(recurringMonths) : undefined,
+      monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+      recurringMonths: recurringMonths ? Number(recurringMonths) : null,
       isRecurring: Boolean(isRecurring),
       tier: tier || "",
       dedication: dedication || "",
@@ -217,7 +217,7 @@ export async function recordPendingDonationAction(data: {
       ambassadorName: ambassadorName || null,
       phone: phone || "",
       email: email || "",
-      paymentStatus: "pending" as const,
+      paymentStatus: "pending",
       paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
       createdAt: new Date().toISOString(),
     };
@@ -240,8 +240,8 @@ export async function recordPendingDonationAction(data: {
         campaign_title: campaignTitle,
         campaign_donation_mode: isRecurring ? "recurring" : "one_time",
         campaign_amount: Number(amount),
-        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : undefined,
-        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : undefined,
+        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
+        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
         campaign_tier: tier || "",
         campaign_is_anonymous: Boolean(isAnonymous),
         campaign_dedication: dedication || "",
@@ -253,6 +253,7 @@ export async function recordPendingDonationAction(data: {
         monthly_amount: monthlyAmount || null,
         is_standing_order: Boolean(isRecurring),
         dedication: dedication || "",
+
         campaign_donations_history: [
           {
             id: donationRef.id,
@@ -658,9 +659,10 @@ export async function recordDonationAction(data: {
         campaign_title: campaignTitle,
         campaign_donation_mode: isRecurring ? "recurring" : "one_time",
         campaign_amount: Number(amount),
-        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : undefined,
-        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : undefined,
+        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
+        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
         campaign_tier: tier || "",
+
         campaign_is_anonymous: Boolean(isAnonymous),
         campaign_dedication: dedication || "",
         campaign_ambassador_name: ambassadorName || "",
@@ -804,8 +806,8 @@ export async function syncContactToCampaign(contactId: string, contactData: any)
         donorName: isAnonymous ? "אנונימי" : donorName,
         realDonorName: donorName,
         amount,
-        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : undefined,
-        recurringMonths: recurringMonths ? Number(recurringMonths) : undefined,
+        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+        recurringMonths: recurringMonths ? Number(recurringMonths) : null,
         isRecurring,
         tier,
         dedication,
@@ -818,6 +820,7 @@ export async function syncContactToCampaign(contactId: string, contactData: any)
         createdAt: prevData?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
 
       await donationDocRef.set(donationRecord, { merge: true });
 

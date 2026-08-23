@@ -110,8 +110,12 @@ try {
   }
 
   adminDb = admin.firestore(app);
+  try {
+    adminDb.settings({ ignoreUndefinedProperties: true });
+  } catch (e) {}
   adminAuth = admin.auth(app);
   adminStorage = admin.storage(app);
+
 } catch (error: any) {
   firebaseAdminInitError = error?.message || String(error);
   console.warn("Notice: Firebase Admin initialized with mock fallback:", firebaseAdminInitError);

@@ -61,18 +61,37 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     }
   }, [isOpen, initialSelectedTierId, tiers]);
 
-  // Donor Details
+  // Donor Details with Autofill
   const [donorName, setDonorName] = useState("");
   const [dedication, setDedication] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
+  // Payment Method Selection (for one-time donations)
+  const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit" | "google_pay">("credit_card");
+  const [iframeUrl, setIframeUrl] = useState<string>("");
+
+  // Load saved donor info from localStorage for instant autofill
+  React.useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = localStorage.getItem("kampin_donor_info");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.donorName && !donorName) setDonorName(parsed.donorName);
+          if (parsed.phone && !phone) setPhone(parsed.phone);
+          if (parsed.email && !email) setEmail(parsed.email);
+        }
+      } catch (e) {}
+    }
+  }, [isOpen]);
+
   // Pending donation tracking
   const [pendingDonationId, setPendingDonationId] = useState("");
   const [pendingContactId, setPendingContactId] = useState("");
 
-  // Credit Card Details
+  // Credit Card Details with Autofill
   const [ccData, setCcData] = useState({
     creditNumber: "",
     expiryMonth: "",
@@ -109,6 +128,13 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     setSelectedTierId("custom");
   };
 
+  // Save donor details to localStorage on proceed
+  const saveDonorToLocalStorage = () => {
+    try {
+      localStorage.setItem("kampin_donor_info", JSON.stringify({ donorName, phone, email }));
+    } catch (e) {}
+  };
+
   // STEP 1: Record pending donor details in CRM & DB when proceeding to payment
   const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +152,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     }
     setError("");
     setLoading(true);
+    saveDonorToLocalStorage();
 
     try {
       const selectedTierObj = tiers.find(t => t.id === selectedTierId);
@@ -160,6 +187,40 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
       setLoading(false);
     }
   };
+
+  // Launch Digital Wallet (Bit or Google Pay / Apple Pay) via Kesher LinkToken
+  const handlePayWithDigitalWallet = async (walletType: "bit" | "google_pay") => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/kesher/get-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: calculatedTotal,
+          clientName: isAnonymous ? "אנונימי" : (donorName || "תורם קמפיין"),
+          phone,
+          email,
+          details: `תרומה בקמפיין - ${walletType === "bit" ? "ביט" : "Google Pay"}`,
+          transactionId: pendingDonationId || `Donation-${campaignId}-${Date.now()}`,
+          installments: 1,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.iframeUrl) {
+        setIframeUrl(data.iframeUrl);
+      } else {
+        setError(data.error || "שגיאה בהפקת קישור לתשלום דיגיטלי מול קשר");
+      }
+    } catch (err: any) {
+      console.error("Digital wallet error:", err);
+      setError(err.message || "שגיאת תקשורת עם שרתי קשר");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // STEP 2: Process Kesher payment and complete donation upon success
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -425,12 +486,15 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                 )}
               </div>
 
-              {/* Donor Details Fields */}
+              {/* Donor Details Fields with Browser Autofill */}
               <div className="space-y-3 pt-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold mb-1 text-slate-300">שם מלא / משפחה *</label>
+                    <label htmlFor="donor-name" className="block text-xs font-bold mb-1 text-slate-300">שם מלא / משפחה *</label>
                     <input
+                      id="donor-name"
+                      name="name"
+                      autoComplete="name"
                       type="text"
                       disabled={isAnonymous}
                       value={donorName}
@@ -441,8 +505,11 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold mb-1 text-slate-300">טלפון נייד *</label>
+                    <label htmlFor="donor-phone" className="block text-xs font-bold mb-1 text-slate-300">טלפון נייד *</label>
                     <input
+                      id="donor-phone"
+                      name="tel"
+                      autoComplete="tel"
                       type="tel"
                       dir="ltr"
                       value={phone}
@@ -454,8 +521,11 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-300">דוא&quot;ל (לקבלת קבלה)</label>
+                  <label htmlFor="donor-email" className="block text-xs font-bold mb-1 text-slate-300">דוא&quot;ל (לקבלת קבלה)</label>
                   <input
+                    id="donor-email"
+                    name="email"
+                    autoComplete="email"
                     type="email"
                     dir="ltr"
                     value={email}
@@ -499,8 +569,8 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   <Lock className="w-5 h-5" />
                   <span>
                     {donationMode === "recurring"
-                      ? `המשך להזנת אשראי (₪${currentMonthly}/חודש בהוראת קבע)`
-                      : `המשך להזנת אשראי (₪${calculatedTotal})`}
+                      ? `המשך לתשלום (₪${currentMonthly}/חודש בהוראת קבע)`
+                      : `המשך לתשלום (₪${calculatedTotal})`}
                   </span>
                 </button>
               </div>
@@ -509,14 +579,17 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
           </>
         )}
 
-        {/* ================= STEP 2: KESHER CREDIT CARD FORM ================= */}
+        {/* ================= STEP 2: KESHER PAYMENT (CC / BIT / GOOGLE PAY) ================= */}
         {step === "payment" && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-5 animate-in fade-in duration-300">
             {/* Header & Back Button */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <button
                 type="button"
-                onClick={() => setStep("details")}
+                onClick={() => {
+                  setIframeUrl("");
+                  setStep("details");
+                }}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700"
               >
                 <ArrowRight className="w-4 h-4" />
@@ -525,12 +598,12 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
 
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-bold text-white">תשלום מאובטח (Kesher)</span>
+                <span className="text-sm font-bold text-white">סליקה מאובטחת (Kesher)</span>
               </div>
             </div>
 
             {/* Donation Summary Card */}
-            <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700/80 flex items-center justify-between">
+            <div className="bg-slate-800/90 p-3.5 rounded-2xl border border-slate-700/80 flex items-center justify-between">
               <div>
                 <span className="text-xs text-slate-400 font-semibold block">סיכום תרומה עבור:</span>
                 <span className="text-sm font-bold text-white">{isAnonymous ? "אנונימי" : (donorName || "תורם")}</span>
@@ -558,127 +631,289 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
               </div>
             )}
 
-            {/* Credit Card Input Form */}
-            <form onSubmit={handleProcessPayment} className="space-y-4 text-sm">
-              
-              {/* Card Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-slate-400" /> מספר כרטיס אשראי *
-                </label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  placeholder="0000 0000 0000 0000"
-                  value={ccData.creditNumber}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
-                    const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ");
-                    setCcData({ ...ccData, creditNumber: formatted });
-                  }}
-                  className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
-                  maxLength={19}
-                />
-              </div>
+            {/* Payment Method Selector Tabs (For One-Time Donations) */}
+            {donationMode === "one_time" && !iframeUrl && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">בחר אמצעי תשלום:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodType("credit_card")}
+                    className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                      paymentMethodType === "credit_card"
+                        ? "bg-slate-800 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500"
+                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <CreditCard className={`w-5 h-5 ${paymentMethodType === "credit_card" ? "text-emerald-400" : "text-slate-400"}`} />
+                    <span className="text-xs font-bold">כרטיס אשראי</span>
+                  </button>
 
-              {/* ID Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-slate-400" /> תעודת זהות (בעל הכרטיס)
-                </label>
-                <input
-                  type="text"
-                  maxLength={9}
-                  dir="ltr"
-                  placeholder="000000000"
-                  value={ccData.idNumber}
-                  onChange={(e) => setCcData({ ...ccData, idNumber: e.target.value.replace(/\D/g, "") })}
-                  className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
-                />
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodType("bit")}
+                    className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                      paymentMethodType === "bit"
+                        ? "bg-emerald-950/80 border-emerald-400 text-emerald-300 shadow-md ring-1 ring-emerald-400"
+                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[11px] flex items-center justify-center">
+                      bit
+                    </div>
+                    <span className="text-xs font-bold">אפליקציית Bit</span>
+                  </button>
 
-              {/* Expiry & CVV Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-slate-400" /> תוקף (חודש/שנה) *
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      dir="ltr"
-                      value={ccData.expiryMonth}
-                      onChange={(e) => setCcData({ ...ccData, expiryMonth: e.target.value })}
-                      className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
-                    >
-                      <option value="" disabled className="bg-slate-900 text-white">MM</option>
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const m = String(i + 1).padStart(2, "0");
-                        return <option key={m} value={m} className="bg-slate-900 text-white">{m}</option>;
-                      })}
-                    </select>
-                    <span className="text-slate-400 self-center font-bold">/</span>
-                    <select
-                      dir="ltr"
-                      value={ccData.expiryYear}
-                      onChange={(e) => setCcData({ ...ccData, expiryYear: e.target.value })}
-                      className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
-                    >
-                      <option value="" disabled className="bg-slate-900 text-white">YY</option>
-                      {Array.from({ length: 15 }, (_, i) => {
-                        const y = String((new Date().getFullYear() % 100) + i).padStart(2, "0");
-                        return <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>;
-                      })}
-                    </select>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodType("google_pay")}
+                    className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                      paymentMethodType === "google_pay"
+                        ? "bg-indigo-950/80 border-indigo-400 text-indigo-200 shadow-md ring-1 ring-indigo-400"
+                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-0.5 text-xs font-black">
+                      <span className="text-blue-400">G</span>
+                      <span className="text-red-400">P</span>
+                      <span className="text-amber-400">a</span>
+                      <span className="text-green-400">y</span>
+                    </div>
+                    <span className="text-xs font-bold">Google Pay</span>
+                  </button>
                 </div>
+              </div>
+            )}
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <Lock className="w-4 h-4 text-slate-400" /> CVV (3 ספרות בגב) *
-                  </label>
-                  <input
-                    type="password"
-                    dir="ltr"
-                    placeholder="123"
-                    value={ccData.cvv2}
-                    onChange={(e) => setCcData({ ...ccData, cvv2: e.target.value.replace(/\D/g, "") })}
-                    className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
-                    maxLength={4}
+            {/* IFRAME EMBEDDED VIEW (When Bit or Google Pay iframe URL is active) */}
+            {iframeUrl ? (
+              <div className="space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setIframeUrl("")}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 cursor-pointer"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    <span>חזור לבחירת אמצעי תשלום</span>
+                  </button>
+                  <a
+                    href={iframeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+                  >
+                    פתח בעמוד מלא ↗
+                  </a>
+                </div>
+                <div className="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-700 bg-white shadow-xl">
+                  <iframe
+                    src={iframeUrl}
+                    className="w-full h-full border-0"
+                    title="Kesher Digital Payment"
+                    allow="payment"
                   />
                 </div>
               </div>
-
-              {/* Submit Payment CTA */}
-              <div className="pt-3">
+            ) : paymentMethodType === "bit" && donationMode === "one_time" ? (
+              /* BIT PAYMENT CARD */
+              <div className="p-6 rounded-2xl bg-gradient-to-b from-emerald-950/60 to-slate-900 border border-emerald-500/40 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
+                  <span className="font-black text-2xl">bit</span>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-black text-white text-base">תשלום מהיר ומאובטח באפליקציית Bit</h4>
+                  <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                    בלחיצה על הכפתור תיפתח סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{calculatedTotal.toLocaleString()}.
+                  </p>
+                </div>
                 <button
-                  type="submit"
+                  type="button"
                   disabled={loading}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-600/40 text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  onClick={() => handlePayWithDigitalWallet("bit")}
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-2xl transition-all shadow-lg shadow-emerald-500/30 text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>מבצע סליקה מאובטחת מול Kesher...</span>
+                      <span>מייצר קישור מאובטח ל-Bit...</span>
                     </>
                   ) : (
                     <>
-                      <ShieldCheck className="w-5 h-5" />
-                      <span>
-                        {donationMode === "recurring"
-                          ? `אשר תרומה חודשית ₪${currentMonthly} (סה"כ ₪${calculatedTotal})`
-                          : `אשר תשלום מאובטח ₪${calculatedTotal}`}
-                      </span>
+                      <span>מעבר לתשלום ₪{calculatedTotal.toLocaleString()} ב-Bit</span>
                     </>
                   )}
                 </button>
-                <p className="text-[11px] text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
-                  <Lock className="w-3 h-3 text-emerald-400 inline" /> הסליקה מוצפנת ומאובטחת בתקן PCI-DSS המחמיר ביותר
-                </p>
               </div>
+            ) : paymentMethodType === "google_pay" && donationMode === "one_time" ? (
+              /* GOOGLE PAY / APPLE PAY CARD */
+              <div className="p-6 rounded-2xl bg-gradient-to-b from-indigo-950/60 to-slate-900 border border-indigo-500/40 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center mx-auto border border-indigo-500/30">
+                  <ShieldCheck className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-black text-white text-base">תשלום בארנק דיגיטלי (Google Pay / Apple Pay)</h4>
+                  <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                    תשלום מיידי בנגיעה אחת ללא צורך בהקלדת פרטי כרטיס אשראי, מאובטח ישירות דרך קשר (Kesher).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handlePayWithDigitalWallet("google_pay")}
+                  className="w-full py-4 bg-white hover:bg-slate-100 text-slate-950 font-black rounded-2xl transition-all shadow-lg text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>מתחבר לארנק הדיגיטלי...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>שלם ₪{calculatedTotal.toLocaleString()} באמצעות Google Pay</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              /* DIRECT CREDIT CARD FORM WITH BROWSER AUTOFILL */
+              <form onSubmit={handleProcessPayment} className="space-y-4 text-sm">
+                
+                {/* Card Number */}
+                <div className="space-y-1.5">
+                  <label htmlFor="cc-number" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-slate-400" /> מספר כרטיס אשראי *
+                  </label>
+                  <input
+                    id="cc-number"
+                    name="cc-number"
+                    autoComplete="cc-number"
+                    type="text"
+                    dir="ltr"
+                    placeholder="0000 0000 0000 0000"
+                    value={ccData.creditNumber}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                      const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ");
+                      setCcData({ ...ccData, creditNumber: formatted });
+                    }}
+                    className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                    maxLength={19}
+                  />
+                </div>
 
-            </form>
+                {/* ID Number */}
+                <div className="space-y-1.5">
+                  <label htmlFor="cardholder-id" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-slate-400" /> תעודת זהות (בעל הכרטיס)
+                  </label>
+                  <input
+                    id="cardholder-id"
+                    name="cardholder-id"
+                    autoComplete="off"
+                    type="text"
+                    maxLength={9}
+                    dir="ltr"
+                    placeholder="000000000"
+                    value={ccData.idNumber}
+                    onChange={(e) => setCcData({ ...ccData, idNumber: e.target.value.replace(/\D/g, "") })}
+                    className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                  />
+                </div>
+
+                {/* Expiry & CVV Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="cc-exp-month" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-slate-400" /> תוקף (חודש/שנה) *
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        id="cc-exp-month"
+                        name="cc-exp-month"
+                        autoComplete="cc-exp-month"
+                        dir="ltr"
+                        value={ccData.expiryMonth}
+                        onChange={(e) => setCcData({ ...ccData, expiryMonth: e.target.value })}
+                        className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
+                      >
+                        <option value="" disabled className="bg-slate-900 text-white">MM</option>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const m = String(i + 1).padStart(2, "0");
+                          return <option key={m} value={m} className="bg-slate-900 text-white">{m}</option>;
+                        })}
+                      </select>
+                      <span className="text-slate-400 self-center font-bold">/</span>
+                      <select
+                        id="cc-exp-year"
+                        name="cc-exp-year"
+                        autoComplete="cc-exp-year"
+                        dir="ltr"
+                        value={ccData.expiryYear}
+                        onChange={(e) => setCcData({ ...ccData, expiryYear: e.target.value })}
+                        className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
+                      >
+                        <option value="" disabled className="bg-slate-900 text-white">YY</option>
+                        {Array.from({ length: 15 }, (_, i) => {
+                          const y = String((new Date().getFullYear() % 100) + i).padStart(2, "0");
+                          return <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>;
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="cc-csc" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-slate-400" /> CVV (3 ספרות בגב) *
+                    </label>
+                    <input
+                      id="cc-csc"
+                      name="cc-csc"
+                      autoComplete="cc-csc"
+                      type="password"
+                      dir="ltr"
+                      placeholder="123"
+                      value={ccData.cvv2}
+                      onChange={(e) => setCcData({ ...ccData, cvv2: e.target.value.replace(/\D/g, "") })}
+                      className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                      maxLength={4}
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Payment CTA */}
+                <div className="pt-3">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-600/40 text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>מבצע סליקה מאובטחת מול Kesher...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-5 h-5" />
+                        <span>
+                          {donationMode === "recurring"
+                            ? `אשר תרומה חודשית ₪${currentMonthly} (סה"כ ₪${calculatedTotal})`
+                            : `אשר תשלום מאובטח ₪${calculatedTotal}`}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
+                    <Lock className="w-3 h-3 text-emerald-400 inline" /> הסליקה מוצפנת ומאובטחת בתקן PCI-DSS המחמיר ביותר
+                  </p>
+                </div>
+
+              </form>
+            )}
           </div>
         )}
+
 
         {/* ================= STEP 3: THANK YOU ================= */}
         {step === "success" && (
