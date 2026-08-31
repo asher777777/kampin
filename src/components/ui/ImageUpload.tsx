@@ -16,7 +16,8 @@ import {
   Trash2, 
   Save, 
   Sparkles,
-  Copy
+  Copy,
+  Upload
 } from "lucide-react";
 import { 
   getMediaLibrary, 
@@ -43,6 +44,7 @@ interface ImageUploadProps {
 export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false, multiple = false, size = 'default', customTrigger }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isModalDragging, setIsModalDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
@@ -146,7 +148,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
     }
   };
 
-  const processFiles = async (files: File[]) => {
+  const processFiles = async (files: File[], isFromModal: boolean = false) => {
     if (files.length === 0) return;
 
     const validFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
@@ -155,12 +157,13 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
       return;
     }
 
-    const filesToUpload = multiple ? validFiles : [validFiles[0]];
+    const filesToUpload = (multiple || isFromModal) ? validFiles : [validFiles[0]];
     setIsUploading(true);
     setUploadProgress({ current: 0, total: filesToUpload.length });
 
     try {
       const uploadedUrls: string[] = [];
+      const newItems: any[] = [];
       
       for (let i = 0; i < filesToUpload.length; i++) {
         const file = filesToUpload[i];
@@ -234,26 +237,54 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
 
         // 3. Add to Media Library
         const libraryName = isVideo ? file.name : `${baseName}.${extension}`;
+        let docId = "";
         try {
-          await addMediaToLibrary(url, libraryName);
+          const libRes = await addMediaToLibrary(url, libraryName);
+          if (libRes?.id) docId = libRes.id;
         } catch (libErr) {
           console.warn("Could not save to library collection:", libErr);
         }
+        
         uploadedUrls.push(url);
+        newItems.push({
+          id: docId || `media_${Date.now()}_${i}`,
+          url,
+          name: libraryName,
+          description: "",
+          alt: "",
+          createdAt: new Date()
+        });
       }
       
       // Reload library to show new items
       try {
         const items = await getMediaLibrary();
-        setMediaItems(items || []);
+        if (items && items.length > 0) {
+          setMediaItems(items);
+        } else {
+          setMediaItems(prev => [...newItems, ...prev]);
+        }
       } catch (e) {
         console.warn("Failed to reload media library:", e);
+        setMediaItems(prev => [...newItems, ...prev]);
       }
       
-      if (multiple) {
-        onSelect(uploadedUrls);
+      if (isFromModal) {
+        if (newItems.length > 0) {
+          const firstUploaded = newItems[0];
+          setSelectedItem(firstUploaded);
+          setTempAlt("");
+          setTempDesc("");
+          if (multiple) {
+            setSelectedItems(prev => [...newItems, ...prev]);
+          }
+        }
       } else {
-        onSelect(uploadedUrls[0]);
+        if (multiple) {
+          onSelect(uploadedUrls);
+        } else {
+          onSelect(uploadedUrls[0]);
+        }
       }
     } catch (error) {
       console.error("Upload failed:", error);
@@ -264,9 +295,9 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
     }
   };
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>, isFromModal = false) => {
     const files = Array.from(e.target.files || []);
-    processFiles(files);
+    processFiles(files, isFromModal);
     e.target.value = "";
   };
 
@@ -570,11 +601,43 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
             <div className="p-6 border-b flex items-center justify-between bg-muted/20 text-primary">
               <div className="flex items-center gap-3">
                 <Library className="h-6 w-6 text-secondary" />
-                <h3 className="text-xl font-bold">גלריית מדיה</h3>
+                <div>
+                  <h3 className="text-xl font-bold leading-none">גלריית מדיה</h3>
+                  <p className="text-xs text-muted-foreground mt-1">בחר מדיה קיימת או העלה קבצים חדשים ישירות לגלריה</p>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowGallery(false)} className="rounded-full h-10 w-10 p-0">
-                <X className="h-6 w-6" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  id="gallery-modal-upload-input"
+                  accept="image/*,video/mp4,video/webm,video/quicktime"
+                  multiple
+                  onChange={(e) => handleUpload(e, true)}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+                <Button
+                  type="button"
+                  onClick={() => document.getElementById("gallery-modal-upload-input")?.click()}
+                  disabled={isUploading}
+                  className="bg-secondary hover:bg-secondary/90 text-white rounded-xl font-bold flex items-center gap-2 px-4 py-2 text-sm shadow-sm cursor-pointer"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{uploadProgress && uploadProgress.total > 1 ? `מעלה ${uploadProgress.current}/${uploadProgress.total}...` : 'מעלה...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      <span>העלאת קבצים</span>
+                    </>
+                  )}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowGallery(false)} className="rounded-full h-10 w-10 p-0 text-muted-foreground hover:text-foreground">
+                  <X className="h-6 w-6" />
+                </Button>
+              </div>
             </div>
             
             {/* Search Bar */}
@@ -586,7 +649,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                   placeholder="חיפוש לפי שם, תיאור או ALT..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pr-10 pl-4 py-2 border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary text-right"
+                  className="w-full pr-10 pl-4 py-2.5 border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary text-right"
                   dir="rtl"
                 />
               </div>
@@ -595,7 +658,42 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
             {/* Modal Content Wrapper (Two-Pane Layout) */}
             <div className="flex-grow flex overflow-hidden">
               {/* Grid Pane (Left Side) */}
-              <div className="flex-grow p-6 overflow-y-auto min-h-[300px]">
+              <div 
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isModalDragging) setIsModalDragging(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isModalDragging) setIsModalDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsModalDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsModalDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    processFiles(Array.from(e.dataTransfer.files), true);
+                  }
+                }}
+                className="flex-grow p-6 overflow-y-auto min-h-[300px] relative"
+              >
+                {/* Drag Overlay */}
+                {isModalDragging && (
+                  <div className="absolute inset-4 z-50 bg-amber-500/10 backdrop-blur-sm border-2 border-dashed border-amber-500 rounded-2xl flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200 select-none pointer-events-none">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 shadow-lg">
+                      <ImagePlus className="h-8 w-8 animate-bounce" />
+                    </div>
+                    <p className="text-base font-extrabold text-amber-600">שחרר קבצים כאן כדי להעלות אותם לגלריה!</p>
+                  </div>
+                )}
+
                 {isLoadingLibrary ? (
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
                     <Loader2 className="animate-spin text-secondary h-12 w-12" />
@@ -603,6 +701,34 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {/* First Card: Quick Upload Dropzone Tile */}
+                    <div 
+                      onClick={() => !isUploading && document.getElementById("gallery-modal-upload-input")?.click()}
+                      className={cn(
+                        "aspect-square relative rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary bg-muted/20 hover:bg-secondary/5 transition-all flex flex-col items-center justify-center cursor-pointer p-3 text-center group shadow-sm hover:shadow-md select-none",
+                        isUploading && "pointer-events-none opacity-60 bg-secondary/5 border-secondary/40"
+                      )}
+                    >
+                      {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="h-7 w-7 animate-spin text-secondary" />
+                          <span className="text-[11px] font-bold text-secondary animate-pulse">
+                            {uploadProgress && uploadProgress.total > 1
+                              ? `מעלה ${uploadProgress.current}/${uploadProgress.total}...`
+                              : "מעלה לגלריה..."}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center mb-2 group-hover:scale-110 group-hover:bg-secondary/20 transition-all text-secondary">
+                            <ImagePlus className="h-5 w-5" />
+                          </div>
+                          <span className="text-xs font-bold text-foreground">העלאה לגלריה</span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">לחץ או גרור קבצים</span>
+                        </>
+                      )}
+                    </div>
+
                     {filteredMediaItems.map((item: any) => {
                       const isSelected = multiple 
                         ? selectedItems.some((i: any) => i.id === item.id) 
@@ -628,10 +754,10 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                         </button>
                       );
                     })}
-                    {filteredMediaItems.length === 0 && (
-                      <div className="col-span-full py-24 text-center">
+                    {filteredMediaItems.length === 0 && searchQuery && (
+                      <div className="col-span-full py-16 text-center">
                         <Library className="h-12 w-12 mx-auto text-muted/20 mb-4" />
-                        <p className="text-muted-foreground font-medium">לא נמצאו קבצים מתאימים.</p>
+                        <p className="text-muted-foreground font-medium">לא נמצאו קבצים התואמים לחיפוש "{searchQuery}".</p>
                       </div>
                     )}
                   </div>

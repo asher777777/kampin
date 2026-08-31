@@ -614,8 +614,22 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
     anchorId: "videoGallery",
     backgroundColor: "transparent",
   },
+  campaignTiers: {
+    visible: true,
+    title: "בחר מסלול תרומה",
+    donationType: "recurring",
+    recurringMonths: 12,
+    anchorId: "campaign-tiers",
+    backgroundColor: "#ffffff",
+    drawerConfig: {
+      theme: "dark",
+      tierDisplayMode: "auto",
+      tierImageShape: "rounded",
+      fontSizeScale: 1,
+    }
+  },
   mobileHiddenSections: [],
-  sectionOrder: ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"],
+  sectionOrder: ["campaignHeader", "campaignTiers", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"],
 };
 
 const DEFAULT_SERVICES_LANDING_CONFIG: HomePageConfig = {
@@ -657,7 +671,7 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
   if (!data) return DEFAULT_HOME_CONFIG;
   
   const rawSectionOrder = data.sectionOrder || DEFAULT_HOME_CONFIG.sectionOrder;
-  const allKnownSections = ["campaignHeader", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"];
+  const allKnownSections = ["campaignHeader", "campaignTiers", "campaignDonors", "hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "videoGallery", "imageListing", "landingSection"];
   
   // Ensure all sections exist in sectionOrder while preserving user-defined ordering
   let sectionOrder = Array.from(new Set([...rawSectionOrder, ...allKnownSections]));
@@ -688,6 +702,14 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
     faq: { ...DEFAULT_HOME_CONFIG.faq, ...data.faq },
     campaignHeader: data.campaignHeader || DEFAULT_HOME_CONFIG.campaignHeader,
     campaignDonors: data.campaignDonors || DEFAULT_HOME_CONFIG.campaignDonors,
+    campaignTiers: data.campaignTiers ? {
+      ...DEFAULT_HOME_CONFIG.campaignTiers,
+      ...data.campaignTiers,
+      drawerConfig: {
+        ...DEFAULT_HOME_CONFIG.campaignTiers?.drawerConfig,
+        ...data.campaignTiers?.drawerConfig,
+      }
+    } : DEFAULT_HOME_CONFIG.campaignTiers,
     mobileHiddenSections: data.mobileHiddenSections || DEFAULT_HOME_CONFIG.mobileHiddenSections || [],
     sectionOrder,
     seo: data.seo,
