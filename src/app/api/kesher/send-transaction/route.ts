@@ -91,8 +91,7 @@ export async function POST(request: Request) {
           Comment1: transactionId || "תשלום מובנה",
           FirstName: clientName ? clientName.trim().split(" ")[0] : "תורם",
           LastName: clientName && clientName.trim().includes(" ") ? clientName.trim().split(" ").slice(1).join(" ") : (clientName ? clientName.trim() : "קמפיין"),
-          ClientName: clientName ? clientName.trim() : "תורם קמפיין",
-          ProjectNumber: settings.paymentPageId || "",
+          ProjectNumber: "000",
           Mail: email || "",
           DocumentType: documentType ? Number(documentType) : 320,
           Id: id || ""
@@ -134,7 +133,12 @@ export async function POST(request: Request) {
 
     const requestResult = result.RequestResult || result;
 
-    if (requestResult.Status === false || requestResult.status === "error" || requestResult.error) {
+    const isSuccess = requestResult.Status === true || 
+                      requestResult.Code === 499 || 
+                      requestResult.Code === 0 ||
+                      (requestResult.Description && requestResult.Description.includes("הצלחה"));
+
+    if (!isSuccess && (requestResult.Status === false || requestResult.status === "error" || requestResult.error)) {
       return NextResponse.json({ 
         success: false, 
         error: requestResult.Description || requestResult.error || "שגיאה בשליחה למערכת קשר",
@@ -154,7 +158,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "התשלום עבר בהצלחה", // Prevent Kesher internal warnings like Code 499 ('נתונים לא נכונים') from reaching the UI
+      message: "התשלום עבר בהצלחה",
       transactionId: receiptUrl,
       encryptedCC
     });

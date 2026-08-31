@@ -45,9 +45,8 @@ export async function POST(request: Request) {
           transaction: {
             FirstName: firstName,
             LastName: lastName,
-            Total: Math.round(Number(amount) * 100), // סכום באגורות
+            Total: Math.round(Number(amount) * 100), // סכום באגורות לפי התיעוד
             Phone: validPhone,
-            Mail: validEmail,
             Currency: 1, // 1 לשקל
             CreditType: 1, // 1 = חיוב רגיל
             NumPayment: 1,
@@ -101,18 +100,9 @@ export async function POST(request: Request) {
           });
         }
 
-        console.error("SendBitTransaction failed with result:", bitResult);
-        const errorDesc = bitResult?.RequestResult?.Description || bitResult?.error || bitResText || "שגיאה לא ידועה מקשר";
-        return NextResponse.json({
-          success: false,
-          error: `שגיאה מקשר: ${errorDesc}`
-        }, { status: 400 });
+        console.warn("SendBitTransaction returned notice, falling back to GetLinkToken:", bitResult);
       } catch (bitErr: any) {
-        console.error("SendBitTransaction exception:", bitErr);
-        return NextResponse.json({
-          success: false,
-          error: `שגיאת תקשורת עם שרת קשר (Bit): ${bitErr.message}`
-        }, { status: 500 });
+        console.error("SendBitTransaction exception, falling back to GetLinkToken:", bitErr);
       }
     }
 
