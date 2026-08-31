@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
-import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2, ArrowLeft, FlaskConical, Share2, Copy } from "lucide-react";
+import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2, ArrowLeft, FlaskConical, Share2, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { recordPendingDonationAction, completeDonationAction, failDonationAction, recordDonationAction } from "@/features/campaigns/actions";
 import { DonationTier } from "@/lib/types/campaign";
 import { CampaignTiersList, defaultTiers } from "./CampaignTiersList";
@@ -92,6 +92,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   // Payment Method Selection (for one-time donations)
   const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit" | "google_pay">("credit_card");
   const [iframeUrl, setIframeUrl] = useState<string>("");
+  const [bitStatus, setBitStatus] = useState<{ message: string; bitUrl?: string; phone?: string } | null>(null);
 
   // Load saved donor info from localStorage for instant autofill
   React.useEffect(() => {
@@ -290,6 +291,12 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         return;
       }
 
+      if (walletType === "bit" && (!phone || phone.replace(/[^0-9]/g, "").length < 9)) {
+        setError("לתשלום ישיר באפליקציית Bit יש להזין מספר טלפון נייד תקין בשלב הפרטים (חזור לשלב הקודם).");
+        setLoading(false);
+        return;
+      }
+
       // PRODUCTION KESHER CALL
       const res = await fetch("/api/kesher/get-token", {
         method: "POST",
@@ -297,9 +304,10 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         body: JSON.stringify({
           campaignId: targetCampId,
           amount: calculatedTotal,
-          clientName: isAnonymous ? "אנונימי" : (donorName || "תורם קמפיין"),
+          clientName: donorName || "תורם קמפיין",
           phone,
           email,
+          walletType,
           details: `תרומה בקמפיין - ${walletType === "bit" ? "ביט" : "Google Pay"}`,
           transactionId: pendingDonationId || `Donation-${targetCampId}-${Date.now()}`,
           installments: 1,
@@ -307,7 +315,18 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
       });
 
       const data = await res.json();
-      if (data.success && data.iframeUrl) {
+      if (data.success && (data.isSmsSent || data.bitUrl || walletType === "bit")) {
+        setBitStatus({
+          message: data.message || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום באפליקציית Bit.",
+          bitUrl: data.bitUrl,
+          phone
+        });
+        if (data.bitUrl) {
+          try {
+            window.open(data.bitUrl, "_blank");
+          } catch (e) {}
+        }
+      } else if (data.success && data.iframeUrl) {
         setIframeUrl(data.iframeUrl);
       } else {
         setError(data.error || "שגיאה בהפקת קישור לתשלום דיגיטלי מול קשר. ודא כי פרטי מסוף קשר מוגדרים במערכת.");
@@ -418,7 +437,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
           creditNumber: cleanCC,
           expiry,
           cvv2: ccData.cvv2,
-          clientName: isAnonymous ? "אנונימי" : (donorName || "תורם קמפיין"),
+          clientName: donorName || "תורם קמפיין",
           phone,
           email,
           id: ccData.idNumber,
@@ -983,48 +1002,114 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     פתח בעמוד מלא ↗
                   </a>
                 </div>
-                <div className="w-full h-[420px] rounded-2xl overflow-hidden border border-slate-700 bg-white shadow-xl relative">
+                <div className="w-full h-[520px] sm:h-[580px] rounded-2xl overflow-hidden border border-slate-700 bg-white shadow-xl relative">
                   <iframe
                     src={iframeUrl}
                     className="w-full h-full border-0"
                     title="Kesher Digital Payment"
                     allow="payment *; clipboard-write; microphone; camera; geolocation"
-                    sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
                   />
                 </div>
               </div>
             ) : paymentMethodType === "bit" && donationMode === "one_time" ? (
               /* BIT PAYMENT CARD */
-              <div className={`p-4 rounded-2xl border text-center space-y-2.5 ${
-                isDark ? "bg-gradient-to-b from-emerald-950/60 to-slate-900 border-emerald-500/40" : "bg-emerald-50/70 border-emerald-300"
-              }`}>
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
-                  <span className="font-black text-lg">bit</span>
+              bitStatus ? (
+                <div className={`p-5 rounded-2xl border text-center space-y-3.5 animate-in fade-in zoom-in-95 ${
+                  isDark ? "bg-gradient-to-b from-emerald-950/90 via-slate-900 to-slate-900 border-emerald-500/50 shadow-2xl" : "bg-emerald-50 border-emerald-300 shadow-lg"
+                }`}>
+                  <div className="relative w-12 h-12 mx-auto">
+                    <div className="absolute inset-0 rounded-2xl bg-emerald-500/30 animate-ping opacity-75" />
+                    <div className="relative w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xl shadow-lg border border-emerald-400">
+                      bit
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h4 className={`font-black text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>
+                      בקשת התשלום נשלחה ל-Bit בהצלחה! 📲
+                    </h4>
+                    <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                      {bitStatus.message}
+                    </p>
+                    {bitStatus.phone && (
+                      <div className={`inline-block px-3 py-1 rounded-full text-xs font-mono font-bold mt-1 ${
+                        isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        נשלח למספר: {bitStatus.phone}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    {bitStatus.bitUrl && (
+                      <a
+                        href={bitStatus.bitUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <span>פתח את אפליקציית Bit במכשיר</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setStep("success");
+                        if (onDonationCompleted) {
+                          onDonationCompleted();
+                        }
+                      }}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>אישרתי את התשלום באפליקציה ✓</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setBitStatus(null)}
+                      className={`w-full py-1 text-xs font-bold transition-colors cursor-pointer ${
+                        isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      חזור ובחר אמצעי תשלום אחר
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  <h4 className={`font-black text-xs sm:text-sm ${isDark ? "text-white" : "text-slate-900"}`}>תשלום מהיר ומאובטח באפליקציית Bit</h4>
-                  <p className={`text-[11px] max-w-sm mx-auto leading-tight ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                    סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{calculatedTotal.toLocaleString()}.
-                  </p>
+              ) : (
+                <div className={`p-4 rounded-2xl border text-center space-y-2.5 ${
+                  isDark ? "bg-gradient-to-b from-emerald-950/60 to-slate-900 border-emerald-500/40" : "bg-emerald-50/70 border-emerald-300"
+                }`}>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
+                    <span className="font-black text-lg">bit</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <h4 className={`font-black text-xs sm:text-sm ${isDark ? "text-white" : "text-slate-900"}`}>תשלום מהיר ומאובטח באפליקציית Bit</h4>
+                    <p className={`text-[11px] max-w-sm mx-auto leading-tight ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                      סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{calculatedTotal.toLocaleString()}.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handlePayWithDigitalWallet("bit")}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>שולח בקשה ל-Bit...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>מעבר לתשלום ₪{calculatedTotal.toLocaleString()} ב-Bit</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handlePayWithDigitalWallet("bit")}
-                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>מייצר קישור מאובטח ל-Bit...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>מעבר לתשלום ₪{calculatedTotal.toLocaleString()} ב-Bit</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              )
             ) : paymentMethodType === "google_pay" && donationMode === "one_time" ? (
               /* GOOGLE PAY / APPLE PAY CARD */
               <div className={`p-4 rounded-2xl border text-center space-y-2.5 ${

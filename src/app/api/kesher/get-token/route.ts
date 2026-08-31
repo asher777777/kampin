@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { amount, clientName, phone, email, details, transactionId, installments, campaignId, userId: requestUserId } = body;
+    const { amount, clientName, phone, email, details, transactionId, installments, walletType, campaignId, userId: requestUserId } = body;
 
     const session = await auth();
     const userId = requestUserId || session?.user?.id;
@@ -29,9 +29,109 @@ export async function POST(request: Request) {
     const rawName = (clientName || "").trim();
     const nameParts = rawName.split(" ").filter(Boolean);
     const firstName = nameParts[0] || "תורם";
-    const lastName = nameParts.slice(1).join(" ") || "קמפיין";
-    const validPhone = (phone && phone.trim().length >= 7) ? phone.trim() : "0500000000";
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : firstName;
+    const cleanPhone = (phone || "").replace(/[^0-9]/g, "");
+    const validPhone = cleanPhone.length >= 9 ? cleanPhone : "0500000000";
     const validEmail = (email && email.includes("@")) ? email.trim() : "donor@hakel.club";
+
+    // 1. Direct Bit transaction via SendBitTransaction API (Official Kesher Bit API)
+    if (walletType === "bit") {
+      const bitPayload = {
+        Json: {
+          userName: settings.userName,
+          password: settings.apiKey,
+          func: "SendBitTransaction",
+          format: "json",
+          transaction: {
+            FirstName: firstName,
+            LastName: lastName,
+            Total: Math.round(Number(amount) * 100), // סכום באגורות
+            Phone: validPhone,
+            Mail: validEmail,
+            Currency: 1, // 1 לשקל
+            CreditType: 1, // 1 = חיוב רגיל
+            NumPayment: 1,
+            ProjectNumber: "000"
+          }
+        },
+        format: "json"
+      };
+
+      console.log("================ KESHER SEND BIT API REQUEST ================");
+      console.log(JSON.stringify(bitPayload, null, 2));
+
+      try {
+        const bitResponse = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bitPayload)
+        });
+
+        const bitResText = await bitResponse.text();
+        console.log("================ KESHER SEND BIT API RESPONSE ================");
+        console.log(bitResText);
+        console.log("==============================================================");
+
+        let bitResult: any = null;
+        try {
+          bitResult = JSON.parse(bitResText);
+        } catch (e) {
+          console.error("Kesher Bit JSON Parse error:", bitResText);
+        }
+
+        const bUrl = bitResult?.BitUrl || bitResult?.Url || bitResult?.bitUrl;
+        const isSuccess = bitResult?.RequestResult?.Status === true || 
+                          bitResult?.RequestResult?.Code === 0 || 
+                          bitResult?.RequestResult?.Code === 499 ||
+                          (bitResult?.RequestResult?.Description && (
+                            bitResult.RequestResult.Description.includes("מסרון") || 
+                            bitResult.RequestResult.Description.includes("טלפון") ||
+                            bitResult.RequestResult.Description.includes("הצלחה") ||
+                            bitResult.RequestResult.Description.includes("נא אשר")
+                          ));
+
+        if (bUrl || isSuccess) {
+          return NextResponse.json({
+            success: true,
+            bitUrl: bUrl || null,
+            isSmsSent: true,
+            message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום באפליקציית Bit.",
+            transactionId: bitResult?.NumTransaction || "",
+            isDirectBit: true
+          });
+        }
+
+        console.error("SendBitTransaction failed with result:", bitResult);
+        const errorDesc = bitResult?.RequestResult?.Description || bitResult?.error || bitResText || "שגיאה לא ידועה מקשר";
+        return NextResponse.json({
+          success: false,
+          error: `שגיאה מקשר: ${errorDesc}`
+        }, { status: 400 });
+      } catch (bitErr: any) {
+        console.error("SendBitTransaction exception:", bitErr);
+        return NextResponse.json({
+          success: false,
+          error: `שגיאת תקשורת עם שרת קשר (Bit): ${bitErr.message}`
+        }, { status: 500 });
+      }
+    }
+
+    const reqData: any = {
+      PaymentPageId: paymentPageId,
+      Currency: 1, // ILS
+      Total: Number(amount),
+      FirstName: firstName,
+      LastName: lastName,
+      Mail: validEmail,
+      Tel: validPhone,
+      CreditType: installments && installments > 1 ? "4" : "1",
+      Date: new Date().toISOString().split("T")[0],
+      Comment: details || "תשלום / תרומה",
+      AddData: transactionId || `TXN_${Date.now()}`,
+      NumPayment: installments && installments > 1 ? installments : 1,
+      MaxPayments: installments && installments > 1 ? installments : 1,
+      Moked: "CommunityGenerator"
+    };
 
     const payload = {
       Json: {
@@ -39,22 +139,7 @@ export async function POST(request: Request) {
         password: settings.apiKey,
         func: "GetLinkToken",
         format: "json",
-        request: {
-          PaymentPageId: paymentPageId,
-          Currency: 1, // ILS
-          Total: Number(amount),
-          FirstName: firstName,
-          LastName: lastName,
-          Mail: validEmail,
-          Tel: validPhone,
-          CreditType: "1", // Regular payment
-          Date: new Date().toISOString().split("T")[0],
-          Comment: details || "תשלום / תרומה",
-          AddData: transactionId || `TXN_${Date.now()}`,
-          NumPayment: 1,
-          MaxPayments: 1,
-          Moked: "CommunityGenerator"
-        }
+        request: reqData
       },
       format: "json"
     };
@@ -99,17 +184,16 @@ export async function POST(request: Request) {
     if (amount) params.append("total", String(amount));
     params.append("currency", "1");
     if (clientName) {
-      params.append("firstname", clientName.split(" ")[0] || "");
-      params.append("lastname", clientName.split(" ").slice(1).join(" ") || "");
+      params.append("firstname", firstName);
+      params.append("lastname", lastName);
     }
     if (phone) params.append("tel", phone);
     if (email) params.append("mail", email);
     if (transactionId) params.append("addactiondata", transactionId);
+    
     if (installments && installments > 1) {
-      params.append("credittype", "4"); // 4 is regular credit installments
+      params.append("credittype", "4");
       params.append("numpayment", String(installments));
-    } else {
-      params.append("credittype", "1"); // 1 is regular credit payment
     }
 
     return NextResponse.json({
