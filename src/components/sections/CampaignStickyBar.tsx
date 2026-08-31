@@ -67,14 +67,15 @@ export const CampaignStickyBar: React.FC<CampaignStickyBarProps> = ({
         <button
           type="button"
           onClick={() => onOpenDonate("one_time")}
-          className="flex items-center gap-2 bg-[#0B132B] hover:bg-slate-900 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-800 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 group"
+          className="flex items-center gap-1.5 bg-[#0B132B] hover:bg-slate-900 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full border border-slate-800 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 group"
           title="תרומה מהירה באפליקציית Bit"
         >
           {/* Bit Circular Logo */}
           <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#00D2D2] flex items-center justify-center text-[#0B132B] font-black text-[10px] sm:text-xs leading-none shadow-sm group-hover:scale-110 transition-transform">
             bit
           </div>
-          <span className="text-[#00D2D2] font-black text-sm sm:text-base tracking-tight">bit</span>
+          <span className="text-slate-200 font-bold text-xs sm:text-sm">תרומה ב-</span>
+          <span className="text-[#00D2D2] font-black text-xs sm:text-sm -mr-0.5">bit</span>
         </button>
 
         {/* Big Donate Red Button */}

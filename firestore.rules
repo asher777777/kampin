@@ -2,11 +2,48 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Golden Model: Isolate all user-owned data
-    // Regular users can only read/write documents where ownerId == their uid.
-    // SUPERADMIN can read/write everything.
+    // Public Content & Campaigns - Anyone can read
+    match /pages/{pageId=**} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN" || request.auth.uid == "1");
+    }
 
-    // Allow user profile access
+    match /campaigns/{campaignId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /landing/{landingId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /services/{serviceId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /posts/{postId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /communities/{communityId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /configs/{configId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /settings/{settingId=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // User Profile & User Subcollections
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN");
@@ -28,7 +65,6 @@ service cloud.firestore {
         request.auth.token.role == "ADMIN" || 
         request.resource.data.ownerId == request.auth.uid
       );
-      // No update or delete allowed for audit logs
       allow update, delete: if false;
     }
 
