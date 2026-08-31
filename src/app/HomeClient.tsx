@@ -22,6 +22,7 @@ const CampaignTiersSection = dynamic(() => import("@/components/sections/Campaig
 const CampaignStickyBar = dynamic(() => import("@/components/sections/CampaignStickyBar").then(m => m.CampaignStickyBar), { ssr: true });
 import { AmbassadorModal } from "@/components/campaigns/AmbassadorModal";
 import { DonationDrawer } from "@/components/campaigns/DonationDrawer";
+import { LiveDonationAlert } from "@/components/campaigns/LiveDonationAlert";
 import { HomePageConfig } from "@/features/home/actions";
 import { GlobalSettings } from "@/features/settings/actions";
 import { getAllCampaigns } from "@/features/campaigns/actions";
@@ -511,11 +512,19 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         configDonationType={config.campaignTiers?.donationType}
         configRecurringMonths={config.campaignTiers?.recurringMonths}
         initialSelectedTierId={selectedTierIdForDrawer}
-        initialDonationMode={drawerInitialMode}
-        drawerConfig={config.campaignTiers?.drawerConfig}
+        drawerConfig={{
+          ...(config.campaignTiers?.drawerConfig || {}),
+          testMode: Boolean(config.campaignTiers?.testMode || config.campaignTiers?.drawerConfig?.testMode),
+        }}
       />
 
-
+      {/* Floating Live Donation Alert Card on side of screen */}
+      <LiveDonationAlert
+        campaignId={activeCampaignId}
+        configTiers={config.campaignTiers?.tiers}
+        onOpenDonate={() => handleOpenDonationDrawer()}
+        enableDemoMode={false}
+      />
 
       <Footer />
       {globalSettings.showFloatingContactButton !== false && (

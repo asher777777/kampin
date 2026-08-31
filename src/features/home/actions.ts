@@ -173,7 +173,7 @@ export interface HomePageConfig {
     objectFit?: "cover" | "contain" | "fill" | "scale-down";
     titleEffect?: "glow" | "badge" | "fade-up" | "cinematic";
     textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
-    desktopHeight?: "normal" | "tall" | "extra-tall" | string;
+    desktopHeight?: "normal" | "tall" | "extra-tall" | "auto" | "natural" | string;
     anchorId?: string;
     backgroundColor?: string;
   };
@@ -236,11 +236,16 @@ export interface HomePageConfig {
   campaignHeader?: any;
   campaignTiers?: {
     visible?: boolean;
+    title?: string;
+    backgroundColor?: string;
+    anchorId?: string;
+    testMode?: boolean;
     donationType?: "one_time" | "recurring" | "both";
     recurringMonths?: number;
     tiers?: any[];
     drawerConfig?: {
       theme?: "dark" | "light";
+      testMode?: boolean;
       tierDisplayMode?: "text" | "full_image" | "auto";
       tierImageShape?: "circle" | "rounded" | "full";
       fieldBgColor?: string;
@@ -254,6 +259,10 @@ export interface HomePageConfig {
       step2Icon?: string;
       step3Title?: string;
       step3Icon?: string;
+      thankYouTitle?: string;
+      thankYouSubtitle?: string;
+      thankYouImage?: string;
+      thankYouShareText?: string;
     };
   };
   campaignDonors?: any;
@@ -705,9 +714,11 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
     campaignTiers: data.campaignTiers ? {
       ...DEFAULT_HOME_CONFIG.campaignTiers,
       ...data.campaignTiers,
+      testMode: data.campaignTiers.testMode ?? data.campaignTiers?.drawerConfig?.testMode ?? false,
       drawerConfig: {
         ...DEFAULT_HOME_CONFIG.campaignTiers?.drawerConfig,
         ...data.campaignTiers?.drawerConfig,
+        testMode: data.campaignTiers.testMode ?? data.campaignTiers?.drawerConfig?.testMode ?? false,
       }
     } : DEFAULT_HOME_CONFIG.campaignTiers,
     mobileHiddenSections: data.mobileHiddenSections || DEFAULT_HOME_CONFIG.mobileHiddenSections || [],

@@ -522,30 +522,52 @@ export const VideoGalleryEditor = ({ config, onChange }: VideoGalleryEditorProps
                 </div>
               </div>
 
-              {/* 5. Desktop Height */}
+              {/* 5. Dimensions & Height (ממדי וגובה התצוגה) */}
               <div>
                 <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-400" /> גובה תצוגה במסכי מחשב (דסקטופ)
+                  <Layers className="w-4 h-4 text-amber-400" /> גובה וממדי תצוגה (דסקטופ ומובייל)
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { id: "normal", label: "סטנדרטי (60vh)" },
-                    { id: "tall", label: "מוגדל +20% (72vh - מומלץ)" },
-                    { id: "extra-tall", label: "ענק (85vh)" }
+                    { 
+                      id: "auto", 
+                      label: "לפי ממדי התמונה (Auto)", 
+                      desc: "גובה ורוחב טבעיים במדויק לפי התמונה, גם במובייל וגם בדסקטופ" 
+                    },
+                    { 
+                      id: "tall", 
+                      label: "מוגדל בדסקטופ (72vh)", 
+                      desc: "תוספת 20% גובה לחוויה קולנועית (מומלץ)" 
+                    },
+                    { 
+                      id: "normal", 
+                      label: "סטנדרטי (60vh)", 
+                      desc: "גובה מסך סטנדרטי בדסקטופ" 
+                    },
+                    { 
+                      id: "extra-tall", 
+                      label: "ענק (85vh)", 
+                      desc: "תופס כמעט את כל גובה המסך" 
+                    }
                   ].map((h) => {
-                    const isSelected = (config.desktopHeight || "tall") === h.id;
+                    const isSelected = (config.desktopHeight || "tall") === h.id || ((config.desktopHeight === "natural") && h.id === "auto");
                     return (
                       <button
                         key={h.id}
                         type="button"
                         onClick={() => updateField("desktopHeight", h.id)}
-                        className={`py-2.5 px-3 rounded-xl border text-xs font-medium transition-all cursor-pointer text-center ${
+                        className={`p-3 rounded-xl border text-right transition-all cursor-pointer flex flex-col gap-1 ${
                           isSelected
-                            ? "bg-amber-500 text-black font-bold border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                            ? "bg-amber-500/15 text-white border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)]"
                             : "bg-[#0f172a] text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white"
                         }`}
                       >
-                        {h.label}
+                        <span className={`text-xs font-bold ${isSelected ? "text-amber-300" : "text-slate-200"}`}>
+                          {h.label}
+                        </span>
+                        <span className="text-[11px] text-slate-400 leading-relaxed">
+                          {h.desc}
+                        </span>
                       </button>
                     );
                   })}

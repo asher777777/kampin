@@ -21,7 +21,7 @@ export interface VideoGalleryProps {
   objectFit?: "cover" | "contain" | "fill" | "scale-down";
   titleEffect?: "cinematic" | "glow" | "badge" | "fade-up";
   textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
-  heightDesktop?: "normal" | "tall" | "extra-tall" | string;
+  heightDesktop?: "normal" | "tall" | "extra-tall" | "auto" | "natural" | string;
   backgroundColor?: string;
 }
 
@@ -128,7 +128,7 @@ export const VideoGallery = ({
   titleEffect = "cinematic",
   textPosition = "bottom",
   heightDesktop = "tall",
-  backgroundColor = "var(--background)",
+  backgroundColor = "#0f172a",
 }: VideoGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -137,6 +137,8 @@ export const VideoGallery = ({
 
   const normalizedImages = useMemo(() => normalizeImages(images), [images]);
   const fitClass = getObjectFitClass(objectFit);
+  const resolvedObjectFit: React.CSSProperties["objectFit"] = (objectFit as any) || "cover";
+  const isAutoHeight = heightDesktop === "auto" || heightDesktop === "natural";
 
   // Background gallery rotation
   useEffect(() => {
@@ -243,12 +245,149 @@ export const VideoGallery = ({
   const renderGalleryBackground = () => {
     if (normalizedImages.length === 0) {
       return (
-        <div className="absolute inset-0 bg-slate-900 flex items-center justify-center text-slate-500">
+        <div className={cn("bg-slate-900 flex items-center justify-center text-slate-500 py-20", isAutoHeight ? "w-full min-h-[300px]" : "absolute inset-0")}>
           לא הוגדרו תמונות לגלריה
         </div>
       );
     }
 
+    const safeCurrentIndex = currentIndex % normalizedImages.length;
+    const current = normalizedImages[safeCurrentIndex];
+
+    // ==========================================
+    // 1. Natural / Auto Dimensions Mode (Mobile & Desktop)
+    // ==========================================
+    if (isAutoHeight) {
+      const imgStyle: React.CSSProperties = {
+        objectFit: resolvedObjectFit,
+        maxHeight: "88vh",
+        maxWidth: "100%",
+        width: resolvedObjectFit === "fill" ? "100%" : resolvedObjectFit === "cover" ? "100%" : "auto",
+        height: resolvedObjectFit === "fill" ? "65vh" : "auto",
+        display: "block",
+        margin: "0 auto",
+      };
+
+      if (effect === "digital-squares") {
+        return (
+          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={safeCurrentIndex}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8 }}
+                className="w-full relative flex items-center justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={current.url}
+                  alt={current.title || `Gallery ${safeCurrentIndex}`}
+                  style={imgStyle}
+                  className={cn("transition-all duration-500", fitClass)}
+                />
+                
+                {/* Digital squares effect layer */}
+                <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 pointer-events-none">
+                  {Array.from({ length: 100 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: 0 }}
+                      transition={{ 
+                        duration: 0.8, 
+                        delay: Math.random() * 0.5, 
+                        ease: "easeOut"
+                      }}
+                      className="bg-black/50"
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      if (effect === "zoom-in") {
+        return (
+          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={safeCurrentIndex}
+                initial={{ opacity: 0, scale: 1.06 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="w-full relative flex items-center justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={current.url}
+                  alt={current.title || "Gallery"}
+                  style={imgStyle}
+                  className={cn("transition-all duration-500", fitClass)}
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      if (effect === "slide") {
+        return (
+          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={safeCurrentIndex}
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -50 }}
+                transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full relative flex items-center justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={current.url}
+                  alt={current.title || "Gallery"}
+                  style={imgStyle}
+                  className={cn("transition-all duration-500", fitClass)}
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      // Default Fade in auto height
+      return (
+        <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={safeCurrentIndex}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="w-full relative flex items-center justify-center"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={current.url}
+                alt={current.title || "Gallery"}
+                style={imgStyle}
+                className={cn("transition-all duration-500", fitClass)}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 2. Fixed Height Modes (tall, normal, extra-tall)
+    // ==========================================
     if (effect === "digital-squares") {
       return (
         <div className="absolute inset-0 overflow-hidden">
@@ -264,6 +403,8 @@ export const VideoGallery = ({
                 src={imgObj.url} 
                 alt={imgObj.title || `Gallery ${idx}`} 
                 fill 
+                sizes="100vw"
+                style={{ objectFit: resolvedObjectFit }}
                 className={cn("transition-all duration-700", fitClass)} 
               />
               
@@ -292,8 +433,6 @@ export const VideoGallery = ({
     }
 
     if (effect === "zoom-in") {
-      const safeCurrentIndex = currentIndex % normalizedImages.length;
-      const current = normalizedImages[safeCurrentIndex];
       return (
         <div className="absolute inset-0 overflow-hidden">
           <AnimatePresence initial={false}>
@@ -309,6 +448,8 @@ export const VideoGallery = ({
                 src={current.url} 
                 alt={current.title || "Gallery"} 
                 fill 
+                sizes="100vw"
+                style={{ objectFit: resolvedObjectFit }}
                 className={cn("transition-all duration-700", fitClass)} 
               />
             </motion.div>
@@ -318,8 +459,6 @@ export const VideoGallery = ({
     }
 
     if (effect === "slide") {
-      const safeCurrentIndex = currentIndex % normalizedImages.length;
-      const current = normalizedImages[safeCurrentIndex];
       return (
         <div className="absolute inset-0 overflow-hidden">
           <AnimatePresence initial={false}>
@@ -335,6 +474,8 @@ export const VideoGallery = ({
                 src={current.url} 
                 alt={current.title || "Gallery"} 
                 fill 
+                sizes="100vw"
+                style={{ objectFit: resolvedObjectFit }}
                 className={cn("transition-all duration-700", fitClass)} 
               />
             </motion.div>
@@ -343,9 +484,7 @@ export const VideoGallery = ({
       );
     }
 
-    // Default Fade effect
-    const safeCurrentIndex = currentIndex % normalizedImages.length;
-    const current = normalizedImages[safeCurrentIndex];
+    // Default Fade effect (fixed container)
     return (
       <div className="absolute inset-0 overflow-hidden">
         <AnimatePresence initial={false}>
@@ -361,6 +500,8 @@ export const VideoGallery = ({
               src={current.url} 
               alt={current.title || "Gallery"} 
               fill 
+              sizes="100vw"
+              style={{ objectFit: resolvedObjectFit }}
               className={cn("transition-all duration-700", fitClass)} 
             />
           </motion.div>
@@ -474,11 +615,14 @@ export const VideoGallery = ({
 
   // Compute desktop height (20% increase on desktop by default: 60vh * 1.2 = 72vh, min-h 400px * 1.2 = 480px)
   const getHeightClasses = () => {
+    if (isAutoHeight) {
+      return "h-auto min-h-0 py-0";
+    }
     if (heightDesktop === "normal") {
-      return "h-[60vh] min-h-[400px]";
+      return "h-[50vh] md:h-[60vh] min-h-[350px] md:min-h-[400px]";
     }
     if (heightDesktop === "extra-tall") {
-      return "h-[65vh] md:h-[85vh] min-h-[450px] md:min-h-[560px]";
+      return "h-[70vh] md:h-[85vh] min-h-[480px] md:min-h-[580px]";
     }
     // "tall" or default
     return "h-[60vh] md:h-[72vh] min-h-[400px] md:min-h-[480px]";
@@ -491,13 +635,13 @@ export const VideoGallery = ({
         "relative w-full flex items-center justify-center overflow-hidden group transition-all duration-500",
         getHeightClasses()
       )}
-      style={{ backgroundColor: backgroundColor || "var(--background)" }}
+      style={{ backgroundColor: backgroundColor || "#0f172a" }}
     >
       {/* Background layer */}
       {renderGalleryBackground()}
       
       {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 transition-colors duration-500 z-10" />
+      <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 transition-colors duration-500 z-10 pointer-events-none" />
 
       {/* Title Overlay */}
       {renderTitleOverlay()}

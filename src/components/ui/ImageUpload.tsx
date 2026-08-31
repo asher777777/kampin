@@ -72,6 +72,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
 
   // File size and dimensions states
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [currentImgDimensions, setCurrentImgDimensions] = useState<{ width: number; height: number } | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
@@ -80,6 +81,37 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
     const lowerUrl = url.toLowerCase();
     return lowerUrl.includes('.mp4') || lowerUrl.includes('.webm') || lowerUrl.includes('.mov') || lowerUrl.includes('.quicktime');
   };
+
+  useEffect(() => {
+    if (!currentImage) {
+      setCurrentImgDimensions(null);
+      return;
+    }
+
+    if (!isVideoUrl(currentImage)) {
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setCurrentImgDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        }
+      };
+      img.onerror = () => {
+        setCurrentImgDimensions(null);
+      };
+      img.src = currentImage;
+    } else {
+      const video = document.createElement("video");
+      video.onloadedmetadata = () => {
+        if (video.videoWidth && video.videoHeight) {
+          setCurrentImgDimensions({ width: video.videoWidth, height: video.videoHeight });
+        }
+      };
+      video.onerror = () => {
+        setCurrentImgDimensions(null);
+      };
+      video.src = currentImage;
+    }
+  }, [currentImage]);
 
   useEffect(() => {
     if (showGallery) {

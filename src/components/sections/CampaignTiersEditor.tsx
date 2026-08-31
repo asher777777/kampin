@@ -4,7 +4,7 @@ import React from "react";
 import { DonationTier } from "@/lib/types/campaign";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { IconPicker } from "@/components/ui/IconPicker";
-import { Plus, Trash2, Image as ImageIcon, Heart, CreditCard, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Image as ImageIcon, Heart, CreditCard, CheckCircle2, FlaskConical } from "lucide-react";
 
 interface CampaignTiersEditorProps {
   config: any;
@@ -59,6 +59,53 @@ export const CampaignTiersEditor: React.FC<CampaignTiersEditorProps> = ({
         <p className="text-xs text-slate-300">
           כאן מנהלים את כפתורי הסכומים והוראות קבע. עיצוב הצבעים של האזור מתבצע בלשונית ה'עיצוב' שמימין.
         </p>
+      </div>
+
+      {/* Test Mode Switch Banner */}
+      <div className={`p-4 rounded-2xl border transition-all ${
+        config.testMode 
+          ? "bg-amber-950/50 border-amber-500 shadow-lg shadow-amber-950/40" 
+          : "bg-slate-800/90 border-slate-700/80"
+      }`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 text-right flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <FlaskConical className={`w-5 h-5 ${config.testMode ? "text-amber-400 animate-pulse" : "text-slate-400"}`} />
+              <label htmlFor="test-mode-toggle" className="font-black text-sm text-white cursor-pointer select-none">
+                מצב טסט לבדיקת רישום תשלומים (ללא חיוב אשראי)
+              </label>
+              {config.testMode && (
+                <span className="bg-amber-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full tracking-wide">
+                  פעיל
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              בסימון תיבה זו, ביצוע תרומה במערכת ידמה תשלום מוצלח באופן מיידי (סטטוס <span className="text-emerald-400 font-bold">'משולם'</span>) <strong className="text-amber-300">ללא פנייה לחברת האשראי</strong>. התרומה תירשם במסד הנתונים, תעדכן את סכומי הקמפיין והשגרירים, ותפעיל את כרטיס ה-UI וההתראות.
+            </p>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+            <input
+              id="test-mode-toggle"
+              type="checkbox"
+              checked={Boolean(config.testMode)}
+              onChange={(e) => {
+                const isChecked = e.target.checked;
+                onChange({
+                  ...config,
+                  testMode: isChecked,
+                  drawerConfig: {
+                    ...(config.drawerConfig || {}),
+                    testMode: isChecked,
+                  }
+                });
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+          </label>
+        </div>
       </div>
 
       <div className="p-3.5 bg-slate-800/90 rounded-2xl border border-rose-500/30 space-y-4">
@@ -367,6 +414,93 @@ export const CampaignTiersEditor: React.FC<CampaignTiersEditorProps> = ({
                 <IconPicker
                   value={config.drawerConfig?.step3Icon || ""}
                   onChange={(val) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, step3Icon: val } })}
+                />
+              </div>
+            </div>
+
+            {/* Thank You & Social Sharing Window Configuration */}
+            <div className="p-3.5 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-amber-950/30 rounded-xl border border-emerald-500/50 space-y-3.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                <Heart className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+                <span>עריכת חלון תודה ושיתוף ברשתות חברתיות</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1 text-slate-300">כותרת חלון התודה</label>
+                <input
+                  type="text"
+                  placeholder="תודה רבה על תרומתך! ❤️"
+                  value={config.drawerConfig?.thankYouTitle || ""}
+                  onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouTitle: e.target.value } })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1 text-slate-300">הודעת תודה מותאמת אישית (אופציונלי)</label>
+                <textarea
+                  rows={2}
+                  placeholder="תרומתך עברה בהצלחה ונוספה מיידית ליעד הקמפיין!"
+                  value={config.drawerConfig?.thankYouSubtitle || ""}
+                  onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouSubtitle: e.target.value } })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+                />
+              </div>
+
+              {/* Thank You Custom Image */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-slate-300">תמונת תודה / באנר מוצג בחלון (אופציונלי)</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <ImageIcon className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="כתובת תמונה (URL) או העלה תמונה"
+                      value={config.drawerConfig?.thankYouImage || ""}
+                      onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouImage: e.target.value } })}
+                      className="w-full pr-8 pl-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-white"
+                    />
+                  </div>
+                  <ImageUpload
+                    compact={true}
+                    currentImage={config.drawerConfig?.thankYouImage}
+                    onSelect={(url) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouImage: url } })}
+                    customTrigger={(open) => (
+                      <button
+                        type="button"
+                        onClick={open}
+                        className="px-2.5 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 transition-colors shadow cursor-pointer"
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        <span>העלאה / גלריה</span>
+                      </button>
+                    )}
+                  />
+                </div>
+                {config.drawerConfig?.thankYouImage && (
+                  <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-emerald-500/50 mt-1">
+                    <img src={config.drawerConfig.thankYouImage} alt="תמונת תודה" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouImage: "" } })}
+                      className="absolute top-1 left-1 bg-black/70 hover:bg-rose-600 text-white p-0.5 rounded text-[10px] cursor-pointer"
+                      title="הסר תמונה"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Social Share Message Text */}
+              <div>
+                <label className="block text-xs font-medium mb-1 text-slate-300">טקסט שיתוף מוכן לרשתות חברתיות (וואטסאפ, פייסבוק, טלגרם)</label>
+                <textarea
+                  rows={2}
+                  placeholder="תרמתי עכשיו לקמפיין החשוב, הצטרפו גם אתם ועזרו להגיע ליעד!"
+                  value={config.drawerConfig?.thankYouShareText || ""}
+                  onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, thankYouShareText: e.target.value } })}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
                 />
               </div>
             </div>

@@ -8,6 +8,7 @@ import { CampaignStickyBar } from "@/components/sections/CampaignStickyBar";
 import { VideoGallery } from "@/components/sections/VideoGallery";
 import { AmbassadorModal } from "@/components/campaigns/AmbassadorModal";
 import { DonationDrawer } from "@/components/campaigns/DonationDrawer";
+import { LiveDonationAlert } from "@/components/campaigns/LiveDonationAlert";
 import { Ambassador, Campaign } from "@/lib/types/campaign";
 import { HomePageConfig } from "@/features/home/actions";
 import { GlobalSettings } from "@/features/settings/actions";
@@ -253,11 +254,7 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
       />
 
       {/* Footer */}
-      <Footer 
-        companyName={globalSettings.companyName}
-        slogan={globalSettings.slogan}
-        siteLogoUrl={globalSettings.siteLogoUrl}
-      />
+      <Footer />
 
       {/* Sticky Bottom Donation Bar */}
       <CampaignStickyBar
@@ -287,8 +284,21 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
         initialDonationMode={drawerInitialMode}
         configTiers={config?.campaignTiers?.tiers}
         configDonationType={config?.campaignTiers?.donationType}
-        configRecurringMonths={config?.campaignTiers?.recurringMonths}
-        drawerConfig={config?.campaignTiers?.drawerConfig}
+        drawerConfig={{
+          ...(config?.campaignTiers?.drawerConfig || {}),
+          testMode: Boolean(config?.campaignTiers?.testMode || config?.campaignTiers?.drawerConfig?.testMode),
+        }}
+      />
+
+      {/* Floating Live Donation Alert Card on side of screen */}
+      <LiveDonationAlert
+        campaignId={targetCampaignId}
+        configTiers={config?.campaignTiers?.tiers}
+        onOpenDonate={() => {
+          setSelectedTierIdForDrawer(undefined);
+          setIsDonationDrawerOpen(true);
+        }}
+        enableDemoMode={false}
       />
     </div>
   );
