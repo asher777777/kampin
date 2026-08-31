@@ -53,7 +53,8 @@ export interface DonationTier {
   monthlyAmount: number;
   subtitle?: string;
   imageSrc?: string;
-  imageShape?: "circle" | "square" | "rounded";
+  imageShape?: "circle" | "square" | "rounded" | "full";
+  displayMode?: "text" | "full_image";
   isDefault?: boolean;
 }
 

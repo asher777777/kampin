@@ -1892,6 +1892,9 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           videoUrl: "",
           videoType: "auto",
           effect: "fade",
+          objectFit: "cover",
+          titleEffect: "cinematic",
+          desktopHeight: "tall",
           anchorId: "videoGallery",
           backgroundColor: "#0f172a"
         };
@@ -1932,6 +1935,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               videoUrl={vGalleryConf.videoUrl}
               videoType={vGalleryConf.videoType}
               effect={vGalleryConf.effect}
+              objectFit={vGalleryConf.objectFit}
+              titleEffect={vGalleryConf.titleEffect}
+              textPosition={vGalleryConf.textPosition}
+              heightDesktop={vGalleryConf.desktopHeight}
               backgroundColor={vGalleryConf.backgroundColor || globalSettings.backgroundColor}
             />
           </div>
@@ -2266,6 +2273,9 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           videoUrl: "",
           videoType: "auto",
           effect: "fade",
+          objectFit: "cover",
+          titleEffect: "cinematic",
+          desktopHeight: "tall",
           anchorId: "videoGallery",
           backgroundColor: "#0f172a"
         };
@@ -2277,6 +2287,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             videoUrl={vGalleryPrevConf.videoUrl}
             videoType={vGalleryPrevConf.videoType}
             effect={vGalleryPrevConf.effect}
+            objectFit={vGalleryPrevConf.objectFit}
+            titleEffect={vGalleryPrevConf.titleEffect}
+            textPosition={vGalleryPrevConf.textPosition}
+            heightDesktop={vGalleryPrevConf.desktopHeight}
             backgroundColor={vGalleryPrevConf.backgroundColor || globalSettings.backgroundColor}
           />
         );

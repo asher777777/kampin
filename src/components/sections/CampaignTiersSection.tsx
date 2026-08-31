@@ -41,6 +41,7 @@ export const CampaignTiersSection: React.FC<CampaignTiersSectionProps> = ({
               tiers={resolvedTiers}
               donationMode={donationMode === "one_time" ? "one_time" : "recurring"}
               theme="light"
+              drawerConfig={config?.drawerConfig}
               onSelectTier={(tier) => onSelectTier(tier.id)}
               onSelectCustomTier={() => onSelectTier("custom")}
             />

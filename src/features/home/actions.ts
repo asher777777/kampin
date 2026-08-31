@@ -166,10 +166,14 @@ export interface HomePageConfig {
   };
   videoGallery?: {
     visible: boolean;
-    images: string[];
+    images: (string | { url: string; title?: string; position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left" })[];
     videoUrl: string;
     videoType: "drive-direct" | "iframe" | "auto";
     effect: "fade" | "digital-squares";
+    objectFit?: "cover" | "contain" | "fill" | "scale-down";
+    titleEffect?: "glow" | "badge" | "fade-up" | "cinematic";
+    textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
+    desktopHeight?: "normal" | "tall" | "extra-tall" | string;
     anchorId?: string;
     backgroundColor?: string;
   };
@@ -230,7 +234,28 @@ export interface HomePageConfig {
     effect?: "glassmorphism" | "glow" | "lift" | "gradient-border" | "minimal";
   };
   campaignHeader?: any;
-  campaignTiers?: any;
+  campaignTiers?: {
+    visible?: boolean;
+    donationType?: "one_time" | "recurring" | "both";
+    recurringMonths?: number;
+    tiers?: any[];
+    drawerConfig?: {
+      theme?: "dark" | "light";
+      tierDisplayMode?: "text" | "full_image" | "auto";
+      tierImageShape?: "circle" | "rounded" | "full";
+      fieldBgColor?: string;
+      borderColor?: string;
+      fontSizeScale?: number;
+      mainTitle?: string;
+      mainIcon?: string;
+      step1Title?: string;
+      step1Icon?: string;
+      step2Title?: string;
+      step2Icon?: string;
+      step3Title?: string;
+      step3Icon?: string;
+    };
+  };
   campaignDonors?: any;
   mobileHiddenSections?: string[];
   sectionOrder: string[];
@@ -583,6 +608,9 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
     videoUrl: "",
     videoType: "auto",
     effect: "fade",
+    objectFit: "cover",
+    titleEffect: "cinematic",
+    desktopHeight: "tall",
     anchorId: "videoGallery",
     backgroundColor: "transparent",
   },

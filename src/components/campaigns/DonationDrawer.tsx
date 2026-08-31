@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2, ArrowLeft } from "lucide-react";
 import { recordPendingDonationAction, completeDonationAction, failDonationAction, recordDonationAction } from "@/features/campaigns/actions";
 import { DonationTier } from "@/lib/types/campaign";
 import { CampaignTiersList, defaultTiers } from "./CampaignTiersList";
@@ -17,6 +18,8 @@ interface DonationDrawerProps {
   configDonationType?: "one_time" | "recurring" | "both";
   configRecurringMonths?: number;
   initialSelectedTierId?: string;
+  initialDonationMode?: "one_time" | "recurring";
+  drawerConfig?: any;
 }
 
 export const DonationDrawer: React.FC<DonationDrawerProps> = ({
@@ -30,13 +33,16 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   configDonationType = "both",
   configRecurringMonths = 12,
   initialSelectedTierId,
+  initialDonationMode,
+  drawerConfig,
 }) => {
   const tiers = configTiers && configTiers.length > 0 ? configTiers : defaultTiers;
+  const isDark = drawerConfig?.theme !== 'light';
 
-  const [step, setStep] = useState<"details" | "payment" | "success">("details");
+  const [step, setStep] = useState<"amount" | "details" | "payment" | "success">("amount");
 
   const [donationMode, setDonationMode] = useState<"recurring" | "one_time">(
-    configDonationType === "recurring" ? "recurring" : "recurring"
+    initialDonationMode || (configDonationType === "one_time" ? "one_time" : "recurring")
   );
 
   const defaultTierAmount = tiers.find(t => t.isDefault)?.monthlyAmount || tiers[0]?.monthlyAmount || 360;
@@ -44,6 +50,16 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   const [monthlyAmount, setMonthlyAmount] = useState<number | "">(defaultTierAmount);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [months, setMonths] = useState<number>(configRecurringMonths || 12);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialDonationMode) {
+        setDonationMode(initialDonationMode);
+      } else if (configDonationType === "one_time") {
+        setDonationMode("one_time");
+      }
+    }
+  }, [isOpen, initialDonationMode, configDonationType]);
 
   React.useEffect(() => {
     if (isOpen && initialSelectedTierId) {
@@ -106,6 +122,12 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   const [receiptUrl, setReceiptUrl] = useState("");
 
   if (!isOpen) return null;
+
+    const renderIcon = (iconName?: string, defaultIcon?: any) => {
+    if (!iconName) return defaultIcon ? defaultIcon : null;
+    const IconComponent = (LucideIcons as any)[iconName];
+    return IconComponent ? <IconComponent className="w-5 h-5" /> : (defaultIcon ? defaultIcon : null);
+  };
 
   const currentMonthly = Number(monthlyAmount) || 0;
   const calculatedTotal = donationMode === "recurring" ? currentMonthly * months : currentMonthly;
@@ -357,7 +379,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   };
 
   const handleCloseAll = () => {
-    setStep("details");
+    setStep("amount");
     setError("");
     setLoading(false);
     onClose();
@@ -366,133 +388,207 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 dir-rtl overflow-y-auto">
-      <div className="bg-slate-900 text-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative border border-slate-700 my-auto">
+      <div className={`max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto rounded-t-3xl sm:rounded-3xl border transition-colors ${
+        isDark
+          ? "bg-slate-900 text-white border-slate-700/80"
+          : "bg-white text-slate-900 border-slate-200"
+      }`}>
         
         {/* Close Button */}
         <button
           onClick={handleCloseAll}
-          className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+          className={`absolute top-4 left-4 p-2 rounded-full transition-colors cursor-pointer ${
+            isDark ? "text-slate-400 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+          }`}
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* ================= STEP 1: DETAILS ================= */}
-        {step === "details" && (
-          <>
-            {/* Header */}
-            <div className="text-center space-y-2 mb-6">
-              <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-1">
-                <Heart className="w-6 h-6 fill-current" />
+                                {/* ================= STEP 1: AMOUNT ================= */}
+        {step === "amount" && (
+          <div className="space-y-4 animate-in slide-in-from-right fade-in">
+            {/* Step Header Pinned to Top */}
+            <div className={`flex items-center justify-between pb-2 border-b ${isDark ? "border-slate-700/40" : "border-slate-200"}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs ${
+                  isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                }`}>
+                  {renderIcon(drawerConfig?.step1Icon, "1")}
+                </div>
+                <h4 className={`text-base sm:text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {drawerConfig?.step1Title || "שלב א: בחירת סכום"}
+                </h4>
               </div>
-              <h3 className="text-2xl font-black">תרומה לקמפיין</h3>
+
               {ambassadorName && (
-                <span className="inline-block bg-amber-500/20 text-amber-300 text-xs font-semibold px-3 py-1 rounded-full border border-amber-500/30">
-                  מיועד לשגריר: {ambassadorName}
+                <span className="bg-amber-500/20 text-amber-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                  שגריר: {ambassadorName}
                 </span>
               )}
             </div>
 
-            {/* Donation Type Selector (Mode Switch: הוראת קבע vs חד פעמי) */}
-            {configDonationType === "both" && (
-              <div className="flex bg-slate-800 p-1 rounded-2xl mb-6 border border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => setDonationMode("recurring")}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    donationMode === "recurring"
-                      ? "bg-emerald-600 text-white shadow-lg"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <Repeat className="w-4 h-4" />
-                  <span>הוראת קבע חודשית</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDonationMode("one_time")}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    donationMode === "one_time"
-                      ? "bg-emerald-600 text-white shadow-lg"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>תרומה חד פעמית</span>
-                </button>
-              </div>
-            )}
+            {/* Amount Summary & Input Row (Pinned directly under header) */}
+            <div className={`p-4 rounded-2xl border ${
+              isDark ? "bg-slate-800/80 border-slate-700/80" : "bg-slate-50 border-slate-200"
+            }`} style={{ backgroundColor: drawerConfig?.fieldBgColor, borderColor: drawerConfig?.borderColor }}>
+              <div className="flex items-center justify-between gap-4">
+                
+                {/* Right: Calculated Total Amount Display (No 'ממגל ממש מקבלים' title!) */}
+                <div className="text-right flex-1">
+                  <div className="text-3xl sm:text-4xl font-black text-emerald-500 dir-rtl">
+                    ₪{calculatedTotal.toLocaleString()}
+                  </div>
+                  {donationMode === "recurring" && (
+                    <span className={`text-[11px] font-medium block mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>
+                      במשך {months} חודשים ({currentMonthly}₪/חודש)
+                    </span>
+                  )}
+                </div>
 
+                {/* Left: Monthly/Custom Input Field */}
+                <div className="flex flex-col items-end gap-1">
+                  <label className={`text-xs font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>
+                    תרומתך{donationMode === "recurring" ? " החודשית:" : ":"}
+                  </label>
+                  <div className={`flex items-center gap-1.5 border rounded-xl px-3 py-1.5 text-xl sm:text-2xl font-black dir-ltr shadow-inner ${
+                    isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  }`} style={{ backgroundColor: drawerConfig?.fieldBgColor ? 'rgba(0,0,0,0.2)' : undefined, borderColor: drawerConfig?.borderColor }}>
+                    <span className="text-xs text-slate-400 font-bold px-1 border-r border-slate-700 pr-1.5">₪ ILS</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={monthlyAmount}
+                      onChange={handleCustomInputChange}
+                      className="w-20 sm:w-24 bg-transparent text-right focus:outline-none font-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Inline Switcher for recurring vs one-time */}
+              {configDonationType === "both" && (
+                <div className={`mt-3 pt-3 border-t flex items-center justify-center gap-3 ${isDark ? "border-slate-700/50" : "border-slate-200"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setDonationMode("recurring")}
+                    className={`text-xs font-bold transition-colors cursor-pointer ${
+                      donationMode === "recurring" ? "text-emerald-500 font-black" : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    הוראת קבע (הו״ק)
+                  </button>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={donationMode === "recurring"}
+                    onClick={() => setDonationMode(donationMode === "recurring" ? "one_time" : "recurring")}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      donationMode === "recurring" ? "bg-emerald-500" : "bg-slate-500"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        donationMode === "recurring" ? "translate-x-0" : "-translate-x-5"
+                      }`}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDonationMode("one_time")}
+                    className={`text-xs font-bold transition-colors cursor-pointer ${
+                      donationMode === "one_time" ? "text-emerald-500 font-black" : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    תרומה חד פעמית
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Tiers Grid */}
+            <div>
+              <label className={`block text-xs font-bold mb-2.5 ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>
+                {donationMode === "recurring" ? "בחר מדרגת תרומה חודשית (הוראת קבע):" : "בחר סכום תרומה:"}
+              </label>
+
+              <CampaignTiersList
+                tiers={tiers}
+                donationMode={donationMode === "recurring" ? "recurring" : "one_time"}
+                selectedTierId={selectedTierId}
+                onSelectTier={handleSelectTier}
+                onSelectCustomTier={handleSelectCustomTier}
+                theme={isDark ? "dark" : "light"}
+                drawerConfig={drawerConfig}
+              />
+            </div>
+            
             {error && (
-              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-3 rounded-xl text-xs font-semibold text-center mb-4">
+              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2.5 rounded-xl text-xs font-semibold text-center">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleProceedToPayment} className="space-y-6 text-sm">
+            {/* Bottom Action Button (Smaller padding, text, Arrow pointing left) */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentMonthly || currentMonthly <= 0) {
+                    setError("אנא בחר סכום תרומה תקין");
+                    return;
+                  }
+                  setError("");
+                  setStep("details");
+                }}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md text-sm sm:text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+              >
+                <span>המשך לפרטים אישיים</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= STEP 2: DETAILS ================= */}
+        {step === "details" && (
+          <div className="space-y-4 animate-in slide-in-from-left fade-in">
+            <div className={`flex items-center justify-between pb-2 border-b ${isDark ? "border-slate-700/40" : "border-slate-200"}`}>
+              <button
+                type="button"
+                onClick={() => setStep("amount")}
+                className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer px-3 py-1.5 rounded-xl border ${
+                  isDark ? "text-slate-400 hover:text-white bg-slate-800 border-slate-700" : "text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200"
+                }`}
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>חזור לבחירת סכום</span>
+              </button>
               
-              {/* Tiers Row */}
-              <div>
-                <label className="block text-xs font-bold mb-3 text-slate-300">
-                  {donationMode === "recurring" ? "בחר מדרגת תרומה חודשית (הוראת קבע)" : "בחר סכום תרומה"}
-                </label>
-
-                <CampaignTiersList
-                  tiers={tiers}
-                  donationMode={donationMode === "recurring" ? "recurring" : "one_time"}
-                  selectedTierId={selectedTierId}
-                  onSelectTier={handleSelectTier}
-                  onSelectCustomTier={handleSelectCustomTier}
-                  theme="dark"
-                />
-              </div>
-
-              {/* Display & Manual Amount Input Box */}
-              <div className="bg-slate-800/90 p-4 rounded-2xl border border-slate-700/80 space-y-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  
-                  {/* Left Side: Calculated Total */}
-                  <div className="text-right">
-                    <span className="text-xs font-semibold text-slate-400">
-                      {donationMode === "recurring" ? "ממגל ממש מקבלים:" : "סה\"כ לתשלום:"}
-                    </span>
-                    <div className="text-3xl font-black text-emerald-400 dir-rtl">
-                      ₪{calculatedTotal.toLocaleString()}
-                    </div>
-                    {donationMode === "recurring" && (
-                      <span className="text-xs text-slate-400 font-medium">
-                        במשך {months} חודשים (₪{currentMonthly}/חודש)
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Right Side: Interactive Monthly Price Input */}
-                  <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
-                    <label className="text-xs font-bold text-slate-300">תרומתך{donationMode === "recurring" ? " החודשית:" : ":"}</label>
-                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-2xl font-black text-white dir-ltr">
-                      <span className="text-xs text-slate-400 font-bold px-1 border-r border-slate-700 pr-2">₪ ILS</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={monthlyAmount}
-                        onChange={handleCustomInputChange}
-                        className="w-28 bg-transparent text-right focus:outline-none text-white font-black"
-                      />
-                    </div>
-                  </div>
+              <div className="flex items-center gap-2">
+                <h4 className={`text-base sm:text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {drawerConfig?.step2Title || "שלב ב: פרטים אישיים"}
+                </h4>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs ${
+                  isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                }`}>
+                  {renderIcon(drawerConfig?.step2Icon, "2")}
                 </div>
-
-                {donationMode === "recurring" && (
-                  <div className="bg-emerald-950/60 border border-emerald-600/40 p-3 rounded-xl text-center text-xs text-emerald-200 font-bold">
-                    תרומה חודשית בהוראת קבע: ברצוני לתרום ₪{currentMonthly} במשך {months} חודשים (סה"כ: ₪{calculatedTotal.toLocaleString()}.00)
-                  </div>
-                )}
               </div>
+            </div>
 
-              {/* Donor Details Fields with Browser Autofill */}
-              <div className="space-y-3 pt-2">
+            {error && (
+              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2.5 rounded-xl text-xs font-semibold text-center mb-2">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleProceedToPayment} className="space-y-4 text-sm">
+              <div className="space-y-3 pt-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="donor-name" className="block text-xs font-bold mb-1 text-slate-300">שם מלא / משפחה *</label>
+                    <label htmlFor="donor-name" className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>שם מלא / משפחה *</label>
                     <input
                       id="donor-name"
                       name="name"
@@ -502,12 +598,15 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                       value={donorName}
                       onChange={(e) => setDonorName(e.target.value)}
                       placeholder="למשל: משפחת כהן"
-                      className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white disabled:opacity-40"
+                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-40 ${
+                        isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
+                      }`}
+                      style={{ backgroundColor: drawerConfig?.fieldBgColor, borderColor: drawerConfig?.borderColor, fontSize: drawerConfig?.fontSizeScale ? `${0.875 * drawerConfig.fontSizeScale}rem` : undefined }}
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="donor-phone" className="block text-xs font-bold mb-1 text-slate-300">טלפון נייד *</label>
+                    <label htmlFor="donor-phone" className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>טלפון נייד *</label>
                     <input
                       id="donor-phone"
                       name="tel"
@@ -517,13 +616,16 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="050-0000000"
-                      className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white text-right"
+                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right ${
+                        isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
+                      }`}
+                      style={{ backgroundColor: drawerConfig?.fieldBgColor, borderColor: drawerConfig?.borderColor, fontSize: drawerConfig?.fontSizeScale ? `${0.875 * drawerConfig.fontSizeScale}rem` : undefined }}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="donor-email" className="block text-xs font-bold mb-1 text-slate-300">דוא&quot;ל (לקבלת קבלה)</label>
+                  <label htmlFor="donor-email" className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>דוא"ל (לקבלת קבלה)</label>
                   <input
                     id="donor-email"
                     name="email"
@@ -533,7 +635,10 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white text-right"
+                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right ${
+                      isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
+                    }`}
+                    style={{ backgroundColor: drawerConfig?.fieldBgColor, borderColor: drawerConfig?.borderColor, fontSize: drawerConfig?.fontSizeScale ? `${0.875 * drawerConfig.fontSizeScale}rem` : undefined }}
                   />
                 </div>
 
@@ -545,82 +650,95 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     onChange={(e) => setIsAnonymous(e.target.checked)}
                     className="rounded text-emerald-500 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
                   />
-                  <label htmlFor="isAnonymous" className="text-xs text-slate-300 font-semibold cursor-pointer">
+                  <label htmlFor="isAnonymous" className={`text-xs font-semibold cursor-pointer ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>
                     תרומה אנונימית (השם לא יוצג ברשימת התורמים הפומבית)
                   </label>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1 text-slate-300">הקדשה / ברכה (יופיע בלוח התורמים)</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`} style={{ fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}>הקדשה / ברכה (יופיע בלוח התורמים)</label>
                   <textarea
                     rows={2}
                     value={dedication}
                     onChange={(e) => setDedication(e.target.value)}
                     placeholder="לזכות, לרפואת, או ברכה מכל הלב..."
-                    className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white"
+                    className={`w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none ${
+                      isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
+                    }`}
+                    style={{ backgroundColor: drawerConfig?.fieldBgColor, borderColor: drawerConfig?.borderColor, fontSize: drawerConfig?.fontSizeScale ? `${0.75 * drawerConfig.fontSizeScale}rem` : undefined }}
                   />
                 </div>
               </div>
 
-              {/* Proceed to Payment CTA */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-rose-600/40 text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md text-sm sm:text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                 >
-                  <Lock className="w-5 h-5" />
+                  <Lock className="w-4 h-4" />
                   <span>
                     {donationMode === "recurring"
                       ? `המשך לתשלום (₪${currentMonthly}/חודש בהוראת קבע)`
                       : `המשך לתשלום (₪${calculatedTotal})`}
                   </span>
+                  <ArrowLeft className="w-4 h-4" />
                 </button>
               </div>
-
             </form>
-          </>
+          </div>
         )}
 
-        {/* ================= STEP 2: KESHER PAYMENT (CC / BIT / GOOGLE PAY) ================= */}
+        {/* ================= STEP 3: KESHER PAYMENT (CC / BIT / GOOGLE PAY) ================= */}
         {step === "payment" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+          <div className="space-y-4 animate-in fade-in duration-300">
             {/* Header & Back Button */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className={`flex items-center justify-between pb-2 border-b ${isDark ? "border-slate-700/40" : "border-slate-200"}`}>
               <button
                 type="button"
                 onClick={() => {
                   setIframeUrl("");
                   setStep("details");
                 }}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700"
+                className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer px-3 py-1.5 rounded-xl border ${
+                  isDark ? "text-slate-400 hover:text-white bg-slate-800 border-slate-700" : "text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200"
+                }`}
               >
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
                 <span>חזור לעריכת פרטים</span>
               </button>
 
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-bold text-white">סליקה מאובטחת (Kesher)</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <h4 className={`text-base sm:text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {drawerConfig?.step3Title || "שלב ג: תשלום מאובטח"}
+                </h4>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs ${
+                  isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                }`}>
+                  {renderIcon(drawerConfig?.step3Icon, "3")}
+                </div>
               </div>
             </div>
 
             {/* Donation Summary Card */}
-            <div className="bg-slate-800/90 p-3.5 rounded-2xl border border-slate-700/80 flex items-center justify-between">
+            <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              isDark ? "bg-slate-800/80 border-slate-700/80" : "bg-slate-50 border-slate-200"
+            }`}>
               <div>
-                <span className="text-xs text-slate-400 font-semibold block">סיכום תרומה עבור:</span>
-                <span className="text-sm font-bold text-white">{isAnonymous ? "אנונימי" : (donorName || "תורם")}</span>
+                <span className={`text-[11px] font-semibold block ${isDark ? "text-slate-400" : "text-slate-500"}`}>סיכום תרומה עבור:</span>
+                <span className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{isAnonymous ? "אנונימי" : (donorName || "תורם")}</span>
                 {dedication && <p className="text-xs text-slate-400 italic line-clamp-1 mt-0.5">&quot;{dedication}&quot;</p>}
               </div>
 
               <div className="text-left">
-                <span className="text-xs text-slate-400 font-semibold block">
+                <span className={`text-[11px] font-semibold block ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                   {donationMode === "recurring" ? `הוראת קבע (${months} חודשים)` : "תשלום חד פעמי"}
                 </span>
-                <span className="text-2xl font-black text-emerald-400 dir-rtl">
+                <span className="text-2xl font-black text-emerald-500 dir-rtl">
                   ₪{calculatedTotal.toLocaleString()}
                 </span>
                 {donationMode === "recurring" && (
-                  <span className="text-[11px] text-slate-400 block">
+                  <span className={`text-[11px] block ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     (₪{currentMonthly} לחודש)
                   </span>
                 )}
@@ -628,7 +746,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             </div>
 
             {error && (
-              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-3.5 rounded-xl text-xs font-semibold text-center">
+              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2.5 rounded-xl text-xs font-semibold text-center">
                 {error}
               </div>
             )}
@@ -636,18 +754,22 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             {/* Payment Method Selector Tabs (For One-Time Donations) */}
             {donationMode === "one_time" && !iframeUrl && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 block">בחר אמצעי תשלום:</label>
+                <label className={`text-xs font-bold block ${isDark ? "text-slate-300" : "text-slate-700"}`}>בחר אמצעי תשלום:</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethodType("credit_card")}
                     className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                       paymentMethodType === "credit_card"
-                        ? "bg-slate-800 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500"
-                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                        ? isDark
+                          ? "bg-slate-800 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500"
+                          : "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-md ring-1 ring-emerald-500"
+                        : isDark
+                          ? "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <CreditCard className={`w-5 h-5 ${paymentMethodType === "credit_card" ? "text-emerald-400" : "text-slate-400"}`} />
+                    <CreditCard className={`w-5 h-5 ${paymentMethodType === "credit_card" ? "text-emerald-500" : "text-slate-400"}`} />
                     <span className="text-xs font-bold">כרטיס אשראי</span>
                   </button>
 
@@ -656,8 +778,12 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     onClick={() => setPaymentMethodType("bit")}
                     className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                       paymentMethodType === "bit"
-                        ? "bg-emerald-950/80 border-emerald-400 text-emerald-300 shadow-md ring-1 ring-emerald-400"
-                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                        ? isDark
+                          ? "bg-emerald-950/80 border-emerald-400 text-emerald-300 shadow-md ring-1 ring-emerald-400"
+                          : "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-md ring-1 ring-emerald-500"
+                        : isDark
+                          ? "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[11px] flex items-center justify-center">
@@ -671,15 +797,19 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     onClick={() => setPaymentMethodType("google_pay")}
                     className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                       paymentMethodType === "google_pay"
-                        ? "bg-indigo-950/80 border-indigo-400 text-indigo-200 shadow-md ring-1 ring-indigo-400"
-                        : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                        ? isDark
+                          ? "bg-indigo-950/80 border-indigo-400 text-indigo-200 shadow-md ring-1 ring-indigo-400"
+                          : "bg-indigo-50 border-indigo-500 text-indigo-950 shadow-md ring-1 ring-indigo-500"
+                        : isDark
+                          ? "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center gap-0.5 text-xs font-black">
-                      <span className="text-blue-400">G</span>
-                      <span className="text-red-400">P</span>
-                      <span className="text-amber-400">a</span>
-                      <span className="text-green-400">y</span>
+                      <span className="text-blue-500">G</span>
+                      <span className="text-red-500">P</span>
+                      <span className="text-amber-500">a</span>
+                      <span className="text-green-500">y</span>
                     </div>
                     <span className="text-xs font-bold">Google Pay</span>
                   </button>
@@ -687,14 +817,16 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
               </div>
             )}
 
-            {/* IFRAME EMBEDDED VIEW (When Bit or Google Pay iframe URL is active) */}
+            {/* IFRAME EMBEDDED VIEW */}
             {iframeUrl ? (
               <div className="space-y-3 animate-in fade-in">
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => setIframeUrl("")}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 cursor-pointer"
+                    className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-xl border cursor-pointer ${
+                      isDark ? "text-slate-400 hover:text-white bg-slate-800 border-slate-700" : "text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200"
+                    }`}
                   >
                     <ArrowRight className="w-4 h-4" />
                     <span>חזור לבחירת אמצעי תשלום</span>
@@ -703,7 +835,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     href={iframeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+                    className="text-xs text-emerald-500 hover:underline flex items-center gap-1 font-bold"
                   >
                     פתח בעמוד מלא ↗
                   </a>
@@ -719,25 +851,27 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
               </div>
             ) : paymentMethodType === "bit" && donationMode === "one_time" ? (
               /* BIT PAYMENT CARD */
-              <div className="p-6 rounded-2xl bg-gradient-to-b from-emerald-950/60 to-slate-900 border border-emerald-500/40 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
-                  <span className="font-black text-2xl">bit</span>
+              <div className={`p-5 rounded-2xl border text-center space-y-3 ${
+                isDark ? "bg-gradient-to-b from-emerald-950/60 to-slate-900 border-emerald-500/40" : "bg-emerald-50/70 border-emerald-300"
+              }`}>
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
+                  <span className="font-black text-xl">bit</span>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-black text-white text-base">תשלום מהיר ומאובטח באפליקציית Bit</h4>
-                  <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
-                    בלחיצה על הכפתור תיפתח סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{calculatedTotal.toLocaleString()}.
+                  <h4 className={`font-black text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>תשלום מהיר ומאובטח באפליקציית Bit</h4>
+                  <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                    סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{calculatedTotal.toLocaleString()}.
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => handlePayWithDigitalWallet("bit")}
-                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-2xl transition-all shadow-lg shadow-emerald-500/30 text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-sm sm:text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       <span>מייצר קישור מאובטח ל-Bit...</span>
                     </>
                   ) : (
@@ -749,13 +883,15 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
               </div>
             ) : paymentMethodType === "google_pay" && donationMode === "one_time" ? (
               /* GOOGLE PAY / APPLE PAY CARD */
-              <div className="p-6 rounded-2xl bg-gradient-to-b from-indigo-950/60 to-slate-900 border border-indigo-500/40 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center mx-auto border border-indigo-500/30">
-                  <ShieldCheck className="w-7 h-7" />
+              <div className={`p-5 rounded-2xl border text-center space-y-3 ${
+                isDark ? "bg-gradient-to-b from-indigo-950/60 to-slate-900 border-indigo-500/40" : "bg-indigo-50/70 border-indigo-300"
+              }`}>
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/30">
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-black text-white text-base">תשלום בארנק דיגיטלי (Google Pay / Apple Pay)</h4>
-                  <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                  <h4 className={`font-black text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>תשלום בארנק דיגיטלי (Google Pay / Apple Pay)</h4>
+                  <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                     תשלום מיידי בנגיעה אחת ללא צורך בהקלדת פרטי כרטיס אשראי, מאובטח ישירות דרך קשר (Kesher).
                   </p>
                 </div>
@@ -763,11 +899,13 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   type="button"
                   disabled={loading}
                   onClick={() => handlePayWithDigitalWallet("google_pay")}
-                  className="w-full py-4 bg-white hover:bg-slate-100 text-slate-950 font-black rounded-2xl transition-all shadow-lg text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className={`w-full py-3 font-black rounded-xl transition-all shadow-md text-sm sm:text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+                    isDark ? "bg-white hover:bg-slate-100 text-slate-950" : "bg-slate-900 hover:bg-slate-800 text-white"
+                  }`}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       <span>מתחבר לארנק הדיגיטלי...</span>
                     </>
                   ) : (
@@ -779,11 +917,11 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
               </div>
             ) : (
               /* DIRECT CREDIT CARD FORM WITH BROWSER AUTOFILL */
-              <form onSubmit={handleProcessPayment} className="space-y-4 text-sm">
+              <form onSubmit={handleProcessPayment} className="space-y-3.5 text-sm">
                 
                 {/* Card Number */}
-                <div className="space-y-1.5">
-                  <label htmlFor="cc-number" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <div className="space-y-1">
+                  <label htmlFor="cc-number" className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                     <CreditCard className="w-4 h-4 text-slate-400" /> מספר כרטיס אשראי *
                   </label>
                   <input
@@ -799,14 +937,16 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                       const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ");
                       setCcData({ ...ccData, creditNumber: formatted });
                     }}
-                    className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                    className={`w-full border focus:border-emerald-500 rounded-xl p-2.5 text-sm sm:text-base outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left ${
+                      isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-50 text-slate-900 border-slate-300"
+                    }`}
                     maxLength={19}
                   />
                 </div>
 
                 {/* ID Number */}
-                <div className="space-y-1.5">
-                  <label htmlFor="cardholder-id" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <div className="space-y-1">
+                  <label htmlFor="cardholder-id" className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                     <User className="w-4 h-4 text-slate-400" /> תעודת זהות (בעל הכרטיס)
                   </label>
                   <input
@@ -819,17 +959,19 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     placeholder="000000000"
                     value={ccData.idNumber}
                     onChange={(e) => setCcData({ ...ccData, idNumber: e.target.value.replace(/\D/g, "") })}
-                    className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                    className={`w-full border focus:border-emerald-500 rounded-xl p-2.5 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left ${
+                      isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-50 text-slate-900 border-slate-300"
+                    }`}
                   />
                 </div>
 
                 {/* Expiry & CVV Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="cc-exp-month" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label htmlFor="cc-exp-month" className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                       <Calendar className="w-4 h-4 text-slate-400" /> תוקף (חודש/שנה) *
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <select
                         id="cc-exp-month"
                         name="cc-exp-month"
@@ -837,12 +979,14 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                         dir="ltr"
                         value={ccData.expiryMonth}
                         onChange={(e) => setCcData({ ...ccData, expiryMonth: e.target.value })}
-                        className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
+                        className={`w-full border focus:border-emerald-500 rounded-xl p-2 text-xs outline-none font-mono ${
+                          isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-50 text-slate-900 border-slate-300"
+                        }`}
                       >
-                        <option value="" disabled className="bg-slate-900 text-white">MM</option>
+                        <option value="" disabled className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>MM</option>
                         {Array.from({ length: 12 }, (_, i) => {
                           const m = String(i + 1).padStart(2, "0");
-                          return <option key={m} value={m} className="bg-slate-900 text-white">{m}</option>;
+                          return <option key={m} value={m} className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>{m}</option>;
                         })}
                       </select>
                       <span className="text-slate-400 self-center font-bold">/</span>
@@ -853,20 +997,22 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                         dir="ltr"
                         value={ccData.expiryYear}
                         onChange={(e) => setCcData({ ...ccData, expiryYear: e.target.value })}
-                        className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-xs outline-none font-mono"
+                        className={`w-full border focus:border-emerald-500 rounded-xl p-2 text-xs outline-none font-mono ${
+                          isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-50 text-slate-900 border-slate-300"
+                        }`}
                       >
-                        <option value="" disabled className="bg-slate-900 text-white">YY</option>
+                        <option value="" disabled className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>YY</option>
                         {Array.from({ length: 15 }, (_, i) => {
                           const y = String((new Date().getFullYear() % 100) + i).padStart(2, "0");
-                          return <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>;
+                          return <option key={y} value={y} className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>{y}</option>;
                         })}
                       </select>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label htmlFor="cc-csc" className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <Lock className="w-4 h-4 text-slate-400" /> CVV (3 ספרות בגב) *
+                  <div className="space-y-1">
+                    <label htmlFor="cc-csc" className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                      <Lock className="w-4 h-4 text-slate-400" /> CVV (3 ספרות) *
                     </label>
                     <input
                       id="cc-csc"
@@ -877,27 +1023,29 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                       placeholder="123"
                       value={ccData.cvv2}
                       onChange={(e) => setCcData({ ...ccData, cvv2: e.target.value.replace(/\D/g, "") })}
-                      className="w-full bg-slate-800 text-white border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left"
+                      className={`w-full border focus:border-emerald-500 rounded-xl p-2 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono tracking-widest text-left ${
+                        isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-50 text-slate-900 border-slate-300"
+                      }`}
                       maxLength={4}
                     />
                   </div>
                 </div>
 
                 {/* Submit Payment CTA */}
-                <div className="pt-3">
+                <div className="pt-2">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-600/40 text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md text-sm sm:text-base flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>מבצע סליקה מאובטחת מול Kesher...</span>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>מבצע סליקה מאובטחת...</span>
                       </>
                     ) : (
                       <>
-                        <ShieldCheck className="w-5 h-5" />
+                        <ShieldCheck className="w-4 h-4" />
                         <span>
                           {donationMode === "recurring"
                             ? `אשר תרומה חודשית ₪${currentMonthly} (סה"כ ₪${calculatedTotal})`
@@ -906,8 +1054,8 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                       </>
                     )}
                   </button>
-                  <p className="text-[11px] text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
-                    <Lock className="w-3 h-3 text-emerald-400 inline" /> הסליקה מוצפנת ומאובטחת בתקן PCI-DSS המחמיר ביותר
+                  <p className={`text-[10px] sm:text-[11px] text-center mt-1.5 flex items-center justify-center gap-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <Lock className="w-3 h-3 text-emerald-500 inline" /> הסליקה מוצפנת ומאובטחת בתקן PCI-DSS
                   </p>
                 </div>
 
@@ -915,7 +1063,6 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             )}
           </div>
         )}
-
 
         {/* ================= STEP 3: THANK YOU ================= */}
         {step === "success" && (

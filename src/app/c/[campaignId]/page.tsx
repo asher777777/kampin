@@ -1,4 +1,6 @@
-import { getCampaignData, getAmbassadorBySlug } from "@/features/campaigns/actions";
+import { getCampaignData } from "@/features/campaigns/actions";
+import { getHomePageConfig } from "@/features/home/actions";
+import { getGlobalSettings } from "@/features/settings/actions";
 import { CampaignClientView } from "./CampaignClientView";
 import { Metadata } from "next";
 
@@ -24,10 +26,26 @@ export default async function CampaignPage({
   const { campaignId } = await params;
   const campaign = await getCampaignData(campaignId);
 
+  let homeConfig: any = null;
+  try {
+    homeConfig = await getHomePageConfig();
+  } catch (e) {
+    console.warn("Failed to get home config in campaign page:", e);
+  }
+
+  let globalSettings: any = null;
+  try {
+    globalSettings = await getGlobalSettings("1");
+  } catch (e) {
+    console.warn("Failed to get global settings in campaign page:", e);
+  }
+
   return (
     <CampaignClientView
       campaignId={campaignId}
       initialCampaign={campaign}
+      initialConfig={homeConfig}
+      initialGlobalSettings={globalSettings}
     />
   );
 }

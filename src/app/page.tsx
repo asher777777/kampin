@@ -39,8 +39,7 @@ export default async function Home() {
     globalSettings = await getGlobalSettings("1");
   } catch (e) {
     console.error("Home global settings fetch error:", e);
-    const { DEFAULT_GLOBAL_SETTINGS } = await import("@/features/settings/actions");
-    globalSettings = DEFAULT_GLOBAL_SETTINGS;
+    globalSettings = null;
   }
 
   let isAdmin = false;

@@ -1,17 +1,27 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface VideoGalleryProps {
+export type VideoGalleryImageItem = string | { 
+  url: string; 
+  title?: string;
+  position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
+};
+
+export interface VideoGalleryProps {
   id?: string;
-  images?: string[];
+  images?: VideoGalleryImageItem[];
   videoUrl?: string;
   videoType?: "drive-direct" | "iframe" | "auto";
-  effect?: "fade" | "digital-squares";
+  effect?: "fade" | "digital-squares" | "zoom-in" | "slide";
+  objectFit?: "cover" | "contain" | "fill" | "scale-down";
+  titleEffect?: "cinematic" | "glow" | "badge" | "fade-up";
+  textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
+  heightDesktop?: "normal" | "tall" | "extra-tall" | string;
   backgroundColor?: string;
 }
 
@@ -54,12 +64,70 @@ const getEmbedUrl = (url: string) => {
   return url;
 };
 
+const normalizeImages = (rawImages: VideoGalleryImageItem[] = []): { 
+  url: string; 
+  title: string; 
+  position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
+}[] => {
+  if (!Array.isArray(rawImages)) return [];
+  return rawImages
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === "string") {
+        return { url: item.trim(), title: "", position: undefined };
+      }
+      if (typeof item === "object" && item.url) {
+        return { 
+          url: item.url.trim(), 
+          title: item.title?.trim() || "",
+          position: item.position
+        };
+      }
+      return null;
+    })
+    .filter((img): img is { url: string; title: string; position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left" } => Boolean(img && img.url !== ""));
+};
+
+const getObjectFitClass = (fit: string = "cover") => {
+  switch (fit) {
+    case "contain":
+      return "object-contain";
+    case "fill":
+      return "object-fill";
+    case "scale-down":
+      return "object-scale-down";
+    case "cover":
+    default:
+      return "object-cover";
+  }
+};
+
+const getPositionClass = (position: string = "bottom") => {
+  switch (position) {
+    case "top":
+      return "top-6 md:top-10 inset-x-0 mx-auto justify-center";
+    case "bottom-right":
+      return "bottom-6 md:bottom-10 right-4 md:right-10 left-auto justify-start";
+    case "bottom-left":
+      return "bottom-6 md:bottom-10 left-4 md:left-10 right-auto justify-end";
+    case "center":
+      return "top-1/2 -translate-y-1/2 inset-x-0 mx-auto justify-center";
+    case "bottom":
+    default:
+      return "bottom-6 md:bottom-10 inset-x-0 mx-auto justify-center";
+  }
+};
+
 export const VideoGallery = ({
   id = "video-gallery",
   images = [],
   videoUrl = "",
   videoType = "auto",
   effect = "fade",
+  objectFit = "cover",
+  titleEffect = "cinematic",
+  textPosition = "bottom",
+  heightDesktop = "tall",
   backgroundColor = "var(--background)",
 }: VideoGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -67,15 +135,17 @@ export const VideoGallery = ({
   const [savedTime, setSavedTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const normalizedImages = useMemo(() => normalizeImages(images), [images]);
+  const fitClass = getObjectFitClass(objectFit);
+
   // Background gallery rotation
   useEffect(() => {
-    const validImages = images?.filter(img => img && img.trim() !== "") || [];
-    if (validImages.length <= 1 || isModalOpen) return;
+    if (normalizedImages.length <= 1 || isModalOpen) return;
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % validImages.length);
-    }, 4000);
+      setCurrentIndex((prev) => (prev + 1) % normalizedImages.length);
+    }, 4500);
     return () => clearInterval(interval);
-  }, [images, isModalOpen]);
+  }, [normalizedImages, isModalOpen]);
 
   // Handle modal close
   const handleClose = () => {
@@ -164,16 +234,14 @@ export const VideoGallery = ({
           className="w-full h-[85vh] md:h-[75vh]"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
-          style={{ border: 'none' }}
+          style={{ border: "none" }}
         />
       </div>
     );
   };
 
   const renderGalleryBackground = () => {
-    const validImages = images?.filter(img => img && img.trim() !== "") || [];
-
-    if (validImages.length === 0) {
+    if (normalizedImages.length === 0) {
       return (
         <div className="absolute inset-0 bg-slate-900 flex items-center justify-center text-slate-500">
           לא הוגדרו תמונות לגלריה
@@ -182,10 +250,9 @@ export const VideoGallery = ({
     }
 
     if (effect === "digital-squares") {
-      // Custom grid overlay effect
       return (
         <div className="absolute inset-0 overflow-hidden">
-          {validImages.map((img, idx) => (
+          {normalizedImages.map((imgObj, idx) => (
             <div
               key={idx}
               className={cn(
@@ -193,7 +260,12 @@ export const VideoGallery = ({
                 idx === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
               )}
             >
-              <Image src={img} alt={`Gallery ${idx}`} fill className="object-cover" />
+              <Image 
+                src={imgObj.url} 
+                alt={imgObj.title || `Gallery ${idx}`} 
+                fill 
+                className={cn("transition-all duration-700", fitClass)} 
+              />
               
               {/* Digital squares effect layer */}
               {idx === currentIndex && (
@@ -219,37 +291,216 @@ export const VideoGallery = ({
       );
     }
 
+    if (effect === "zoom-in") {
+      const safeCurrentIndex = currentIndex % normalizedImages.length;
+      const current = normalizedImages[safeCurrentIndex];
+      return (
+        <div className="absolute inset-0 overflow-hidden">
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={safeCurrentIndex}
+              initial={{ opacity: 0, scale: 1.15 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 1.8, ease: "easeOut" }}
+              className="absolute inset-0"
+            >
+              <Image 
+                src={current.url} 
+                alt={current.title || "Gallery"} 
+                fill 
+                className={cn("transition-all duration-700", fitClass)} 
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      );
+    }
+
+    if (effect === "slide") {
+      const safeCurrentIndex = currentIndex % normalizedImages.length;
+      const current = normalizedImages[safeCurrentIndex];
+      return (
+        <div className="absolute inset-0 overflow-hidden">
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={safeCurrentIndex}
+              initial={{ opacity: 0, x: 60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -60 }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute inset-0"
+            >
+              <Image 
+                src={current.url} 
+                alt={current.title || "Gallery"} 
+                fill 
+                className={cn("transition-all duration-700", fitClass)} 
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      );
+    }
+
     // Default Fade effect
-    const safeCurrentIndex = currentIndex % validImages.length;
+    const safeCurrentIndex = currentIndex % normalizedImages.length;
+    const current = normalizedImages[safeCurrentIndex];
     return (
       <div className="absolute inset-0 overflow-hidden">
         <AnimatePresence initial={false}>
           <motion.div
             key={safeCurrentIndex}
-            initial={{ opacity: 0, scale: 1.05 }}
+            initial={{ opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.5 }}
             className="absolute inset-0"
           >
-            <Image src={validImages[safeCurrentIndex]} alt="Gallery" fill className="object-cover" />
+            <Image 
+              src={current.url} 
+              alt={current.title || "Gallery"} 
+              fill 
+              className={cn("transition-all duration-700", fitClass)} 
+            />
           </motion.div>
         </AnimatePresence>
       </div>
     );
   };
 
+  const renderTitleOverlay = () => {
+    if (normalizedImages.length === 0) return null;
+    const safeCurrentIndex = currentIndex % normalizedImages.length;
+    const currentItem = normalizedImages[safeCurrentIndex];
+    if (!currentItem || !currentItem.title) return null;
+
+    const titleText = currentItem.title;
+    const activePosition = currentItem.position || textPosition || "bottom";
+    const posClass = getPositionClass(activePosition);
+
+    if (titleEffect === "fade-up") {
+      return (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`title-${safeCurrentIndex}-${titleText}`}
+            initial={{ opacity: 0, y: activePosition === "top" ? -20 : 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: activePosition === "top" ? -20 : -20 }}
+            transition={{ duration: 0.6 }}
+            className={cn(
+              "absolute inset-x-0 z-30 px-6 flex items-center text-center pointer-events-none",
+              activePosition === "top" 
+                ? "top-0 pt-6 md:pt-8 pb-14 bg-gradient-to-b from-black/90 via-black/50 to-transparent justify-center" 
+                : "bottom-0 pb-6 md:pb-8 pt-16 bg-gradient-to-t from-black/90 via-black/50 to-transparent justify-center"
+            )}
+            dir="rtl"
+          >
+            <h3 className="text-base md:text-2xl font-bold text-white max-w-3xl drop-shadow-md">
+              {titleText}
+            </h3>
+          </motion.div>
+        </AnimatePresence>
+      );
+    }
+
+    if (titleEffect === "glow") {
+      return (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`title-${safeCurrentIndex}-${titleText}`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.7 }}
+            className={cn(
+              "absolute z-30 max-w-2xl px-6 md:px-8 py-3 md:py-4 rounded-3xl bg-amber-950/80 backdrop-blur-lg border border-amber-400/50 shadow-[0_0_35px_rgba(245,158,11,0.35)] text-center mx-4 pointer-events-none flex items-center",
+              posClass
+            )}
+            dir="rtl"
+          >
+            <h3 className="text-base md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-white to-amber-200 drop-shadow">
+              {titleText}
+            </h3>
+          </motion.div>
+        </AnimatePresence>
+      );
+    }
+
+    if (titleEffect === "badge") {
+      return (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`title-${safeCurrentIndex}-${titleText}`}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.5 }}
+            className={cn(
+              "absolute z-30 px-5 py-2.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white shadow-xl text-center mx-4 pointer-events-none flex items-center",
+              posClass
+            )}
+            dir="rtl"
+          >
+            <p className="text-sm md:text-base font-semibold text-slate-100 tracking-wide">{titleText}</p>
+          </motion.div>
+        </AnimatePresence>
+      );
+    }
+
+    // Default "cinematic"
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`title-${safeCurrentIndex}-${titleText}`}
+          initial={{ opacity: 0, y: activePosition === "top" ? -25 : 25, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: activePosition === "top" ? -15 : -15, scale: 0.96 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className={cn(
+            "absolute z-30 max-w-3xl mx-4 px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-black/70 backdrop-blur-md border border-amber-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.6)] flex items-center gap-3 text-center pointer-events-none",
+            posClass
+          )}
+          dir="rtl"
+        >
+          <span className="w-2 md:w-2.5 h-2 md:h-2.5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_#f59e0b] animate-pulse" />
+          <h3 className="text-base md:text-2xl font-bold tracking-wide text-white drop-shadow-md">
+            {titleText}
+          </h3>
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  // Compute desktop height (20% increase on desktop by default: 60vh * 1.2 = 72vh, min-h 400px * 1.2 = 480px)
+  const getHeightClasses = () => {
+    if (heightDesktop === "normal") {
+      return "h-[60vh] min-h-[400px]";
+    }
+    if (heightDesktop === "extra-tall") {
+      return "h-[65vh] md:h-[85vh] min-h-[450px] md:min-h-[560px]";
+    }
+    // "tall" or default
+    return "h-[60vh] md:h-[72vh] min-h-[400px] md:min-h-[480px]";
+  };
+
   return (
     <section 
       id={id} 
-      className="relative w-full h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden group"
+      className={cn(
+        "relative w-full flex items-center justify-center overflow-hidden group transition-all duration-500",
+        getHeightClasses()
+      )}
       style={{ backgroundColor: backgroundColor || "var(--background)" }}
     >
       {/* Background layer */}
       {renderGalleryBackground()}
       
       {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors duration-500 z-10" />
+      <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 transition-colors duration-500 z-10" />
+
+      {/* Title Overlay */}
+      {renderTitleOverlay()}
 
       {/* Center Play Button */}
       {videoUrl && (
@@ -259,9 +510,9 @@ export const VideoGallery = ({
           className="relative z-20 group/btn flex items-center justify-center cursor-pointer"
           aria-label="הפעל וידאו"
         >
-          <div className="absolute inset-0 bg-white/20 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
-          <div className="relative w-24 h-24 md:w-32 md:h-32 bg-white/10 backdrop-blur-md border-2 border-white/30 rounded-full flex items-center justify-center hover:bg-white/20 hover:scale-110 transition-all duration-300 shadow-2xl">
-            <Play className="w-10 h-10 md:w-12 md:h-12 text-white ml-2" fill="currentColor" />
+          <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
+          <div className="relative w-20 h-20 md:w-28 md:h-28 bg-black/40 backdrop-blur-md border-2 border-amber-400/50 hover:border-amber-400 rounded-full flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+            <Play className="w-9 h-9 md:w-12 md:h-12 text-amber-300 ml-1.5 drop-shadow" fill="currentColor" />
           </div>
         </button>
       )}
@@ -287,7 +538,7 @@ export const VideoGallery = ({
               <X className="w-7 h-7 stroke-[2.5]" />
             </button>
 
-            <div className="w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative bg-black">
+            <div className="w-full rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative bg-black">
                {renderVideoPlayer()}
             </div>
           </div>

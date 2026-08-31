@@ -48,6 +48,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const [isAmbassadorModalOpen, setIsAmbassadorModalOpen] = useState(false);
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
   const [selectedTierIdForDrawer, setSelectedTierIdForDrawer] = useState<string | undefined>();
+  const [drawerInitialMode, setDrawerInitialMode] = useState<"one_time" | "recurring" | undefined>();
   const [config, setConfig] = useState<HomePageConfig>(initialConfig);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     ...(initialGlobalSettings || { siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] }),
@@ -125,8 +126,9 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
 
   const [activeCampaignId, setActiveCampaignId] = useState<string>(rawConfigCampId);
 
-  const handleOpenDonationDrawer = (tierId?: string) => {
+  const handleOpenDonationDrawer = (tierId?: string, mode?: "one_time" | "recurring") => {
     setSelectedTierIdForDrawer(tierId);
+    setDrawerInitialMode(mode);
     setIsDonationDrawerOpen(true);
   };
 
@@ -341,6 +343,10 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             videoUrl={vGalleryConf.videoUrl}
             videoType={vGalleryConf.videoType}
             effect={vGalleryConf.effect}
+            objectFit={vGalleryConf.objectFit}
+            titleEffect={vGalleryConf.titleEffect}
+            textPosition={vGalleryConf.textPosition}
+            heightDesktop={vGalleryConf.desktopHeight}
             backgroundColor={vGalleryConf.backgroundColor || globalSettings.backgroundColor}
           />
         );
@@ -486,7 +492,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       {/* Sticky Bottom Bar for Campaign */}
       {(config.campaignHeader?.visible !== false || config.campaignDonors?.visible !== false) && (
         <CampaignStickyBar
-          onOpenDonate={() => handleOpenDonationDrawer()}
+          onOpenDonate={(mode) => handleOpenDonationDrawer(undefined, mode)}
         />
       )}
 
@@ -505,6 +511,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         configDonationType={config.campaignTiers?.donationType}
         configRecurringMonths={config.campaignTiers?.recurringMonths}
         initialSelectedTierId={selectedTierIdForDrawer}
+        initialDonationMode={drawerInitialMode}
+        drawerConfig={config.campaignTiers?.drawerConfig}
       />
 
 

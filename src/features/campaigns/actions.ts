@@ -39,11 +39,15 @@ export async function getCampaignData(campaignId: string): Promise<Campaign | nu
  */
 export async function getAmbassadorBySlug(campaignId: string, slug: string): Promise<Ambassador | null> {
   try {
-    const snap = await adminDb
+    const cleanSlug = decodeURIComponent(slug || "").trim();
+    const targetCampaignId = (campaignId === "default-campaign" || campaignId === "home") ? "home" : campaignId;
+    
+    // 1. Query by slug in target campaign
+    let snap = await adminDb
       .collection("campaigns")
-      .doc(campaignId)
+      .doc(targetCampaignId)
       .collection("ambassadors")
-      .where("slug", "==", slug)
+      .where("slug", "==", cleanSlug)
       .limit(1)
       .get();
 
@@ -51,6 +55,35 @@ export async function getAmbassadorBySlug(campaignId: string, slug: string): Pro
       const doc = snap.docs[0];
       return { id: doc.id, ...doc.data() } as Ambassador;
     }
+
+    // 2. Query by doc ID
+    const byIdSnap = await adminDb
+      .collection("campaigns")
+      .doc(targetCampaignId)
+      .collection("ambassadors")
+      .doc(cleanSlug)
+      .get();
+
+    if (byIdSnap.exists) {
+      return { id: byIdSnap.id, ...byIdSnap.data() } as Ambassador;
+    }
+
+    // 3. Fallback for default-campaign alias
+    if (targetCampaignId === "home") {
+      const fallbackSnap = await adminDb
+        .collection("campaigns")
+        .doc("default-campaign")
+        .collection("ambassadors")
+        .where("slug", "==", cleanSlug)
+        .limit(1)
+        .get();
+
+      if (!fallbackSnap.empty) {
+        const doc = fallbackSnap.docs[0];
+        return { id: doc.id, ...doc.data() } as Ambassador;
+      }
+    }
+
     return null;
   } catch (error) {
     console.error("Error fetching ambassador by slug:", error);
