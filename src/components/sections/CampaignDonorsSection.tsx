@@ -504,13 +504,44 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
             )}
 
             <div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">אודות הקמפיין</h3>
-              <p className="mb-2">
-                {campaignDescription || "ברוכים הבאים לקמפיין הגיוס המיוחד שלנו! הודות לתמיכה ולשותפות שלכם, אנו מצליחים להרחיב את הפעילות ולהגיע להישגים מרשימים."}
-              </p>
-              <p>
-                כל תרומה קטנה כגדולה מקרבת אותנו להשגת היעד ומאפשרת לנו לשנות מציאות ולהשפיע ישירות.
-              </p>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-4 pb-2 border-b border-slate-100">
+                {config?.aboutTitle || "אודות הקמפיין"}
+              </h3>
+              
+              {/* Rich HTML / Image Content */}
+              <div className="rich-content text-slate-700 leading-relaxed max-w-none w-full" dir="rtl">
+                {(() => {
+                  const content = config?.aboutContent || campaignDescription;
+                  if (!content) {
+                    return (
+                      <>
+                        <p className="mb-3">
+                          ברוכים הבאים לקמפיין הגיוס המיוחד שלנו! הודות לתמיכה ולשותפות שלכם, אנו מצליחים להרחיב את הפעילות ולהגיע להישגים מרשימים.
+                        </p>
+                        <p>
+                          כל תרומה קטנה כגדולה מקרבת אותנו להשגת היעד ומאפשרת לנו לשנות מציאות ולהשפיע ישירות.
+                        </p>
+                      </>
+                    );
+                  }
+
+                  const hasHtml = /<[a-z][\s\S]*>/i.test(content);
+                  if (hasHtml) {
+                    return (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: content }} 
+                        className="space-y-4 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl [&_img]:shadow-md [&_img]:my-6 [&_img]:mx-auto [&_img]:block [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pr-6 [&_ol]:list-decimal [&_ol]:pr-6 [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-bold [&_a]:text-amber-600 [&_a]:underline"
+                      />
+                    );
+                  }
+
+                  return (
+                    <div className="whitespace-pre-line space-y-3">
+                      {content}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         )}

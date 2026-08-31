@@ -13,13 +13,15 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  minHeight?: number;
 }
 
 export function RichTextEditor({
   value,
   onChange,
   className = "",
-  placeholder
+  placeholder,
+  minHeight = 350
 }: RichTextEditorProps) {
   const editor = useRef(null);
 
@@ -28,7 +30,7 @@ export function RichTextEditor({
     placeholder: placeholder || 'התחל לכתוב...',
     direction: 'rtl' as 'rtl',
     language: 'he',
-    minHeight: 400,
+    minHeight: minHeight,
     style: {
       fontFamily: 'inherit',
     },

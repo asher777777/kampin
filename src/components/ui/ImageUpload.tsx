@@ -17,7 +17,9 @@ import {
   Save, 
   Sparkles,
   Copy,
-  Upload
+  Upload,
+  ExternalLink,
+  Maximize2
 } from "lucide-react";
 import { 
   getMediaLibrary, 
@@ -50,6 +52,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [previewFit, setPreviewFit] = useState<'contain' | 'cover'>('contain');
 
   useEffect(() => {
     setMounted(true);
@@ -515,8 +518,8 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
       {customTrigger ? (
         customTrigger(() => setShowGallery(true))
       ) : (
-        <div className={`flex ${compact ? "flex-col" : "gap-2"}`}>
-          <div className="flex gap-2">
+        <div className={`flex flex-wrap items-center ${compact ? "flex-col" : "gap-2"}`}>
+          <div className="flex gap-2 items-center">
             <div 
               onDragOver={handleDragOver}
               onDragEnter={handleDragOver}
@@ -527,7 +530,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                 isDragging 
                   ? "border-amber-500 bg-amber-500/15 scale-105 ring-2 ring-amber-500/40" 
                   : "border-primary/20 hover:border-secondary bg-muted/30",
-                compact ? "h-16 w-full max-w-xs" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"
+                compact ? "h-16 w-full max-w-xs" : size === 'sm' ? "h-16 w-16 sm:h-20 sm:w-20" : "h-24 w-24 sm:h-32 sm:w-32"
               )}
             >
               <input
@@ -554,11 +557,11 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                 </div>
               ) : (
                 <>
-                  <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact || size === 'sm' ? "h-4 w-4" : ""}`} />
-                  <span className={`font-bold mt-1 uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px] mt-2"}`}>
+                  <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact || size === 'sm' ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6"}`} />
+                  <span className={`font-bold mt-1 uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[8px] sm:text-[9px]" : "text-[9px] sm:text-[10px] mt-1 sm:mt-2"}`}>
                     העלאה<br className={size === 'sm' ? 'block' : 'hidden'}/>חדשה
                     {multiple && size !== 'sm' && !compact && (
-                      <span className="block text-[8px] font-normal text-muted-foreground normal-case mt-0.5">(או גרור קבצים)</span>
+                      <span className="hidden sm:block text-[8px] font-normal text-muted-foreground normal-case mt-0.5">(או גרור קבצים)</span>
                     )}
                   </span>
                 </>
@@ -568,24 +571,24 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
             <Button
               type="button"
               variant="outline"
-              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 cursor-pointer ${compact ? "h-16 w-full max-w-xs gap-1" : size === 'sm' ? "h-20 w-20 gap-1" : "h-32 w-32 gap-2"}`}
+              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 cursor-pointer ${compact ? "h-16 w-full max-w-xs gap-1" : size === 'sm' ? "h-16 w-16 sm:h-20 sm:w-20 gap-1" : "h-24 w-24 sm:h-32 sm:w-32 gap-1.5 sm:gap-2"}`}
               onClick={() => setShowGallery(true)}
               disabled={isUploading}
             >
-              <Library className={`text-primary/40 ${compact || size === 'sm' ? "h-4 w-4" : "h-6 w-6"}`} />
-              <span className={`font-bold uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px]"}`}>גלריית<br className={size === 'sm' ? 'block' : 'hidden'}/>מדיה</span>
+              <Library className={`text-primary/40 ${compact || size === 'sm' ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6"}`} />
+              <span className={`font-bold uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[8px] sm:text-[9px]" : "text-[9px] sm:text-[10px]"}`}>גלריית<br className={size === 'sm' ? 'block' : 'hidden'}/>מדיה</span>
             </Button>
           </div>
 
           {currentImage && (
-            <div className={`rounded-xl overflow-hidden border relative group shrink-0 ${compact ? "h-32 w-full max-w-sm mt-3" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"}`}>
+            <div className={`rounded-xl overflow-hidden border relative group shrink-0 ${compact ? "h-32 w-full max-w-sm mt-2" : size === 'sm' ? "h-16 w-16 sm:h-20 sm:w-20" : "h-24 w-24 sm:h-32 sm:w-32"}`}>
               {isVideoUrl(currentImage) ? (
                 <video src={currentImage} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
               ) : (
                 <img src={currentImage} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
               )}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Check className="text-white" />
+                <Check className="text-white h-5 w-5 sm:h-6 sm:w-6" />
               </div>
             </div>
           )}
@@ -594,16 +597,16 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
 
       {/* Gallery Modal */}
       {showGallery && mounted && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" dir="rtl">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 md:p-6" dir="rtl">
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md" onClick={() => setShowGallery(false)} />
-          <div className="relative bg-white w-full max-w-6xl max-h-[85vh] rounded-[2.5rem] shadow-2xl border overflow-hidden flex flex-col">
+          <div className="relative bg-white w-full max-w-6xl h-[94vh] sm:h-[88vh] md:h-[85vh] rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] shadow-2xl border overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="p-6 border-b flex items-center justify-between bg-muted/20 text-primary">
-              <div className="flex items-center gap-3">
-                <Library className="h-6 w-6 text-secondary" />
+            <div className="p-3 sm:p-4 md:p-6 border-b flex items-center justify-between bg-muted/20 text-primary shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <Library className="h-5 w-5 sm:h-6 sm:w-6 text-secondary" />
                 <div>
-                  <h3 className="text-xl font-bold leading-none">גלריית מדיה</h3>
-                  <p className="text-xs text-muted-foreground mt-1">בחר מדיה קיימת או העלה קבצים חדשים ישירות לגלריה</p>
+                  <h3 className="text-base sm:text-xl font-bold leading-none">גלריית מדיה</h3>
+                  <p className="hidden sm:block text-xs text-muted-foreground mt-1">בחר מדיה קיימת או העלה קבצים חדשים ישירות לגלריה</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -620,28 +623,28 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                   type="button"
                   onClick={() => document.getElementById("gallery-modal-upload-input")?.click()}
                   disabled={isUploading}
-                  className="bg-secondary hover:bg-secondary/90 text-white rounded-xl font-bold flex items-center gap-2 px-4 py-2 text-sm shadow-sm cursor-pointer"
+                  className="bg-secondary hover:bg-secondary/90 text-white rounded-xl font-bold flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm shadow-sm cursor-pointer"
                 >
                   {isUploading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                       <span>{uploadProgress && uploadProgress.total > 1 ? `מעלה ${uploadProgress.current}/${uploadProgress.total}...` : 'מעלה...'}</span>
                     </>
                   ) : (
                     <>
-                      <Upload className="h-4 w-4" />
+                      <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       <span>העלאת קבצים</span>
                     </>
                   )}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowGallery(false)} className="rounded-full h-10 w-10 p-0 text-muted-foreground hover:text-foreground">
-                  <X className="h-6 w-6" />
+                <Button variant="ghost" size="sm" onClick={() => setShowGallery(false)} className="rounded-full h-8 w-8 sm:h-10 sm:w-10 p-0 text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5 sm:h-6 sm:w-6" />
                 </Button>
               </div>
             </div>
             
             {/* Search Bar */}
-            <div className="p-4 border-b bg-muted/5 flex items-center gap-3">
+            <div className="p-3 sm:p-4 border-b bg-muted/5 flex items-center gap-3 shrink-0">
               <div className="relative flex-grow">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
@@ -649,15 +652,15 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                   placeholder="חיפוש לפי שם, תיאור או ALT..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pr-10 pl-4 py-2.5 border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary text-right"
+                  className="w-full pr-9 sm:pr-10 pl-3 sm:pl-4 py-2 sm:py-2.5 border rounded-xl bg-background text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary text-right"
                   dir="rtl"
                 />
               </div>
             </div>
 
-            {/* Modal Content Wrapper (Two-Pane Layout) */}
-            <div className="flex-grow flex overflow-hidden">
-              {/* Grid Pane (Left Side) */}
+            {/* Modal Content Wrapper (Two-Pane Layout: Responsive column on mobile, row on desktop) */}
+            <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative min-h-0">
+              {/* Grid Pane */}
               <div 
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -682,37 +685,37 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                     processFiles(Array.from(e.dataTransfer.files), true);
                   }
                 }}
-                className="flex-grow p-6 overflow-y-auto min-h-[300px] relative"
+                className="flex-grow p-3 sm:p-4 md:p-6 overflow-y-auto min-h-0 relative"
               >
                 {/* Drag Overlay */}
                 {isModalDragging && (
-                  <div className="absolute inset-4 z-50 bg-amber-500/10 backdrop-blur-sm border-2 border-dashed border-amber-500 rounded-2xl flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200 select-none pointer-events-none">
-                    <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 shadow-lg">
-                      <ImagePlus className="h-8 w-8 animate-bounce" />
+                  <div className="absolute inset-2 sm:inset-4 z-50 bg-amber-500/10 backdrop-blur-sm border-2 border-dashed border-amber-500 rounded-2xl flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200 select-none pointer-events-none">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 shadow-lg">
+                      <ImagePlus className="h-6 w-6 sm:h-8 sm:w-8 animate-bounce" />
                     </div>
-                    <p className="text-base font-extrabold text-amber-600">שחרר קבצים כאן כדי להעלות אותם לגלריה!</p>
+                    <p className="text-sm sm:text-base font-extrabold text-amber-600">שחרר קבצים כאן כדי להעלות אותם לגלריה!</p>
                   </div>
                 )}
 
                 {isLoadingLibrary ? (
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
-                    <Loader2 className="animate-spin text-secondary h-12 w-12" />
-                    <p className="text-sm font-bold text-muted-foreground animate-pulse tracking-widest uppercase">טוען ספריית מדיה...</p>
+                    <Loader2 className="animate-spin text-secondary h-10 w-10 sm:h-12 sm:w-12" />
+                    <p className="text-xs sm:text-sm font-bold text-muted-foreground animate-pulse tracking-widest uppercase">טוען ספריית מדיה...</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-4">
                     {/* First Card: Quick Upload Dropzone Tile */}
                     <div 
                       onClick={() => !isUploading && document.getElementById("gallery-modal-upload-input")?.click()}
                       className={cn(
-                        "aspect-square relative rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary bg-muted/20 hover:bg-secondary/5 transition-all flex flex-col items-center justify-center cursor-pointer p-3 text-center group shadow-sm hover:shadow-md select-none",
+                        "aspect-square relative rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary bg-muted/20 hover:bg-secondary/5 transition-all flex flex-col items-center justify-center cursor-pointer p-2.5 sm:p-3 text-center group shadow-sm hover:shadow-md select-none",
                         isUploading && "pointer-events-none opacity-60 bg-secondary/5 border-secondary/40"
                       )}
                     >
                       {isUploading ? (
-                        <div className="flex flex-col items-center gap-2">
-                          <Loader2 className="h-7 w-7 animate-spin text-secondary" />
-                          <span className="text-[11px] font-bold text-secondary animate-pulse">
+                        <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+                          <Loader2 className="h-6 w-6 sm:h-7 sm:w-7 animate-spin text-secondary" />
+                          <span className="text-[10px] sm:text-[11px] font-bold text-secondary animate-pulse">
                             {uploadProgress && uploadProgress.total > 1
                               ? `מעלה ${uploadProgress.current}/${uploadProgress.total}...`
                               : "מעלה לגלריה..."}
@@ -720,11 +723,11 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                         </div>
                       ) : (
                         <>
-                          <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center mb-2 group-hover:scale-110 group-hover:bg-secondary/20 transition-all text-secondary">
-                            <ImagePlus className="h-5 w-5" />
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary/10 flex items-center justify-center mb-1.5 sm:mb-2 group-hover:scale-110 group-hover:bg-secondary/20 transition-all text-secondary">
+                            <ImagePlus className="h-4 w-4 sm:h-5 sm:w-5" />
                           </div>
                           <span className="text-xs font-bold text-foreground">העלאה לגלריה</span>
-                          <span className="text-[10px] text-muted-foreground mt-0.5">לחץ או גרור קבצים</span>
+                          <span className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">לחץ או גרור קבצים</span>
                         </>
                       )}
                     </div>
@@ -737,47 +740,85 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                         <button
                           key={item.id}
                           onClick={() => handleSelectGridItem(item)}
-                          className={`aspect-square relative rounded-xl overflow-hidden group border-2 transition-all shadow-sm hover:shadow-md ${
+                          className={`aspect-square relative rounded-xl overflow-hidden group border-2 transition-all shadow-sm hover:shadow-md bg-slate-100 ${
                             isSelected ? 'border-secondary ring-2 ring-secondary/50 scale-95' : 'border-transparent hover:border-secondary'
                           }`}
                         >
                           {isVideoUrl(item.url) ? (
                             <video src={item.url} className="absolute inset-0 w-full h-full object-cover" muted />
                           ) : (
-                            <img src={item.url} alt={item.alt || item.name} className="absolute inset-0 w-full h-full object-cover" />
+                            <img src={item.url} alt={item.alt || item.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                           )}
                           <div className={`absolute inset-0 bg-secondary/10 transition-opacity flex items-center justify-center ${
                             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                           }`}>
-                            <Check className="text-white h-8 w-8 drop-shadow-lg" />
+                            <Check className="text-white h-6 w-6 sm:h-8 sm:w-8 drop-shadow-lg" />
                           </div>
                         </button>
                       );
                     })}
                     {filteredMediaItems.length === 0 && searchQuery && (
                       <div className="col-span-full py-16 text-center">
-                        <Library className="h-12 w-12 mx-auto text-muted/20 mb-4" />
-                        <p className="text-muted-foreground font-medium">לא נמצאו קבצים התואמים לחיפוש "{searchQuery}".</p>
+                        <Library className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted/20 mb-3" />
+                        <p className="text-xs sm:text-sm text-muted-foreground font-medium">לא נמצאו קבצים התואמים לחיפוש "{searchQuery}".</p>
                       </div>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Details & Actions Pane (Right Side) */}
+              {/* Details & Actions Pane (Responsive: Sidebar on Desktop, Bottom Sheet on Mobile) */}
               {(selectedItem || (multiple && selectedItems.length > 0)) && (
-                <div className="w-80 border-r border-slate-100 bg-slate-50/50 p-6 overflow-y-auto flex flex-col gap-5 text-right shrink-0" dir="rtl">
+                <div className="w-full md:w-80 border-t md:border-t-0 md:border-r border-slate-200 bg-slate-50/95 md:bg-slate-50/50 p-4 sm:p-6 overflow-y-auto flex flex-col gap-4 sm:gap-5 text-right shrink-0 max-h-[50vh] md:max-h-full shadow-lg md:shadow-none z-10" dir="rtl">
                   {selectedItem ? (
                     <>
-                      <h4 className="font-bold text-lg border-b pb-2 text-primary">פרטי המדיה</h4>
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <h4 className="font-bold text-base sm:text-lg text-primary">פרטי המדיה</h4>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedItem(null)}
+                          className="md:hidden text-xs text-muted-foreground hover:text-foreground px-2 py-1 bg-slate-200/60 rounded-lg cursor-pointer"
+                        >
+                          סגור פרטים
+                        </button>
+                      </div>
                       
-                      {/* Preview */}
-                      <div className="aspect-video w-full rounded-xl overflow-hidden border bg-white flex items-center justify-center relative shadow-inner">
+                      {/* Responsive Preview with Contain / Cover adaptation toggle */}
+                      <div className="relative aspect-video w-full rounded-xl overflow-hidden border bg-slate-200/50 flex items-center justify-center group shadow-inner">
                         {isVideoUrl(selectedItem.url) ? (
-                          <video src={selectedItem.url} className="w-full h-full object-contain" controls />
+                          <video 
+                            src={selectedItem.url} 
+                            className={`w-full h-full ${previewFit === 'cover' ? 'object-cover' : 'object-contain'}`} 
+                            controls 
+                          />
                         ) : (
-                          <img src={selectedItem.url} alt={selectedItem.alt || selectedItem.name} className="w-full h-full object-contain" />
+                          <img 
+                            src={selectedItem.url} 
+                            alt={selectedItem.alt || selectedItem.name} 
+                            className={`w-full h-full transition-all duration-200 ${previewFit === 'cover' ? 'object-cover' : 'object-contain'}`} 
+                          />
                         )}
+
+                        {/* View Controls Overlay */}
+                        <div className="absolute top-2 left-2 flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewFit(f => f === 'contain' ? 'cover' : 'contain')}
+                            className="bg-black/70 hover:bg-black/90 text-white text-[10px] px-2 py-1 rounded-md backdrop-blur-sm transition-all cursor-pointer font-medium"
+                            title="החלף התאמת גודל תמונה לתצוגה"
+                          >
+                            {previewFit === 'contain' ? 'התאמה מלאה' : 'מילוי שטח'}
+                          </button>
+                          <a
+                            href={selectedItem.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-black/70 hover:bg-black/90 text-white p-1 rounded-md backdrop-blur-sm transition-all"
+                            title="פתח תמונה בגודל מלא"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
                       </div>
 
                       {/* Text details */}
@@ -793,17 +834,17 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                             navigator.clipboard.writeText(selectedItem.url);
                             alert("הקישור הועתק!");
                           }}
-                          className="text-secondary hover:text-secondary/80 font-semibold flex items-center gap-1 mt-2 transition-colors cursor-pointer"
+                          className="text-secondary hover:text-secondary/80 font-semibold flex items-center gap-1 mt-1.5 transition-colors cursor-pointer"
                         >
                           <Copy className="h-3 w-3" />
                           העתק קישור
                         </button>
                       </div>
 
-                      <hr className="border-slate-100" />
+                      <hr className="border-slate-200/60" />
 
                       {/* Form */}
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-foreground">ALT Tag (טקסט אלטרנטיבי לגוגל)</label>
                           <input
@@ -811,7 +852,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                             value={tempAlt}
                             onChange={(e) => setTempAlt(e.target.value)}
                             placeholder="טקסט לקידום נגישות ו-SEO..."
-                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary"
+                            className="w-full px-3 py-2 border rounded-lg text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary"
                           />
                         </div>
                         
@@ -821,28 +862,28 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                             value={tempDesc}
                             onChange={(e) => setTempDesc(e.target.value)}
                             placeholder="תיאור מפורט..."
-                            rows={3}
-                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary resize-none"
+                            rows={2}
+                            className="w-full px-3 py-2 border rounded-lg text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary resize-none"
                           />
                         </div>
 
                         <Button 
                           onClick={handleSaveMetadata} 
                           disabled={isUpdatingMetadata}
-                          className="w-full py-2 flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 text-white rounded-lg text-sm font-semibold cursor-pointer"
+                          className="w-full py-2 flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 text-white rounded-lg text-xs sm:text-sm font-semibold cursor-pointer"
                         >
                           {isUpdatingMetadata ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                           שמור פרטים
                         </Button>
                       </div>
 
-                      <hr className="border-slate-100" />
+                      <hr className="border-slate-200/60" />
 
                       {/* Actions */}
                       <div className="space-y-2">
                         {/* Optimize existing item */}
                         {!isVideoUrl(selectedItem.url) && (
-                          <div className="space-y-3 p-3 bg-slate-100/60 rounded-xl border border-slate-200/50 mb-1">
+                          <div className="space-y-2.5 p-3 bg-slate-100/80 rounded-xl border border-slate-200 mb-1">
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-slate-500 block">פורמט המרה</label>
                               <select
@@ -873,7 +914,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                               variant="outline"
                               onClick={handleOptimizeExistingItem}
                               disabled={isOptimizing}
-                              className="w-full py-2 flex items-center justify-center gap-2 border-secondary/20 hover:border-secondary/50 text-secondary hover:bg-secondary/5 bg-white rounded-lg text-sm font-semibold cursor-pointer"
+                              className="w-full py-1.5 sm:py-2 flex items-center justify-center gap-2 border-secondary/20 hover:border-secondary/50 text-secondary hover:bg-secondary/5 bg-white rounded-lg text-xs sm:text-sm font-semibold cursor-pointer"
                             >
                               {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                               {isOptimizing ? 'מבצע אופטימיזציה...' : 'בצע אופטימיזציה וכיווץ'}
@@ -885,7 +926,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                           variant="ghost"
                           onClick={handleDeleteItem}
                           disabled={isDeleting}
-                          className="w-full py-2 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg text-sm font-semibold cursor-pointer"
+                          className="w-full py-1.5 sm:py-2 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer"
                         >
                           {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           מחק קובץ לצמיתות
@@ -893,15 +934,15 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                       </div>
                     </>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center">
-                      <Check className="h-12 w-12 text-secondary mb-4 opacity-50" />
-                      <h4 className="font-bold text-lg text-primary">{selectedItems.length} קבצים נבחרו</h4>
-                      <p className="text-sm text-muted-foreground mt-2">לחץ על 'בחר קבצים' למטה כדי להוסיף את כולם.</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+                      <Check className="h-8 w-8 sm:h-12 sm:w-12 text-secondary mb-2 sm:mb-4 opacity-50" />
+                      <h4 className="font-bold text-base sm:text-lg text-primary">{selectedItems.length} קבצים נבחרו</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">לחץ על 'בחר קבצים' למטה כדי להוסיף את כולם.</p>
                     </div>
                   )}
 
                   {/* Select main action */}
-                  <div className="mt-auto pt-4 border-t border-slate-100">
+                  <div className="mt-auto pt-3 sm:pt-4 border-t border-slate-200/60 sticky bottom-0 bg-slate-50/95 py-2">
                     <Button
                       onClick={() => {
                         if (multiple) {
@@ -915,9 +956,9 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                         }
                         setShowGallery(false);
                       }}
-                      className="w-full py-3 bg-secondary hover:bg-secondary/95 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-2.5 sm:py-3 bg-secondary hover:bg-secondary/95 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
                     >
-                      <Check className="h-5 w-5" />
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5" />
                       {multiple && selectedItems.length > 0 ? `בחר ${selectedItems.length} קבצים` : 'בחר תמונה זו'}
                     </Button>
                   </div>

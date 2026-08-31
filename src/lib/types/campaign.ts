@@ -94,4 +94,6 @@ export interface CampaignDonorsConfig {
   primaryColor?: string;
   backgroundColor?: string;
   anchorId?: string;
+  aboutTitle?: string;
+  aboutContent?: string;
 }
