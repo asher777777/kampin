@@ -36,6 +36,7 @@ export interface GlobalSettings {
   headerBgColor?: string;
   headerTitleColor?: string;
   headerSloganColor?: string;
+  headerSticky?: boolean;
 
   // Global Colors
   primaryColor?: string;
@@ -106,6 +107,7 @@ const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   headerBgColor: "",
   headerTitleColor: "",
   headerSloganColor: "",
+  headerSticky: true,
   primaryColor: "#d8435d",
   secondaryColor: "#10354b",
   backgroundColor: "#f8f9fa",
@@ -152,10 +154,11 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         customAudiences: data?.customAudiences || [],
         customGoals: data?.customGoals || [],
         
-        // Header Colors
+        // Header Colors & Position
         headerBgColor: data?.headerBgColor || "",
         headerTitleColor: data?.headerTitleColor || "",
         headerSloganColor: data?.headerSloganColor || "",
+        headerSticky: data?.headerSticky !== undefined ? data.headerSticky !== false : true,
 
         // Global Colors
         primaryColor: data?.primaryColor || "",

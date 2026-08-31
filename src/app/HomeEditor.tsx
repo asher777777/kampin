@@ -1900,16 +1900,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
         };
 
         const videoGalleryDesignNode = (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
-              <label className="text-xs text-slate-400 font-medium">מזהה עוגן (ID)</label>
-              <input 
-                type="text" 
-                value={vGalleryConf.anchorId || ""}
-                onChange={(e) => setConfig({ ...config, videoGallery: { ...vGalleryConf, anchorId: e.target.value }})}
-                className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
-                placeholder="videoGallery"
-                dir="ltr"
+          <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto px-0 pb-8 mt-4 text-right" dir="rtl">
+            <div className="w-full pt-2">
+              <VideoGalleryEditor
+                config={vGalleryConf}
+                onChange={(newConf: any) => setConfig({ ...config, videoGallery: newConf })}
+                initialTab="settings"
               />
             </div>
           </div>
@@ -1921,7 +1917,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               <h5 className="text-sm font-bold text-white mb-4">ניהול גלריית וידאו</h5>
               <VideoGalleryEditor
                 config={vGalleryConf}
-                onChange={(newConf) => setConfig({ ...config, videoGallery: newConf })}
+                onChange={(newConf: any) => setConfig({ ...config, videoGallery: newConf })}
               />
             </div>
           </div>
@@ -2378,6 +2374,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           headerBgColor={globalSettings.headerBgColor}
           headerTitleColor={globalSettings.headerTitleColor}
           headerSloganColor={globalSettings.headerSloganColor}
+          isSticky={globalSettings.headerSticky !== false}
         />
       )}
       
@@ -2861,6 +2858,39 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                       <span>שמאל</span>
                     </button>
                   </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-600 block">הדבקת תפריט עליון (Sticky Header)</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGlobalSettings({ ...globalSettings, headerSticky: true })}
+                      className={cn(
+                        "flex-1 py-2.5 px-3 border rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer text-center",
+                        globalSettings.headerSticky !== false 
+                          ? "border-secondary bg-secondary/5 text-secondary shadow-sm" 
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <span>נעול בראש המסך (דביק)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGlobalSettings({ ...globalSettings, headerSticky: false })}
+                      className={cn(
+                        "flex-1 py-2.5 px-3 border rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer text-center",
+                        globalSettings.headerSticky === false 
+                          ? "border-secondary bg-secondary/5 text-secondary shadow-sm" 
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <span>ללא הדבקה (מעל התוכן)</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    * במצב 'ללא הדבקה', התפריט העליון מופיע מעל תמונת הגלריה הראשית ואינו מסתיר או מכסה אותה כלל.
+                  </p>
                 </div>
               </div>
             )}

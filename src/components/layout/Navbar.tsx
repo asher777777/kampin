@@ -19,6 +19,7 @@ interface NavbarProps {
   headerBgColor?: string;
   headerTitleColor?: string;
   headerSloganColor?: string;
+  isSticky?: boolean;
 }
 
 export const Navbar = ({ 
@@ -29,7 +30,8 @@ export const Navbar = ({
   slogan,
   headerBgColor,
   headerTitleColor,
-  headerSloganColor
+  headerSloganColor,
+  isSticky = true,
 }: NavbarProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -145,15 +147,18 @@ export const Navbar = ({
   return (
     <nav
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-6 py-4",
-        isScrolled
+        "z-50 transition-all duration-300 px-6 py-4",
+        isSticky 
+          ? "fixed top-0 left-0 right-0" 
+          : "relative w-full",
+        isScrolled && isSticky
           ? "border-b shadow-sm py-3 backdrop-blur-md"
           : (headerBgColor ? "backdrop-blur-md" : "")
       )}
       style={{
         backgroundColor: headerBgColor
           ? headerBgColor
-          : (isScrolled ? "var(--background, rgba(255, 255, 255, 0.9))" : "transparent"),
+          : (isScrolled && isSticky ? "var(--background, rgba(255, 255, 255, 0.9))" : "transparent"),
       }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">

@@ -50,6 +50,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
   const [selectedTierIdForDrawer, setSelectedTierIdForDrawer] = useState<string | undefined>();
   const [drawerInitialMode, setDrawerInitialMode] = useState<"one_time" | "recurring" | undefined>();
+  const [drawerInitialPaymentMethod, setDrawerInitialPaymentMethod] = useState<"credit_card" | "bit" | "google_pay" | undefined>();
   const [config, setConfig] = useState<HomePageConfig>(initialConfig);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     ...(initialGlobalSettings || { siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] }),
@@ -127,9 +128,14 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
 
   const [activeCampaignId, setActiveCampaignId] = useState<string>(rawConfigCampId);
 
-  const handleOpenDonationDrawer = (tierId?: string, mode?: "one_time" | "recurring") => {
+  const handleOpenDonationDrawer = (
+    tierId?: string,
+    mode?: "one_time" | "recurring",
+    paymentMethod?: "credit_card" | "bit" | "google_pay"
+  ) => {
     setSelectedTierIdForDrawer(tierId);
     setDrawerInitialMode(mode);
+    setDrawerInitialPaymentMethod(paymentMethod);
     setIsDonationDrawerOpen(true);
   };
 
@@ -443,6 +449,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           headerBgColor={globalSettings.headerBgColor}
           headerTitleColor={globalSettings.headerTitleColor}
           headerSloganColor={globalSettings.headerSloganColor}
+          isSticky={globalSettings.headerSticky !== false}
         />
       )}
       
@@ -512,6 +519,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         configDonationType={config.campaignTiers?.donationType}
         configRecurringMonths={config.campaignTiers?.recurringMonths}
         initialSelectedTierId={selectedTierIdForDrawer}
+        initialDonationMode={drawerInitialMode}
+        initialPaymentMethod={drawerInitialPaymentMethod}
         drawerConfig={{
           ...(config.campaignTiers?.drawerConfig || {}),
           testMode: Boolean(config.campaignTiers?.testMode || config.campaignTiers?.drawerConfig?.testMode),

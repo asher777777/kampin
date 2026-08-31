@@ -4,7 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export type UserRole = "SUPERADMIN" | "ADMIN" | "PRO" | "DEVELOPING" | "TRIAL";
+export type UserRole = "SUPERADMIN" | "ADMIN" | "USER" | "PRO" | "DEVELOPING" | "TRIAL";
 
 export interface UserDoc {
   id?: string;
@@ -113,9 +113,9 @@ export async function changeMyPassword(newPassword: string) {
 // Validation helper functions
 export async function checkFeatureLimit(userId: string, feature: "contacts" | "landing_pages" | "ai" | "payments" | "forms") {
   const session = await auth();
-  const role = session?.user?.role || "ADMIN";
+  const role = session?.user?.role || "USER";
   
-  if (role === "SUPERADMIN" || role === "ADMIN" || role === "PRO") return { allowed: true };
+  if (role === "SUPERADMIN" || role === "ADMIN" || role === "USER" || role === "PRO") return { allowed: true };
 
   // TRIAL check
   if (role === "TRIAL") {

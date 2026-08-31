@@ -1,34 +1,34 @@
 {
   "sentPayload": {
     "Json": {
-      "userName": "2180005WS9914",
-      "password": "SkYxnQyhzRM36uccztNYc5aQRR2ZmliFS0OBGQItfTf0yslqTR",
+      "userName": "2181990WS12121544",
+      "password": "VnqiVsBRP1C1s6tM1QhdvkkiPKyqEpWqWNnGb7e78O4OfMVtZs",
       "func": "SendTransaction",
       "format": "json",
       "tran": {
         "Address": "",
         "City": "",
-        "CreditNum": "4580830003219458",
+        "CreditNum": "4580900006566956",
         "Token": null,
-        "Expiry": "3009",
-        "Cvv2": "385",
-        "Total": 600,
+        "Expiry": "3005",
+        "Cvv2": "567",
+        "Total": 55000,
         "Currency": 1,
-        "CreditType": 10,
-        "NumPayment": 12,
-        "Phone": "052695465",
+        "CreditType": 1,
+        "NumPayment": 1,
+        "Phone": "+972526968008",
         "ParamJ": "J4",
         "TransactionType": "debit",
-        "Comment1": "טופס פנייה",
-        "FirstName": "בדיקה",
-        "LastName": "בדיקה",
-        "ProjectNumber": "000",
-        "Mail": "g@maik.com",
+        "Comment1": "Donation-home-1788196029156",
+        "FirstName": "מ.י",
+        "LastName": "בריא ב\"מ בריא",
+        "ProjectNumber": "",
+        "Mail": "suprgreensite@gmail.com",
         "DocumentType": 320,
-        "Id": ""
+        "Id": "076796760"
       }
     },
     "format": "json"
   },
-  "response": "{\"BitOutput\":null,\"BitUrl\":null,\"CardMumber\":\"458083******9458\",\"CardName\":\"חיוב מיידי2\",\"CardType\":\"DelekCard\",\"ChargeOptions\":null,\"CheckCVV\":\"NotInserted\",\"CheckIdentityNumber\":\"NotInserted\",\"City\":null,\"ClearingCompany\":\"LeumiCard\",\"ClubCode\":\"0\",\"Comment1\":\"טופס פנייה\",\"Comment2\":null,\"Comment3\":null,\"Comment4\":\"חיוב מיידי בהוראת קבע חדשה\",\"Comment5\":null,\"CompanyName\":\"פשוט מושלם\",\"CompanyTranId\":\"182\",\"ConfirmSource\":\"NoConfirm\",\"CurrencyISOValue\":\"376\",\"CurrencyName\":\"שקל\",\"CurrencySymbole\":\"₪\",\"Date\":\"2026-07-13T15:12:33.000Z\",\"DisplayInstructionsForChargeCard\":\"0\",\"DocumentsDetails\":{\"DocumentDetails\":[{\"DocNumber\":\"20106\",\"PdfLink\":\"https://files.ezcount.co.il/front/documents/get/26a93028-97d7-454e-85ee-8776fcf16744\",\"PdfLinkCopy\":\"https://files.ezcount.co.il/front/documents/get/26a93028-97d7-454e-85ee-8776fcf16744/copy\"}]},\"ExpairyDate\":\"3009\",\"FileNumber\":null,\"FirstName\":null,\"FirstPayment\":null,\"HashUser\":null,\"Id\":null,\"Intot\":\"0000000458083******945826000409300000000600000000000000000020130150000094177300000000000000000055001007     חיוב מיידי2\",\"IssuerCompany\":\"VisaCAL\",\"J5TranId\":null,\"LastName\":null,\"Mail\":\"g@maik.com\",\"MonthlyPayment\":null,\"Name\":\"בדיקה בדיקה\",\"NumPayment\":null,\"NumTransaction\":\"182\",\"OKNum\":\"0941773\",\"ObligationApiIdentity\":\"000170\",\"ObligationReference\":\"000170\",\"Phone\":\"052695465\",\"ProjectName\":\"פשוט מושלם\",\"ProjectNumber\":\"000\",\"ReciptName\":\"בדיקה בדיקה\",\"RequestResult\":{\"Code\":499,\"Data\":null,\"Description\":\"הוראת קבע נקלטה בהצלחה, עסקה ראשונה עברה בהצלחה\",\"Status\":true},\"Sum\":600,\"TerminalName\":\"יופיי\",\"TerminalNumber\":\"2180005\",\"Token\":\"4562635614539458\",\"TransactionCode\":\"50\",\"TransactionCreditType\":\"now\",\"TransactionType\":\"BlockedCard\",\"UniqNum\":null,\"UserData\":null}"
+  "response": "{\"Address\":null,\"BitOutput\":null,\"BitUrl\":null,\"CardMumber\":\"458090******6956\",\"CardName\":\"2\",\"CardType\":\"DelekCard\",\"ChargeOptions\":null,\"CheckCVV\":\"NotInserted\",\"CheckIdentityNumber\":\"NotInserted\",\"ClearingCompany\":\"Isracard\",\"ClubCode\":\"0\",\"Comment1\":\"Donation-home-1788196029156\",\"Comment2\":null,\"Comment3\":null,\"Comment4\":null,\"Comment5\":null,\"CompanyName\":\"מדרש לאה - מרכז התעוררות (ע\\\"ר)\",\"CompanyTranId\":\"600\",\"ConfirmSource\":\"NoConfirm\",\"CurrencyISOValue\":\"376\",\"CurrencyName\":\"שקל\",\"CurrencySymbole\":\"₪\",\"Date\":\"2026-08-31T20:07:04.000Z\",\"DisplayInstructionsForChargeCard\":\"0\",\"ExpairyDate\":\"3005\",\"FileNumber\":null,\"FirstName\":null,\"FirstPayment\":null,\"HashUser\":null,\"Id\":\"076796760\",\"Intot\":\"7320000458090******695600000405300000055000000000000000000000110150000000000000000000000000000101001201               2\",\"IssuerCompany\":\"Isracard\",\"J5TranId\":null,\"LastName\":null,\"Mail\":\"suprgreensite@gmail.com\",\"MonthlyPayment\":null,\"Name\":\"מ.י בריא ב\\\"מ בריא\",\"NumPayment\":1,\"NumTransaction\":\"600\",\"OKNum\":\"0000000\",\"ObligationApiIdentity\":\"000378\",\"ObligationReference\":\"000378\",\"Phone\":\"+972526968008\",\"ProjectName\":\"מדרש לאה - מרכז התעוררות (ע\\\"ר)\",\"ProjectNumber\":\"000\",\"ReciptFor\":null,\"ReciptName\":null,\"RequestResult\":{\"Code\":415,\"Data\":null,\"Description\":\"הוזנו נתונים לא תקינים\",\"Status\":false},\"Sum\":55000,\"TerminalName\":\"גמא\",\"TerminalNumber\":\"2181990\",\"Token\":\"4508606464146956\",\"TransactionCode\":\"50\",\"TransactionCreditType\":\"regullar\",\"TransactionType\":\"BlockedCard\",\"UniqNum\":null,\"UserData\":null}"
 }

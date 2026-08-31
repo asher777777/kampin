@@ -1,5 +1,5 @@
-import HomeEplace from "@/wfd/HomeEplace";
+import { LiveBuilderShell } from "@/features/mini-site-builder/components/LiveBuilderShell";
 
 export default function BuilderPage() {
-  return <HomeEplace />;
+  return <LiveBuilderShell />;
 }

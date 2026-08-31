@@ -31,8 +31,8 @@ export default async function Home() {
     config = await getHomePageConfig();
   } catch (e) {
     console.error("Home page config fetch error:", e);
-    const { DEFAULT_HOME_CONFIG } = await import("@/features/home/actions");
-    config = DEFAULT_HOME_CONFIG;
+    const { getDefaultHomeConfig } = await import("@/features/home/actions");
+    config = await getDefaultHomeConfig();
   }
 
   try {

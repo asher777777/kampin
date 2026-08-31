@@ -5,7 +5,7 @@ import { Share2, Heart, Copy, Check, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 interface CampaignStickyBarProps {
-  onOpenDonate: (mode?: "one_time" | "recurring") => void;
+  onOpenDonate: (mode?: "one_time" | "recurring", paymentMethod?: "credit_card" | "bit" | "google_pay") => void;
   onOpenShare?: () => void;
   mainCampaignUrl?: string;
   isAmbassadorView?: boolean;
@@ -44,8 +44,10 @@ export const CampaignStickyBar: React.FC<CampaignStickyBarProps> = ({
         <div className="flex items-center gap-2">
           {/* Share Button */}
           <button
+            type="button"
             onClick={handleShareClick}
-            className="flex items-center gap-1.5 px-3.5 md:px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-full text-xs md:text-sm transition-all border border-slate-200 shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-full text-xs sm:text-sm transition-all border border-slate-300 shadow-sm hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+            title="שתף קמפיין זה"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
             <span>{copied ? "הועתק!" : "שתף"}</span>
@@ -63,10 +65,10 @@ export const CampaignStickyBar: React.FC<CampaignStickyBarProps> = ({
           )}
         </div>
 
-        {/* Bit Payment Button with Logo - Opens One-Time Donation */}
+        {/* Bit Payment Button with Logo - Opens One-Time Donation with Bit selected */}
         <button
           type="button"
-          onClick={() => onOpenDonate("one_time")}
+          onClick={() => onOpenDonate("one_time", "bit")}
           className="flex items-center gap-1.5 bg-[#0B132B] hover:bg-slate-900 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full border border-slate-800 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 group"
           title="תרומה מהירה באפליקציית Bit"
         >

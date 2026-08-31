@@ -5,7 +5,6 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { saveGlobalSettings, getGlobalSettings, GlobalSettings } from "@/features/settings/actions";
 import { savePageConfig, saveHomePageConfig, getPageConfig, HomePageConfig } from "@/features/home/actions";
-import { getUserCoins, grantPitchBonusCoins, deductCoins, deductAiTextCoins } from "@/features/credits/actions";
 import { generateSeoImageWithAI, rephraseTextWithAI, getAiSettings } from "@/features/ai/actions";
 import { buildLogoPrompt, BrandLogoContext } from "../utils/logoPromptBuilder";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -109,9 +108,8 @@ export async function saveBuilderProgress(
 
 
 
-    const coinsData = await getUserCoins(targetUserId);
     revalidatePath("/agentonbord");
-    return { success: true, coins: coinsData.coins };
+    return { success: true, coins: 0 };
   } catch (error) {
     console.error("Error saving builder progress:", error);
     return { success: false, coins: 0 };
@@ -286,13 +284,10 @@ export async function evaluateDifferentiatorAndGrantCoins(
       return {
         success: true,
         isConvincing: false,
-        agentResponse: "הטיעון הזה קצר וכללי מדי. כדי שאעניק את 100 המטבעות – פרט מה המנגנון או הערך המעשי הספציפי שלכם שאי אפשר למצוא אצל הגופים בשוק?",
-        coins: (await getUserCoins(session.user.id)).coins,
+        agentResponse: "הטיעון הזה קצר וכללי מדי. כדי שנוכל להתקדם – פרט מה המנגנון או הערך המעשי הספציפי שלכם שאי אפשר למצוא אצל הגופים בשוק?",
+        coins: 0,
       };
     }
-
-    // Award 100 pitch bonus coins
-    const bonusRes = await grantPitchBonusCoins(session.user.id);
 
     // Save problem, differentiator & competitors to DB & CRM
     await saveBuilderProgress(
@@ -300,13 +295,13 @@ export async function evaluateDifferentiatorAndGrantCoins(
       session.user.id
     );
 
-    const agentResponse = `הנימוק הזה ענייני ומציג נדבך שונה ביחס לגופים בשוק. העברתי לך 100 מטבעות להתחלת העבודה.`;
+    const agentResponse = `הנימוק הזה ענייני ומציג נדבך שונה ביחס לגופים בשוק. הנתונים נשמרו בהצלחה!`;
 
     return {
       success: true,
       isConvincing: true,
       agentResponse,
-      coins: bonusRes.newBalance,
+      coins: 0,
     };
   } catch (error: any) {
     console.error("Error evaluating differentiator:", error);
@@ -436,22 +431,18 @@ export async function generateRichVisionAndInsightsWithAI(
         const parsed = JSON.parse(cleanJson);
         if (parsed.companyVision) generatedVision = parsed.companyVision;
 
-        const deductResult = await deductAiTextCoins(generatedVision, "ניסוח חזון קופירייטינג 200+ מילים", session.user.id);
-
         return {
           success: true,
           companyVision: generatedVision,
           shortVision: parsed.shortVision || generatedVision.slice(0, 100),
           personas: parsed.personas || [],
           servicePages: parsed.servicePages || [],
-          newBalance: deductResult.newBalance,
+          newBalance: 0,
         };
       } catch (err) {
         console.warn("AI Pro vision generation fallback:", err);
       }
     }
-
-    const deductResult = await deductAiTextCoins(generatedVision, "ניסוח חזון קופירייטינג 200+ מילים", session.user.id);
 
     return {
       success: true,
@@ -465,7 +456,7 @@ export async function generateRichVisionAndInsightsWithAI(
         { id: "s1", title: "ייעוץ וליווי אסטרטגי", description: "בניית מותג מנצח ומעטפת שיווקית" },
         { id: "s2", title: "בנייה ופיתוח מיני-סייטים", description: "הקמת פורטל דיגיטלי ממיר ומעוצב" },
       ],
-      newBalance: deductResult.newBalance,
+      newBalance: 0,
     };
   } catch (error: any) {
     console.error("Error generating rich vision:", error);
@@ -486,29 +477,23 @@ export async function generateLogoWithAI(context: BrandLogoContext): Promise<{
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    // 1. Deduct 10 coins for logo generation
-    const deductRes = await deductCoins(10, "יצירת לוגו ב-AI", session.user.id);
-    if (!deductRes.success) {
-      return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
-    }
-
-    // 2. Build precise prompt
+    // 1. Build precise prompt
     const prompt = buildLogoPrompt(context);
 
-    // 3. Call AI Image Generation
+    // 2. Call AI Image Generation
     const imgRes = await generateSeoImageWithAI(prompt);
     if (!imgRes.success || !imgRes.imageUrl) {
-      return { success: false, newBalance: deductRes.newBalance, error: imgRes.error || "שגיאה ביצירת תמונת לוגו" };
+      return { success: false, newBalance: 0, error: imgRes.error || "שגיאה ביצירת תמונת לוגו" };
     }
 
-    // 4. Save logo to settings and DB
+    // 3. Save logo to settings and DB
     await saveGlobalSettings({ logoUrl: imgRes.imageUrl });
     await saveBuilderProgress({ logoUrl: imgRes.imageUrl }, session.user.id);
 
     return {
       success: true,
       logoUrl: imgRes.imageUrl,
-      newBalance: deductRes.newBalance,
+      newBalance: 0,
     };
   } catch (error: any) {
     console.error("Error generating AI logo:", error);
@@ -528,19 +513,6 @@ export async function generateSingleLogoWithFeedback(
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-
-    let newBalance = 0;
-    // Only deduct coins if this is the first generation (no previous interaction ID)
-    if (!previousInteractionId) {
-      const deductRes = await deductCoins(10, `יצירת סמל לוגו ב-AI`, session.user.id);
-      if (!deductRes.success) {
-        return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
-      }
-      newBalance = deductRes.newBalance;
-    } else {
-      // Free revision, just get the current balance
-      newBalance = (await getUserCoins(session.user.id)).coins;
-    }
 
     let apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
     
@@ -667,7 +639,7 @@ Problem Solved: ${context.businessProblem || ""}`;
       explanation: parsed.explanation,
       seed,
       interactionId,
-      newBalance,
+      newBalance: 0,
     };
   } catch (error: any) {
     console.error("Error generating single AI logo:", error);
@@ -694,12 +666,6 @@ export async function createServicePageWithAI(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    // Deduct 10 coins for service page creation
-    const deductRes = await deductCoins(10, `יצירת עמוד שירות: ${serviceTitle}`, session.user.id);
-    if (!deductRes.success) {
-      return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
-    }
-
     // Generate service image
     const imagePrompt = `Modern professional service banner illustration for "${serviceTitle}", solving pain point "${painPoint}". Clean minimalist style, studio lighting, high quality`;
     const imgRes = await generateSeoImageWithAI(imagePrompt);
@@ -714,7 +680,7 @@ export async function createServicePageWithAI(
     return {
       success: true,
       servicePage: newPage,
-      newBalance: deductRes.newBalance,
+      newBalance: 0,
     };
   } catch (error: any) {
     console.error("Error creating service page:", error);

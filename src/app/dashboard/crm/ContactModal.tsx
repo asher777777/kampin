@@ -12,7 +12,6 @@ import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
 import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle } from "lucide-react";
 import { InteractionsList } from "@/components/ui/InteractionsList";
-import { getUserCoins, adminUpdateUserCoins } from "@/features/credits/actions";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -1256,7 +1255,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                             }, {})
                           ).map(([category, items]) => (
                             <optgroup key={category} label={category} className="bg-[#181818] text-amber-400 font-bold">
-                              {items.map((c) => (
+                              {(items as any[]).map((c: any) => (
                                 <option key={c.id} value={c.id} className="bg-[#0a0a0a] text-white font-normal">
                                   {c.title} {c.id !== "home" ? `(${c.id})` : ""}
                                 </option>
@@ -1953,67 +1952,12 @@ function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
   )
 }
 
-function AiStatsView({ contact, systemUserId, onCoinsUpdate }: { contact: Contact, systemUserId: string, onCoinsUpdate: () => void }) {
-  const [coins, setCoins] = useState<number | null>(null);
-  const [editingCoins, setEditingCoins] = useState(false);
-  const [newCoinsVal, setNewCoinsVal] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getUserCoins(systemUserId).then(res => {
-      setCoins(res.coins);
-      setNewCoinsVal(res.coins.toString());
-      setLoading(false);
-    });
-  }, [systemUserId]);
-
-  const handleSaveCoins = async () => {
-    const val = parseInt(newCoinsVal);
-    if (isNaN(val)) return;
-    setLoading(true);
-    const res = await adminUpdateUserCoins(systemUserId, val);
-    if (res.success) {
-      setCoins(val);
-      setEditingCoins(false);
-      onCoinsUpdate();
-    } else {
-      alert("שגיאה בעדכון מטבעות");
-    }
-    setLoading(false);
-  };
-
+function AiStatsView({ contact }: { contact: Contact, systemUserId?: string, onCoinsUpdate?: () => void }) {
   const interactions = contact.ai_interactions || [];
 
   return (
     <div className="p-6 bg-[#111] animate-in fade-in duration-200 text-right" dir="rtl">
       <div className="space-y-6">
-        
-        {/* Coins Management */}
-        <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-2xl flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-black text-amber-500 mb-1">יתרת מטבעות (Coins)</h4>
-            <p className="text-xs text-slate-400">המטבעות משמשים ליצירת תוכן באמצעות AI.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {loading ? (
-              <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
-            ) : editingCoins ? (
-              <div className="flex items-center gap-2">
-                <Input type="number" value={newCoinsVal} onChange={(e) => setNewCoinsVal(e.target.value)} className="w-24 h-8 text-center text-sm font-bold bg-[#181818] border-amber-500/50" />
-                <Button size="sm" onClick={handleSaveCoins} className="h-8 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold">שמור</Button>
-                <Button size="sm" variant="ghost" onClick={() => { setEditingCoins(false); setNewCoinsVal(coins?.toString() || "0"); }} className="h-8 px-2 text-slate-400">בטל</Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-black text-white">{coins !== null ? coins : "..."}</span>
-                <Button size="sm" onClick={() => setEditingCoins(true)} className="h-8 px-3 bg-[#222] hover:bg-[#333] border border-white/10 text-xs font-bold text-slate-300">
-                  <Edit className="w-3.5 h-3.5 ml-1.5" /> ערוך
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Stats Panel */}
         <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">סיכום שימוש ב-API</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

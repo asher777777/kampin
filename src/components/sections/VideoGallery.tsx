@@ -70,22 +70,16 @@ const normalizeImages = (rawImages: VideoGalleryImageItem[] = []): {
   position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
 }[] => {
   if (!Array.isArray(rawImages)) return [];
-  return rawImages
-    .map((item) => {
-      if (!item) return null;
-      if (typeof item === "string") {
-        return { url: item.trim(), title: "", position: undefined };
-      }
-      if (typeof item === "object" && item.url) {
-        return { 
-          url: item.url.trim(), 
-          title: item.title?.trim() || "",
-          position: item.position
-        };
-      }
-      return null;
-    })
-    .filter((img): img is { url: string; title: string; position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left" } => Boolean(img && img.url !== ""));
+  const list: { url: string; title: string; position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left" }[] = [];
+  for (const item of rawImages) {
+    if (!item) continue;
+    if (typeof item === "string" && item.trim()) {
+      list.push({ url: item.trim(), title: "", position: undefined });
+    } else if (typeof item === "object" && item.url && item.url.trim()) {
+      list.push({ url: item.url.trim(), title: item.title?.trim() || "", position: item.position });
+    }
+  }
+  return list;
 };
 
 const getObjectFitClass = (fit: string = "cover") => {
@@ -613,19 +607,19 @@ export const VideoGallery = ({
     );
   };
 
-  // Compute desktop height (20% increase on desktop by default: 60vh * 1.2 = 72vh, min-h 400px * 1.2 = 480px)
+  // Compute desktop & mobile height
   const getHeightClasses = () => {
     if (isAutoHeight) {
       return "h-auto min-h-0 py-0";
     }
     if (heightDesktop === "normal") {
-      return "h-[50vh] md:h-[60vh] min-h-[350px] md:min-h-[400px]";
+      return "h-[40vh] sm:h-[50vh] md:h-[60vh] min-h-[220px] sm:min-h-[300px] md:min-h-[400px]";
     }
     if (heightDesktop === "extra-tall") {
-      return "h-[70vh] md:h-[85vh] min-h-[480px] md:min-h-[580px]";
+      return "h-[55vh] sm:h-[70vh] md:h-[85vh] min-h-[320px] sm:min-h-[450px] md:min-h-[580px]";
     }
-    // "tall" or default
-    return "h-[60vh] md:h-[72vh] min-h-[400px] md:min-h-[480px]";
+    // "tall" or default (+20% on desktop)
+    return "h-[48vh] sm:h-[58vh] md:h-[72vh] min-h-[260px] sm:min-h-[360px] md:min-h-[480px]";
   };
 
   return (

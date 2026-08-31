@@ -2,45 +2,171 @@
 
 import { adminDb } from "@/lib/firebase-admin";
 
-export async function getKesherSettings() {
+export async function getEffectiveKesherSettings(userId?: string, campaignId?: string) {
+  try {
+    // 1. Check specified userId
+    if (userId) {
+      const userDoc = await adminDb.collection("users").doc(userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData?.kesherSettings?.userName && userData?.kesherSettings?.apiKey) {
+          return {
+            userName: userData.kesherSettings.userName,
+            apiKey: userData.kesherSettings.apiKey,
+            paymentPageId: userData.kesherSettings.paymentPageId || "",
+            ezCountToken: userData.kesherSettings.ezCountToken || "",
+            isActive: true,
+          };
+        }
+        if (userData?.useAdminKesher === false) {
+          const userKesherDoc = await adminDb.collection("users").doc(userId).collection("settings").doc("kesher").get();
+          if (userKesherDoc.exists) {
+            const uData = userKesherDoc.data();
+            if (uData?.userName && uData?.apiKey) {
+              return {
+                userName: uData.userName,
+                apiKey: uData.apiKey,
+                paymentPageId: uData.paymentPageId || "",
+                ezCountToken: uData.ezCountToken || "",
+                isActive: true,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Check campaign owner if campaignId is provided
+    if (campaignId && campaignId !== "home" && campaignId !== "default-campaign") {
+      try {
+        const campaignDoc = await adminDb.collection("campaigns").doc(campaignId).get();
+        if (campaignDoc.exists) {
+          const campData = campaignDoc.data();
+          const ownerId = campData?.ownerId || campData?.userId;
+          if (ownerId && ownerId !== userId) {
+            const ownerSettings: any = await getEffectiveKesherSettings(ownerId);
+            if (ownerSettings?.isActive) {
+              return ownerSettings;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Check configs/global (Superadmin Global Config)
+    const globalDoc = await adminDb.collection("configs").doc("global").get();
+    if (globalDoc.exists) {
+      const gData = globalDoc.data() || {};
+      const uName = gData.kesherUserName || gData.userName || gData.kesherSettings?.userName;
+      const aKey = gData.kesherApiKey || gData.apiKey || gData.kesherSettings?.apiKey;
+      if (uName && aKey) {
+        return {
+          userName: uName,
+          apiKey: aKey,
+          paymentPageId: gData.kesherPaymentPageId || gData.paymentPageId || gData.kesherSettings?.paymentPageId || "",
+          ezCountToken: gData.kesherEzCountToken || gData.ezCountToken || gData.kesherSettings?.ezCountToken || "",
+          isActive: true,
+        };
+      }
+    }
+
+    // 4. Check root settings/kesher
+    const rootKesherDoc = await adminDb.collection("settings").doc("kesher").get();
+    if (rootKesherDoc.exists) {
+      const rData = rootKesherDoc.data() || {};
+      const uName = rData.userName || rData.kesherUserName;
+      const aKey = rData.apiKey || rData.kesherApiKey;
+      if (uName && aKey) {
+        return {
+          userName: uName,
+          apiKey: aKey,
+          paymentPageId: rData.paymentPageId || rData.kesherPaymentPageId || "",
+          ezCountToken: rData.ezCountToken || rData.kesherEzCountToken || "",
+          isActive: true,
+        };
+      }
+    }
+
+    // 5. Check all SUPERADMIN / ADMIN users in Firestore
+    try {
+      const superAdmins = await adminDb.collection("users").where("role", "in", ["SUPERADMIN", "ADMIN"]).limit(5).get();
+      for (const doc of superAdmins.docs) {
+        const data = doc.data();
+        if (data.kesherSettings?.userName && data.kesherSettings?.apiKey) {
+          return {
+            userName: data.kesherSettings.userName,
+            apiKey: data.kesherSettings.apiKey,
+            paymentPageId: data.kesherSettings.paymentPageId || "",
+            ezCountToken: data.kesherSettings.ezCountToken || "",
+            isActive: true,
+          };
+        }
+        const adminSub = await adminDb.collection("users").doc(doc.id).collection("settings").doc("kesher").get();
+        if (adminSub.exists) {
+          const subData = adminSub.data();
+          if (subData?.userName && subData?.apiKey) {
+            return {
+              userName: subData.userName,
+              apiKey: subData.apiKey,
+              paymentPageId: subData.paymentPageId || "",
+              ezCountToken: subData.ezCountToken || "",
+              isActive: true,
+            };
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 6. Check legacy doc("1")
+    try {
+      const legacyAdmin = await adminDb.collection("users").doc("1").collection("settings").doc("kesher").get();
+      if (legacyAdmin.exists) {
+        const lData = legacyAdmin.data();
+        if (lData?.userName && lData?.apiKey) {
+          return {
+            userName: lData.userName,
+            apiKey: lData.apiKey,
+            paymentPageId: lData.paymentPageId || "",
+            ezCountToken: lData.ezCountToken || "",
+            isActive: true,
+          };
+        }
+      }
+    } catch (e) {}
+
+    // 7. Fallback: Environment Variables
+    if (process.env.KESHER_USER_NAME && process.env.KESHER_API_KEY) {
+      return {
+        userName: process.env.KESHER_USER_NAME,
+        apiKey: process.env.KESHER_API_KEY,
+        paymentPageId: process.env.KESHER_PAYMENT_PAGE_ID || "",
+        ezCountToken: process.env.KESHER_EZCOUNT_TOKEN || "",
+        isActive: true,
+      };
+    }
+  } catch (err) {
+    console.error("Error in getEffectiveKesherSettings:", err);
+  }
+
+  return {
+    userName: "",
+    apiKey: "",
+    paymentPageId: "",
+    ezCountToken: "",
+    isActive: false,
+  };
+}
+
+export async function getKesherSettings(customUserId?: string) {
   try {
     const { auth } = await import("@/lib/auth");
     const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error("Unauthorized");
-
-    // First check user doc overrides
-    const userDoc = await adminDb.collection("users").doc(userId).get();
-    const userData = userDoc.data();
-    
-    if (userData?.useAdminKesher) {
-      const globalDoc = await adminDb.collection("configs").doc("global").get();
-      const globalConfig = globalDoc.data() || {};
-      return { 
-        userName: globalConfig.kesherUserName || "", 
-        apiKey: globalConfig.kesherApiKey || "",
-        isActive: !!(globalConfig.kesherUserName && globalConfig.kesherApiKey)
-      };
-    }
-    
-    if (userData?.kesherSettings?.userName || userData?.kesherSettings?.apiKey) {
-      return { 
-        ...userData.kesherSettings,
-        isActive: !!(userData.kesherSettings.userName && userData.kesherSettings.apiKey)
-      };
-    }
-
-    const { getUserDb } = await import("@/lib/firebase-admin");
-    const docRef = getUserDb(userId).collection("settings").doc("kesher");
-    const docSnap = await docRef.get();
-    
-    if (docSnap.exists) {
-      return docSnap.data();
-    }
+    const userId = customUserId || session?.user?.id;
+    return await getEffectiveKesherSettings(userId);
   } catch (err) {
     console.error("Error getting Kesher settings:", err);
+    return await getEffectiveKesherSettings();
   }
-  return null;
 }
 
 export async function saveKesherSettings(settings: any) {

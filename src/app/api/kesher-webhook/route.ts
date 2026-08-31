@@ -71,8 +71,9 @@ export async function GET(request: Request) {
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
-    // Handle SaaS subscription upgrade if AddData is present
-    if (addData && addData.startsWith("SAAS_")) {
+    // Handle SaaS subscription upgrade ONLY if transaction was successful
+    const isSuccess = status === "000" || status === "Success" || status === "0";
+    if (isSuccess && addData && addData.startsWith("SAAS_")) {
       try {
         const parts = addData.split("_");
         const userId = parts[1];

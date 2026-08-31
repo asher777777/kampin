@@ -3,7 +3,7 @@ import { adminDb, getUserDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-export const KNOWN_COLLECTIONS = [
+const KNOWN_COLLECTIONS = [
   // 1. AI Agents, Workers & Conversations
   {
     id: 'employees',

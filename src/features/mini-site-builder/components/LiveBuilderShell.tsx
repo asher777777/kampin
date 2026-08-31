@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  Coins, 
   Sparkles, 
   Send, 
   Loader2, 
@@ -20,7 +19,6 @@ import {
   Link as LinkIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CoinBalanceBadge } from "./CoinBalanceBadge";
 import { LiveBuilderPreview } from "./LiveBuilderPreview";
 import { 
   BuilderStateData, 
@@ -46,8 +44,8 @@ interface Message {
 }
 
 interface LiveBuilderShellProps {
-  initialCoins: number;
-  userName: string;
+  initialCoins?: number;
+  userName?: string;
   initialState?: BuilderStateData;
 }
 
@@ -83,9 +81,7 @@ const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () =>
   );
 };
 
-export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveBuilderShellProps) {
-  const [coins, setCoins] = useState(initialCoins);
-  const [highlightCoins, setHighlightCoins] = useState(false);
+export function LiveBuilderShell({ userName, initialState }: LiveBuilderShellProps) {
   const [currentStep, setCurrentStep] = useState(initialState?.currentStep || 1);
   const [pitchSubStep, setPitchSubStep] = useState<"problem" | "differentiator" | "company_name" | "select_slug">((initialState?.pitchSubStep as any) || "problem");
   const [slugOptions, setSlugOptions] = useState<string[]>([]);
@@ -239,8 +235,6 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
       }
 
       if (res.success && res.isConvincing) {
-        setCoins(res.coins);
-        setHighlightCoins(true);
         setState((prev) => ({ ...prev, differentiator: diff, currentStep: 2 }));
         
         addAgentMessageWithTyping(`${res.agentResponse} כעת, מה שם החברה או העסק שלך?`, true, 500);
@@ -314,8 +308,6 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
       );
 
       if (aiRes.success) {
-        setCoins(aiRes.newBalance);
-
         setState((prev) => ({ 
           ...prev, 
           slogan: sloganInput, 
@@ -368,13 +360,12 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
     try {
       const res = await createServicePageWithAI(newServiceTitle, state.pitchProblem || "");
       if (res.success && res.servicePage) {
-        setCoins(res.newBalance);
         const updated = [...(state.servicePages || []), res.servicePage];
         setState((prev) => ({ ...prev, servicePages: updated }));
         saveBuilderProgress({ servicePages: updated });
 
         addUserMessage(`עמוד שירות: ${newServiceTitle}`);
-        addAgentMessageWithTyping(`עמוד השירות "${newServiceTitle}" הוקם (נוכו 10 מטבעות).`, true, 400);
+        addAgentMessageWithTyping(`עמוד השירות "${newServiceTitle}" הוקם בהצלחה.`, true, 400);
         setNewServiceTitle("");
       }
     } finally {
@@ -391,7 +382,7 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
       if (isRevision) {
         addUserMessage(`אבקש לתקן את הסמל: ${logoRevisionFeedback}`);
       } else {
-        addUserMessage("כן, אשמח מאוד לייצר סמל ב-10 מטבעות.");
+        addUserMessage("כן, אשמח מאוד לייצר סמל לעסק.");
       }
 
       const res = await generateSingleLogoWithFeedback(
@@ -408,7 +399,6 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
       );
 
       if (res.success && res.logoUrl) {
-        setCoins(res.newBalance);
         setState((prev) => ({ ...prev, logoUrl: res.logoUrl }));
         setLogoPrompt(res.prompt || "");
         setLogoExplanation(res.explanation || "");
@@ -515,8 +505,6 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
         </div>
 
         <div className="flex items-center gap-3">
-          <CoinBalanceBadge coins={coins} highlight={highlightCoins} />
-
           {/* Eye Modal Preview Button */}
           <button
             onClick={() => setIsPreviewOpen(true)}

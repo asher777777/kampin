@@ -5,101 +5,48 @@ import { auth } from "@/lib/auth";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { amount, clientName, phone, email, details, transactionId, installments, userId: requestUserId } = body;
+    const { amount, clientName, phone, email, details, transactionId, installments, campaignId, userId: requestUserId } = body;
 
     const session = await auth();
     const userId = requestUserId || session?.user?.id;
 
-    let settings: any = null;
+    const { getEffectiveKesherSettings } = await import("@/features/kesher/actions");
+    const settings = await getEffectiveKesherSettings(userId, campaignId);
 
-    if (userId) {
-      // Get user settings
-      const userDoc = await adminDb.collection("users").doc(userId).get();
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        if (userData?.useAdminKesher === false) {
-          const userKesherDoc = await adminDb.collection("users").doc(userId).collection("settings").doc("kesher").get();
-          if (userKesherDoc.exists) {
-            settings = userKesherDoc.data();
-          }
-        }
-      }
+    if (!settings || !settings.userName || !settings.apiKey) {
+      return NextResponse.json({ success: false, error: "כרגע לא ניתן להשתמש בשירות התשלומים (פרטי חיבור לקשר חסרים). אנא פנה להנהלה." }, { status: 400 });
     }
 
-    // Default for guest users and site-wide clearing: load from global settings
-    if (!settings || (!settings.userName && !settings.apiKey)) {
-      // Check configs/global
-      const globalDoc = await adminDb.collection("configs").doc("global").get();
-      if (globalDoc.exists) {
-        const globalConfig = globalDoc.data() || {};
-        settings = {
-          userName: globalConfig.kesherUserName || globalConfig.userName || globalConfig.kesherSettings?.userName || "",
-          apiKey: globalConfig.kesherApiKey || globalConfig.apiKey || globalConfig.kesherSettings?.apiKey || "",
-          paymentPageId: globalConfig.kesherPaymentPageId || globalConfig.paymentPageId || globalConfig.kesherSettings?.paymentPageId || "",
-          ezCountToken: globalConfig.kesherEzCountToken || globalConfig.ezCountToken || globalConfig.kesherSettings?.ezCountToken || "",
-        };
-      }
+    const paymentPageId = (settings.paymentPageId || process.env.KESHER_PAYMENT_PAGE_ID || "").trim();
 
-      // Check root settings/kesher
-      if (!settings?.userName || !settings?.apiKey) {
-        const rootKesherDoc = await adminDb.collection("settings").doc("kesher").get();
-        if (rootKesherDoc.exists) {
-          const rData = rootKesherDoc.data() || {};
-          settings = {
-            userName: rData.userName || rData.kesherUserName || "",
-            apiKey: rData.apiKey || rData.kesherApiKey || "",
-            paymentPageId: rData.paymentPageId || rData.kesherPaymentPageId || "",
-            ezCountToken: rData.ezCountToken || rData.kesherEzCountToken || "",
-          };
-        }
-      }
-
-      // Check admin user settings
-      if (!settings?.userName || !settings?.apiKey) {
-        const adminKesher = await adminDb.collection("users").doc("1").collection("settings").doc("kesher").get();
-        if (adminKesher.exists) {
-          const aData = adminKesher.data() || {};
-          settings = {
-            userName: aData.userName || aData.kesherUserName || "",
-            apiKey: aData.apiKey || aData.kesherApiKey || "",
-            paymentPageId: aData.paymentPageId || aData.kesherPaymentPageId || "",
-            ezCountToken: aData.ezCountToken || aData.kesherEzCountToken || "",
-          };
-        }
-      }
-
-      // Fallback: Environment Variables
-      if (!settings?.userName || !settings?.apiKey) {
-        if (process.env.KESHER_USER_NAME && process.env.KESHER_API_KEY) {
-          settings = {
-            userName: process.env.KESHER_USER_NAME,
-            apiKey: process.env.KESHER_API_KEY,
-            paymentPageId: process.env.KESHER_PAYMENT_PAGE_ID || "",
-            ezCountToken: process.env.KESHER_EZCOUNT_TOKEN || "",
-          };
-        }
-      }
+    if (!paymentPageId || paymentPageId === "000") {
+      return NextResponse.json({ 
+        success: false, 
+        error: "לתשלום באמצעות Bit / Google Pay יש להגדיר 'מספר דף תשלום' (Payment Page ID) בהגדרות קשר בלוח הבקרה. ניתן לשלם כעת ישירות באמצעות כרטיס אשראי." 
+      }, { status: 400 });
     }
 
-    if (!settings || !settings.userName || !settings.apiKey || !settings.paymentPageId) {
-      return NextResponse.json({ success: false, error: "כרגע לא ניתן להשתמש בשירות התשלומים. אנא פנה להנהלה." }, { status: 400 });
-    }
-
+    const rawName = (clientName || "").trim();
+    const nameParts = rawName.split(" ").filter(Boolean);
+    const firstName = nameParts[0] || "תורם";
+    const lastName = nameParts.slice(1).join(" ") || "קמפיין";
+    const validPhone = (phone && phone.trim().length >= 7) ? phone.trim() : "0500000000";
+    const validEmail = (email && email.includes("@")) ? email.trim() : "donor@hakel.club";
 
     const payload = {
       Json: {
         userName: settings.userName,
-        password: settings.apiKey, // The plugin uses password
+        password: settings.apiKey,
         func: "GetLinkToken",
         format: "json",
         request: {
-          PaymentPageId: settings.paymentPageId, // Pass as string to keep "000"
+          PaymentPageId: paymentPageId,
           Currency: 1, // ILS
           Total: Number(amount),
-          FirstName: clientName ? clientName.split(" ")[0] : "",
-          LastName: clientName ? clientName.split(" ").slice(1).join(" ") : "",
-          Mail: email || "",
-          Tel: phone || "",
+          FirstName: firstName,
+          LastName: lastName,
+          Mail: validEmail,
+          Tel: validPhone,
           CreditType: "1", // Regular payment
           Date: new Date().toISOString().split("T")[0],
           Comment: details || "תשלום / תרומה",
@@ -168,7 +115,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       token: token,
-      iframeUrl: `https://ultra.kesherhk.info/external/paymentPage/${settings.paymentPageId}?${params.toString()}`
+      iframeUrl: `https://ultra.kesherhk.info/external/paymentPage/${paymentPageId}?${params.toString()}`
     });
 
   } catch (error: any) {

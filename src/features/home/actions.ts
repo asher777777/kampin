@@ -619,6 +619,7 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
     effect: "fade",
     objectFit: "cover",
     titleEffect: "cinematic",
+    textPosition: "bottom",
     desktopHeight: "tall",
     anchorId: "videoGallery",
     backgroundColor: "transparent",
@@ -730,6 +731,10 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
 
 export async function getHomePageConfig(): Promise<HomePageConfig> {
   return getPageConfigWithDefault("pages", "home", DEFAULT_HOME_CONFIG);
+}
+
+export async function getDefaultHomeConfig(): Promise<HomePageConfig> {
+  return DEFAULT_HOME_CONFIG;
 }
 
 export async function getServicesLandingConfig(): Promise<HomePageConfig> {

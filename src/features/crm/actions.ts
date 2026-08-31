@@ -53,31 +53,18 @@ export async function getContacts(params: {
     const page = params.page || 1;
     const perPage = params.per_page !== undefined ? params.per_page : 10;
 
-    // Fetch all contacts for this owner and status from Firestore
+    // Fetch contacts for this owner and status from Firestore
     const contactsRef = adminDb.collection("contacts");
     const snapshot = await contactsRef
       .where("ownerId", "==", ownerId)
       .where("status", "==", status)
       .get();
 
-    // Fetch all system users to match with contacts
-    const usersRef = adminDb.collection("users");
-    const usersSnap = await usersRef.get();
-    const userEmails = new Map<string, string>();
-    const userPhones = new Map<string, string>();
-    usersSnap.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.email) userEmails.set(data.email, doc.id);
-      if (data.username) userPhones.set(data.username, doc.id);
-    });
-
     let contacts: Contact[] = snapshot.docs.map((doc: any) => {
       const data = doc.data();
-      const systemUserId = (data.email && userEmails.get(data.email)) || (data.conta_phone && userPhones.get(data.conta_phone));
       return {
         id: doc.id,
-        isUser: !!systemUserId,
-        systemUserId: systemUserId || undefined,
+        isUser: !!data.systemUserId,
         ...data,
       } as Contact;
     });
@@ -217,9 +204,20 @@ export async function getContactById(id: string) {
       throw new Error("אין הרשאה לצפות באיש קשר זה");
     }
 
+    // Pull events from subcollection
+    let allEvents = data?.events || [];
+    try {
+      const eventsSnap = await docRef.collection("events").orderBy("time", "desc").limit(50).get();
+      if (!eventsSnap.empty) {
+        const subEvents = eventsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+        allEvents = [...subEvents, ...allEvents];
+      }
+    } catch (e) {}
+
     const contact = {
       id: docSnap.id,
       ...data,
+      events: allEvents,
     };
     return JSON.parse(JSON.stringify(contact)) as Contact;
   } catch (error) {
@@ -451,13 +449,13 @@ export async function getCRMStats() {
     const contactsRef = adminDb.collection("contacts");
 
     const [activeSnap, trashedSnap] = await Promise.all([
-      contactsRef.where("ownerId", "==", ownerId).where("status", "==", "active").get(),
-      contactsRef.where("ownerId", "==", ownerId).where("status", "==", "trashed").get(),
+      contactsRef.where("ownerId", "==", ownerId).where("status", "==", "active").count().get(),
+      contactsRef.where("ownerId", "==", ownerId).where("status", "==", "trashed").count().get(),
     ]);
 
     return {
-      active: activeSnap.size,
-      trashed: trashedSnap.size,
+      active: activeSnap.data().count,
+      trashed: trashedSnap.data().count,
     };
   } catch (error) {
     console.error("Error in getCRMStats:", error);
@@ -810,31 +808,28 @@ export async function submitCRMForm(params: {
     };
 
     if (contactId) {
-      const updatedEvents = [...(existingData?.events || []), newEvent];
-      
-      // Save previous version history
-      const prevHistory = existingData?.history || [];
-      // Clean up the history from the data to avoid exponential growth
-      const previousDataWithoutHistory = { ...existingData };
-      delete previousDataWithoutHistory.history;
-      
+      const docRef = contactsRef.doc(contactId);
       const newHistoryEntry = {
         updatedAt: new Date().toISOString(),
         updatedBy: `Form: ${formTitle}`,
-        previousData: previousDataWithoutHistory
+        submission: formData,
+        amountPaid: amountPaid || 0,
+        createdAt: new Date().toISOString()
       };
 
-      await contactsRef.doc(contactId).update({
+      await docRef.update({
         ...dbData,
-        events: updatedEvents,
-        history: [...prevHistory, newHistoryEntry]
+        updatedAt: new Date().toISOString(),
       });
+
+      await docRef.collection("events").add(newEvent);
+      await docRef.collection("history").add(newHistoryEntry);
     } else {
-      await contactsRef.add({
+      const docRef = await contactsRef.add({
         ...dbData,
         createdAt: new Date().toISOString(),
-        events: [newEvent]
       });
+      await docRef.collection("events").add(newEvent);
     }
 
     let whatsappSent = false;
@@ -939,28 +934,32 @@ export async function submitCRMForm(params: {
 export async function sendEmailAction(contactId: string, email: string, subject: string, body: string) {
   try {
     const ownerId = await getUserId();
-    const docRef = getUserDb(ownerId).collection("contacts").doc(contactId);
-    const docSnap = await docRef.get();
+    let docRef = adminDb.collection("contacts").doc(contactId);
+    let docSnap = await docRef.get();
+    
+    if (!docSnap.exists) {
+      docRef = getUserDb(ownerId).collection("contacts").doc(contactId) as any;
+      docSnap = await docRef.get();
+    }
     
     if (!docSnap.exists) {
       throw new Error("איש הקשר לא נמצא");
     }
     
-    if (docSnap.data()?.ownerId !== ownerId) {
+    const contactData = docSnap.data();
+    if (contactData?.ownerId && contactData.ownerId !== ownerId) {
       throw new Error("אין הרשאה לערוך איש קשר זה");
     }
-    
-    const contactData = docSnap.data();
-    const currentEvents = contactData?.events || [];
     
     const newEvent = {
       time: new Date().toISOString(),
       title: "מייל יוצא מהמערכת",
       text: `אל: ${email}\nנושא: ${subject}\nתוכן:\n${body}`,
+      createdAt: new Date().toISOString()
     };
     
+    await docRef.collection("events").add(newEvent);
     await docRef.update({
-      events: [newEvent, ...currentEvents],
       updatedAt: new Date().toISOString(),
     });
     
@@ -975,28 +974,32 @@ export async function sendEmailAction(contactId: string, email: string, subject:
 export async function addContactReminder(contactId: string, title: string, text: string, time: string) {
   try {
     const ownerId = await getUserId();
-    const docRef = getUserDb(ownerId).collection("contacts").doc(contactId);
-    const docSnap = await docRef.get();
+    let docRef = adminDb.collection("contacts").doc(contactId);
+    let docSnap = await docRef.get();
+    
+    if (!docSnap.exists) {
+      docRef = getUserDb(ownerId).collection("contacts").doc(contactId) as any;
+      docSnap = await docRef.get();
+    }
     
     if (!docSnap.exists) {
       throw new Error("איש הקשר לא נמצא");
     }
     
-    if (docSnap.data()?.ownerId !== ownerId) {
+    const contactData = docSnap.data();
+    if (contactData?.ownerId && contactData.ownerId !== ownerId) {
       throw new Error("אין הרשאה לערוך איש קשר זה");
     }
-    
-    const contactData = docSnap.data();
-    const currentEvents = contactData?.events || [];
     
     const newEvent = {
       time: time || new Date().toISOString(),
       title: title || "תזכורת",
       text: text || "",
+      createdAt: new Date().toISOString()
     };
     
+    await docRef.collection("events").add(newEvent);
     await docRef.update({
-      events: [newEvent, ...currentEvents],
       updatedAt: new Date().toISOString(),
     });
     
@@ -1016,21 +1019,28 @@ export async function sendWhatsAppAction(contactId: string, phone: string, messa
     
     // Save to contact timeline
     const ownerId = await getUserId();
-    const docRef = getUserDb(ownerId).collection("contacts").doc(contactId);
-    const docSnap = await docRef.get();
+    let docRef = adminDb.collection("contacts").doc(contactId);
+    let docSnap = await docRef.get();
     
-    if (docSnap.exists && docSnap.data()?.ownerId === ownerId) {
+    if (!docSnap.exists) {
+      docRef = getUserDb(ownerId).collection("contacts").doc(contactId) as any;
+      docSnap = await docRef.get();
+    }
+    
+    if (docSnap.exists) {
       const contactData = docSnap.data();
-      const currentEvents = contactData?.events || [];
-      const newEvent = {
-        time: new Date().toISOString(),
-        title: "הודעה יוצאת מוואטסאפ",
-        text: message,
-      };
-      await docRef.update({
-        events: [newEvent, ...currentEvents],
-        updatedAt: new Date().toISOString(),
-      });
+      if (!contactData?.ownerId || contactData.ownerId === ownerId) {
+        const newEvent = {
+          time: new Date().toISOString(),
+          title: "הודעה יוצאת מוואטסאפ",
+          text: message,
+          createdAt: new Date().toISOString()
+        };
+        await docRef.collection("events").add(newEvent);
+        await docRef.update({
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
     
     return { success: true };

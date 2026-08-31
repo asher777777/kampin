@@ -36,6 +36,7 @@ export interface VideoGalleryConfig {
 interface VideoGalleryEditorProps {
   config: VideoGalleryConfig;
   onChange: (config: VideoGalleryConfig) => void;
+  initialTab?: "media" | "settings";
 }
 
 interface InternalImageItem {
@@ -45,8 +46,8 @@ interface InternalImageItem {
   position?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
 }
 
-export const VideoGalleryEditor = ({ config, onChange }: VideoGalleryEditorProps) => {
-  const [activeTab, setActiveTab] = useState<"media" | "settings">("media");
+export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: VideoGalleryEditorProps) => {
+  const [activeTab, setActiveTab] = useState<"media" | "settings">(initialTab);
 
   const updateField = (key: keyof VideoGalleryConfig, value: any) => {
     onChange({ ...config, [key]: value });

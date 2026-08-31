@@ -49,9 +49,12 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   const rawId = (config?.campaignId && config.campaignId !== "default-campaign") ? config.campaignId : (campaignId || "home");
   const targetCampaignId = rawId === "default-campaign" ? "home" : rawId;
 
-  // 1. Initial direct fetch via Server Action
+  const initialLoadedCampaignRef = React.useRef<string | null>(null);
+
+  // 1. Initial direct fetch via Server Action (Once per campaign)
   useEffect(() => {
-    if (!targetCampaignId) return;
+    if (!targetCampaignId || initialLoadedCampaignRef.current === targetCampaignId) return;
+    initialLoadedCampaignRef.current = targetCampaignId;
     getCampaignDonationsAction(targetCampaignId).then((res) => {
       if (res.donations && res.donations.length > 0) {
         setDonations(res.donations);

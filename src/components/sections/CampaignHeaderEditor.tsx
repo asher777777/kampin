@@ -69,7 +69,7 @@ export const CampaignHeaderEditor: React.FC<CampaignHeaderEditorProps> = ({
             }, {})
           ).map(([category, items]) => (
             <optgroup key={category} label={category} className="bg-slate-800 text-amber-400 font-bold">
-              {items.map((c) => (
+              {(items as any[]).map((c: any) => (
                 <option key={c.id} value={c.id} className="bg-slate-900 text-white font-normal">
                   {c.title} {c.id !== "home" ? `(${c.id})` : ""}
                 </option>

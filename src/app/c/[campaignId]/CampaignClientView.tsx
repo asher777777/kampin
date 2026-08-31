@@ -41,6 +41,7 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
   const [selectedTierIdForDrawer, setSelectedTierIdForDrawer] = useState<string | undefined>();
   const [drawerInitialMode, setDrawerInitialMode] = useState<"one_time" | "recurring" | undefined>();
+  const [drawerInitialPaymentMethod, setDrawerInitialPaymentMethod] = useState<"credit_card" | "bit" | "google_pay" | undefined>();
 
   const [liveCampaign, setLiveCampaign] = useState<Campaign | null>(initialCampaign || null);
   const [liveAmbassador, setLiveAmbassador] = useState<Ambassador | null>(initialAmbassador || null);
