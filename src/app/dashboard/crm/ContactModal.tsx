@@ -10,7 +10,7 @@ import { getAllCampaigns } from "@/features/campaigns/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle } from "lucide-react";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle, FileText } from "lucide-react";
 import { InteractionsList } from "@/components/ui/InteractionsList";
 
 const getInitials = (name: string, fm?: string) => {
@@ -1523,6 +1523,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                               <th className="p-3">קמפיין</th>
                               <th className="p-3">תאריך</th>
                               <th className="p-3">סטטוס</th>
+                              <th className="p-3">קבלה / חשבונית</th>
                               <th className="p-3 text-left">פעולות</th>
                             </tr>
                           </thead>
@@ -1543,13 +1544,30 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                                     {item.paymentStatus === "completed" ? "הושלם" : item.paymentStatus === "pending" ? "ממתין לתשלום" : "נכשל"}
                                   </span>
                                 </td>
+                                <td className="p-3">
+                                  {item.receiptUrl || item.receiptLink ? (
+                                    <a
+                                      href={item.receiptUrl || item.receiptLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold transition-colors cursor-pointer"
+                                      title="פתח קבלה / חשבונית בטאב חדש"
+                                    >
+                                      <FileText className="w-3 h-3 text-amber-400" />
+                                      <span>קבלה</span>
+                                      <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px]">-</span>
+                                  )}
+                                </td>
                                 <td className="p-3 text-left">
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setCampaignDonationsHistory(campaignDonationsHistory.filter((_, i) => i !== idx));
                                     }}
-                                    className="text-slate-500 hover:text-rose-400 p-1"
+                                    className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer"
                                     title="מחק רשומה"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1608,33 +1626,106 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
 
               {/* Order List */}
               <div className="space-y-3">
-                <h5 className="text-xs font-bold text-slate-700">פירוט עסקאות אחרונות</h5>
-                {(contact?.order_count || 0) === 0 ? (
-                  <div className="p-6 text-center border rounded-2xl text-slate-400 text-xs bg-slate-50/50">
+                <h5 className="text-xs font-bold text-slate-400">פירוט עסקאות ותשלומים</h5>
+                {(!contact?.payments || contact.payments.length === 0) && (!campaignDonationsHistory || campaignDonationsHistory.length === 0) ? (
+                  <div className="p-6 text-center border border-white/5 rounded-2xl text-slate-500 text-xs bg-[#141414]">
                     לא נמצאה היסטוריית תשלומים עבור איש קשר זה.
                   </div>
                 ) : (
-                  <div className="border rounded-2xl overflow-hidden bg-white shadow-sm max-h-[200px] overflow-y-auto">
+                  <div className="border border-white/5 rounded-2xl overflow-hidden bg-[#141414] shadow-sm max-h-[300px] overflow-y-auto">
                     <table className="w-full text-right text-xs">
-                      <thead className="bg-slate-50 border-b font-bold text-amber-500">
+                      <thead className="bg-[#1c1c1c] border-b border-white/5 font-bold text-amber-500 sticky top-0">
                         <tr>
                           <th className="p-3">סכום</th>
+                          <th className="p-3">אמצעי תשלום / קמפיין</th>
                           <th className="p-3">תאריך</th>
                           <th className="p-3">סטטוס</th>
+                          <th className="p-3">מספר עסקה</th>
+                          <th className="p-3">קבלה / חשבונית</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y text-slate-700">
-                        {/* Simulating orders based on summary fields */}
-                        {contact?.last_order_date && (
-                          <tr className="hover:bg-slate-50 transition-colors">
-                            <td className="p-3 font-bold text-slate-900">₪{(contact.total_spent || 0).toFixed(2)}</td>
-                            <td className="p-3">{new Date(contact.last_order_date).toLocaleDateString("he-IL")}</td>
-                            <td className="p-3">
-                              <span className="px-2 py-0.5 bg-green-50 text-green-600 border border-green-100 rounded-full font-bold">
-                                הושלם
-                              </span>
-                            </td>
-                          </tr>
+                      <tbody className="divide-y divide-white/5 text-slate-300">
+                        {/* Display payments if exist */}
+                        {contact?.payments && contact.payments.length > 0 ? (
+                          contact.payments.map((p: any, idx: number) => {
+                            const receipt = p.receiptLink || p.receiptUrl;
+                            return (
+                              <tr key={`p_${idx}`} className="hover:bg-[#181818] transition-colors">
+                                <td className="p-3 font-bold text-white">₪{Number(p.amount || 0).toLocaleString()}</td>
+                                <td className="p-3 text-slate-400">{p.method || "אשראי / קשר"}</td>
+                                <td className="p-3">{p.date ? new Date(p.date).toLocaleDateString("he-IL") : "-"}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    p.status === "success" || p.status === "completed"
+                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : p.status === "pending"
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  }`}>
+                                    {p.status === "success" || p.status === "completed" ? "הושלם" : p.status === "pending" ? "ממתין לתשלום" : "נכשל"}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono text-[10px] text-slate-400">{p.transactionId || "-"}</td>
+                                <td className="p-3">
+                                  {receipt ? (
+                                    <a
+                                      href={receipt}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold transition-colors cursor-pointer"
+                                      title="צפה בקבלה באיזיקאונט"
+                                    >
+                                      <FileText className="w-3 h-3 text-amber-400" />
+                                      <span>קבלה {p.docNumber ? `#${p.docNumber}` : ""}</span>
+                                      <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px]">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          campaignDonationsHistory.map((d: any, idx: number) => {
+                            const receipt = d.receiptUrl || d.receiptLink;
+                            return (
+                              <tr key={`d_${idx}`} className="hover:bg-[#181818] transition-colors">
+                                <td className="p-3 font-bold text-white">₪{Number(d.amount || 0).toLocaleString()}</td>
+                                <td className="p-3 text-slate-400">{d.campaignTitle || d.paymentMethod || "קמפיין"}</td>
+                                <td className="p-3">{d.date ? new Date(d.date).toLocaleDateString("he-IL") : "-"}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    d.paymentStatus === "completed"
+                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : d.paymentStatus === "pending"
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  }`}>
+                                    {d.paymentStatus === "completed" ? "הושלם" : d.paymentStatus === "pending" ? "ממתין לתשלום" : "נכשל"}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono text-[10px] text-slate-400">{d.transactionId || "-"}</td>
+                                <td className="p-3">
+                                  {receipt ? (
+                                    <a
+                                      href={receipt}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold transition-colors cursor-pointer"
+                                      title="צפה בקבלה"
+                                    >
+                                      <FileText className="w-3 h-3 text-amber-400" />
+                                      <span>קבלה</span>
+                                      <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px]">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>

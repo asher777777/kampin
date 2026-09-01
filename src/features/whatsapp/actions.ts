@@ -14,44 +14,115 @@ async function getUserId(): Promise<string> {
   throw new Error("Unauthorized");
 }
 
-// 1. Get WhatsApp Configuration Settings
-export async function getWhatsAppSettings(): Promise<WhatsAppSettings> {
+// 1. Get WhatsApp Configuration Settings with Multi-tier Cascade Fallback and Detailed Logging
+export async function getWhatsAppSettings(specificUserId?: string): Promise<WhatsAppSettings> {
+  console.log("===> [WhatsApp Server] getWhatsAppSettings called for specificUserId:", specificUserId || "current session");
   try {
-    const userId = await getUserId();
-    
-    // Check user overrides
-    const userDoc = await adminDb.collection("users").doc(userId).get();
-    const userData = userDoc.data();
-    
-    if (userData?.useAdminGreenApi) {
-      const globalDoc = await adminDb.collection("configs").doc("global").get();
-      const globalConfig = globalDoc.data() || {};
-      return {
-        idInstance: globalConfig.greenApiInstanceId || "",
-        apiToken: globalConfig.greenApiToken || "",
-      };
-    }
-    
-    if (userData?.greenApiSettings?.instanceId || userData?.greenApiSettings?.apiTokenInstance) {
-      return {
-        idInstance: userData.greenApiSettings.instanceId || "",
-        apiToken: userData.greenApiSettings.apiTokenInstance || "",
-      };
+    let userId = specificUserId;
+    if (!userId) {
+      try {
+        userId = await getUserId();
+        console.log("===> [WhatsApp Server] Current session userId:", userId);
+      } catch (e) {
+        console.log("===> [WhatsApp Server] No active session found in getUserId:", (e as Error).message);
+      }
     }
 
-    const docRef = adminDb.collection("whatsapp_settings").doc(userId);
-    const docSnap = await docRef.get();
-    
-    if (docSnap.exists) {
-      const data = docSnap.data();
-      return {
-        idInstance: data?.idInstance || "",
-        apiToken: data?.apiToken || "",
-      };
+    // Helper to extract keys from any object
+    const extractKeys = (obj: any, sourceName: string): WhatsAppSettings | null => {
+      if (!obj || typeof obj !== "object") return null;
+      const idInstance = obj.instanceId || obj.idInstance || obj.greenApiInstanceId || obj.greenApiSettings?.instanceId || obj.greenApiSettings?.idInstance;
+      const apiToken = obj.apiTokenInstance || obj.apiToken || obj.greenApiToken || obj.greenApiSettings?.apiTokenInstance || obj.greenApiSettings?.apiToken;
+      if (idInstance && apiToken) {
+        console.log(`===> [WhatsApp Server] Found Green API keys in [${sourceName}]:`, {
+          idInstance: String(idInstance).trim(),
+          apiTokenLength: String(apiToken).trim().length,
+        });
+        return {
+          idInstance: String(idInstance).trim(),
+          apiToken: String(apiToken).trim(),
+        };
+      }
+      return null;
+    };
+
+    if (userId) {
+      // 1. Check user document
+      const userDoc = await adminDb.collection("users").doc(userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        console.log("===> [WhatsApp Server] Found userData for current user:", {
+          hasGreenApiSettings: !!userData?.greenApiSettings,
+          useAdminGreenApi: userData?.useAdminGreenApi,
+          role: userData?.role,
+        });
+
+        if (!userData?.useAdminGreenApi) {
+          const keys = extractKeys(userData, `users/${userId}`);
+          if (keys) return keys;
+        }
+      }
+
+      // 2. Check whatsapp_settings/{userId}
+      const docRef = adminDb.collection("whatsapp_settings").doc(userId);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const keys = extractKeys(docSnap.data(), `whatsapp_settings/${userId}`);
+        if (keys) return keys;
+      }
     }
+
+    // 3. Fallback to global config (configs/global)
+    const globalDoc = await adminDb.collection("configs").doc("global").get();
+    if (globalDoc.exists) {
+      const keys = extractKeys(globalDoc.data(), "configs/global");
+      if (keys) return keys;
+    }
+
+    // 4. Fallback: Search in configs/whatsapp or settings/whatsapp
+    for (const [col, docId] of [["configs", "whatsapp"], ["settings", "whatsapp"], ["settings", "greenapi"]]) {
+      try {
+        const d = await adminDb.collection(col).doc(docId).get();
+        if (d.exists) {
+          const keys = extractKeys(d.data(), `${col}/${docId}`);
+          if (keys) return keys;
+        }
+      } catch (e) {}
+    }
+
+    // 5. Fallback: Search all users with admin roles or any user having greenApi keys
+    const adminRoles = ["SUPERADMIN", "ADMIN", "superadmin", "admin"];
+    const adminUsersSnapshot = await adminDb.collection("users")
+      .where("role", "in", adminRoles)
+      .get();
+
+    console.log(`===> [WhatsApp Server] Found ${adminUsersSnapshot.docs.length} admin user docs in search`);
+
+    for (const adminDoc of adminUsersSnapshot.docs) {
+      const aData = adminDoc.data();
+      const keys = extractKeys(aData, `admin user doc [${adminDoc.id} (${aData.email || aData.username})]`);
+      if (keys) return keys;
+
+      // Check admin's whatsapp_settings doc
+      const adminWaDoc = await adminDb.collection("whatsapp_settings").doc(adminDoc.id).get();
+      if (adminWaDoc.exists) {
+        const waKeys = extractKeys(adminWaDoc.data(), `whatsapp_settings/${adminDoc.id}`);
+        if (waKeys) return waKeys;
+      }
+    }
+
+    // 6. Final fallback: Scan all users to see if any user document has greenApiSettings
+    const allUsersSnap = await adminDb.collection("users").limit(50).get();
+    for (const uDoc of allUsersSnap.docs) {
+      const uData = uDoc.data();
+      const keys = extractKeys(uData, `scan user [${uDoc.id}]`);
+      if (keys) return keys;
+    }
+
+    console.warn("===> [WhatsApp Server] WARNING: No Green API keys found in any Firestore collection or user document!");
     return { idInstance: "", apiToken: "" };
   } catch (error) {
-    console.warn("Error fetching WhatsApp settings:", (error as Error).message);
+    console.error("===> [WhatsApp Server] Error in getWhatsAppSettings:", error);
     return { idInstance: "", apiToken: "" };
   }
 }
@@ -78,69 +149,125 @@ function getGreenApiUrl(settings: WhatsAppSettings, action: string): string {
 
 // 3. Get WhatsApp Connection Status
 export async function getWhatsAppConnection(): Promise<WhatsAppConnectionState> {
+  console.log("===> [WhatsApp Server] getWhatsAppConnection triggered");
   try {
     const settings = await getWhatsAppSettings();
     if (!settings.idInstance || !settings.apiToken) {
-      return { status: "notAuthorized", error: "חסרים פרטי חיבור וואטסאפ (ID Instance, API Token) בהגדרות." };
+      console.log("===> [WhatsApp Server] Returning notConfigured: missing idInstance or apiToken");
+      return { 
+        status: "notConfigured", 
+        error: "טרם הוגדרו מזהה מופע (Instance ID) וטוקן (API Token) של Green API במערכת." 
+      };
     }
 
     const stateUrl = getGreenApiUrl(settings, "getStateInstance");
+    console.log("===> [WhatsApp Server] Fetching getStateInstance from Green API:", `https://api.green-api.com/waInstance${settings.idInstance}/getStateInstance/***`);
     const stateRes = await fetch(stateUrl, { next: { revalidate: 0 } });
+    const stateStatus = stateRes.status;
+    const stateBody = await stateRes.text();
+    console.log(`===> [WhatsApp Server] Green API getStateInstance response [${stateStatus}]:`, stateBody);
+
     if (!stateRes.ok) {
-      throw new Error(`שגיאה בשרת: ${stateRes.status}`);
+      throw new Error(`שגיאת תקשורת עם Green API (קוד ${stateStatus}): ${stateBody || "ודא שפרטי החיבור תקינים"}`);
     }
-    const stateData = await stateRes.json();
+
+    let stateData: any = {};
+    try {
+      stateData = JSON.parse(stateBody);
+    } catch (e) {
+      throw new Error(`תשובה לא תקינה מ-Green API: ${stateBody}`);
+    }
+
     const status = stateData.stateInstance;
+    console.log("===> [WhatsApp Server] Green API stateInstance status:", status);
 
     if (status === "authorized") {
       // Get settings to retrieve phone number, avatar, name
-      const settingsUrl = getGreenApiUrl(settings, "getSettings");
-      const settingsRes = await fetch(settingsUrl, { next: { revalidate: 0 } });
-      const settingsData = await settingsRes.json();
-      
+      try {
+        const settingsUrl = getGreenApiUrl(settings, "getSettings");
+        const settingsRes = await fetch(settingsUrl, { next: { revalidate: 0 } });
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          return {
+            status: "authorized",
+            phoneNumber: settingsData.wid ? settingsData.wid.replace("@c.us", "") : "",
+            avatar: settingsData.avatar || "",
+            name: settingsData.contactName || "משתמש וואטסאפ",
+          };
+        }
+      } catch (err) {
+        console.warn("Failed to get WhatsApp user profile settings:", err);
+      }
+
       return {
         status: "authorized",
-        phoneNumber: settingsData.wid ? settingsData.wid.replace("@c.us", "") : "",
-        avatar: settingsData.avatar || "",
-        name: settingsData.contactName || "משתמש וואטסאפ",
+        phoneNumber: "",
+        avatar: "",
+        name: "וואטסאפ מחובר",
       };
     } else if (status === "notAuthorized") {
       return { status: "notAuthorized" };
+    } else if (status === "blocked") {
+      return { status: "error", error: "מופע הוואטסאפ חסום ב-Green API (Blocked)." };
+    } else if (status === "sleepMode") {
+      return { status: "error", error: "מופע הוואטסאפ במצב שינה (Sleep Mode)." };
+    } else if (status === "starting") {
+      return { status: "checking", error: "מופע הוואטסאפ בתהליך אתחול..." };
     } else {
-      return { status: "error", error: `מצב לא ידוע: ${status}` };
+      return { status: "notAuthorized" };
     }
   } catch (error) {
-    console.error("Error checking WhatsApp connection:", error);
+    console.error("===> [WhatsApp Server] Error checking WhatsApp connection:", error);
     return { status: "error", error: (error as Error).message };
   }
 }
 
 // 4. Fetch Connection QR Code (Base64)
 export async function getWhatsAppQR(): Promise<WhatsAppConnectionState> {
+  console.log("===> [WhatsApp Server] getWhatsAppQR called");
   try {
     const settings = await getWhatsAppSettings();
     if (!settings.idInstance || !settings.apiToken) {
-      return { status: "notAuthorized", error: "חסרים פרטי חיבור וואטסאפ." };
+      console.log("===> [WhatsApp Server] getWhatsAppQR: missing settings, returning notConfigured");
+      return { 
+        status: "notConfigured", 
+        error: "טרם הוגדרו מזהה מופע (Instance ID) וטוקן (API Token) של Green API." 
+      };
     }
 
     const qrUrl = getGreenApiUrl(settings, "qr");
+    console.log("===> [WhatsApp Server] Fetching qr from Green API:", `https://api.green-api.com/waInstance${settings.idInstance}/qr/***`);
     const res = await fetch(qrUrl, { next: { revalidate: 0 } });
+    const qrStatus = res.status;
+    const qrBody = await res.text();
+    console.log(`===> [WhatsApp Server] Green API qr response [${qrStatus}]:`, qrBody.length > 200 ? `${qrBody.substring(0, 100)}... (${qrBody.length} chars)` : qrBody);
+
     if (!res.ok) {
-      throw new Error(`שגיאה בקבלת QR: ${res.status}`);
+      throw new Error(`שגיאה בקבלת QR משרת Green API (קוד ${qrStatus}): ${qrBody || "ודא שמזהה המופע והטוקן תקינים"}`);
     }
-    const data = await res.json();
+
+    let data: any = {};
+    try {
+      data = JSON.parse(qrBody);
+    } catch (e) {
+      throw new Error(`תשובה לא תקינה מ-Green API: ${qrBody}`);
+    }
     
     if (data.type === "qrCode") {
+      console.log("===> [WhatsApp Server] Successfully retrieved QR code Base64!");
       return {
         status: "qr",
         qrCode: `data:image/png;base64,${data.message}`,
       };
+    } else if (data.type === "alreadyLogged") {
+      console.log("===> [WhatsApp Server] Instance is already logged in, redirecting to connection check");
+      return getWhatsAppConnection();
     } else {
-      // Might be already authorized or checking
+      console.log("===> [WhatsApp Server] Other QR response type:", data.type);
       return getWhatsAppConnection();
     }
   } catch (error) {
-    console.error("Error getting WhatsApp QR:", error);
+    console.error("===> [WhatsApp Server] Error getting WhatsApp QR:", error);
     return { status: "error", error: (error as Error).message };
   }
 }

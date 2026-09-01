@@ -442,8 +442,19 @@ export function GroupSendTab() {
               {/* Tags multiselect */}
               {filtersConfig.tags.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">סנן לפי תוויות</h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">סנן לפי תוויות ({filtersConfig.tags.length})</h4>
+                    {selectedTags.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedTags([])}
+                        className="text-[11px] font-bold text-indigo-600 hover:underline"
+                      >
+                        נקה בחירה ({selectedTags.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto p-2 border border-slate-100 rounded-2xl bg-slate-50/40">
                     {filtersConfig.tags.map((tag) => {
                       const isSelected = selectedTags.includes(tag);
                       return (
@@ -493,8 +504,19 @@ export function GroupSendTab() {
               {/* Lead sources select */}
               {filtersConfig.lead_sources.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">סנן לפי מקור הגעה</h4>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">סנן לפי מקור הגעה ({filtersConfig.lead_sources.length})</h4>
+                    {selectedSources.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedSources([])}
+                        className="text-[11px] font-bold text-indigo-600 hover:underline"
+                      >
+                        נקה בחירה ({selectedSources.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 border border-slate-100 rounded-2xl bg-slate-50/40">
                     {filtersConfig.lead_sources.map((src) => {
                       const isSelected = selectedSources.includes(src);
                       return (

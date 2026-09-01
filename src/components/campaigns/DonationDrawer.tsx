@@ -24,6 +24,40 @@ interface DonationDrawerProps {
   drawerConfig?: any;
 }
 
+export function formatUserFriendlyPaymentError(rawError?: string): string {
+  if (!rawError) return "חלה שגיאה בביצוע התשלום. אנא ודא את הפרטים ונסה שנית.";
+  const str = String(rawError).trim();
+  
+  // Technical / Code errors
+  if (str.includes("SchemaValidationFault") || str.includes("SyntaxError") || str.includes("Unexpected token") || str.includes("fetch") || str.includes("500") || str.includes("404") || str.includes("Bad Request")) {
+    return "חלה תקלה זמנית בחיבור למערכת התשלומים. אנא נסה שוב בעוד מספר רגעים.";
+  }
+  if (str.includes("415") || str.includes("הוזנו נתונים לא תקינים")) {
+    return "פרטי הכרטיס שהוזנו אינם תקינים. אנא ודא את מספר הכרטיס, התוקף והקוד בגב הכרטיס (CVV) ונסה שנית.";
+  }
+  if (str.includes("406") || str.includes("תוקף")) {
+    return "תוקף הכרטיס אינו תקין. אנא ודא שבחרת חודש ושנה תקינים.";
+  }
+  if (str.includes("סירוב") || str.includes("נדחה") || str.includes("BlockedCard") || str.includes("אינו מורשה")) {
+    return "התשלום נדחה על ידי חברת האשראי. אנא נסה כרטיס אחר או פנה לחברת האשראי.";
+  }
+  if (str.includes("עיסקה כפולה")) {
+    return "עסקה זו כבר נקלטה בהצלחה במערכת.";
+  }
+  if (str.includes("מסגרת") || str.includes("כיסוי")) {
+    return "אין מסגרת מספקת בכרטיס לביצוע העסקה. אנא נסה כרטיס אחר.";
+  }
+  if (str.includes("טלפון") || str.includes("05")) {
+    return "לתשלום ב-Bit יש להזין מספר טלפון נייד ישראלי תקין (המתחיל ב-05).";
+  }
+  if (str.includes("קשר") && str.includes("מסוף")) {
+    return "שירות התשלומים אינו זמין כרגע. אנא פנה להנהלת העמותה.";
+  }
+
+  // Remove technical prefixes if any
+  return str.replace(/^שגיאה מקשר\s*(\(Bit\))?:\s*/, "");
+}
+
 export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   isOpen,
   onClose,
@@ -692,8 +726,27 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             </div>
             
             {error && (
-              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2 rounded-xl text-xs font-semibold text-center">
-                {error}
+              <div className={`p-3 rounded-xl border text-xs font-semibold flex items-start gap-2 shadow-sm animate-in fade-in ${
+                isDark
+                  ? "bg-rose-950/90 border-rose-500/80 text-rose-100 shadow-rose-950/50"
+                  : "bg-rose-50 border-rose-300 text-rose-900 shadow-rose-100"
+              }`}>
+                <div className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-black">
+                  !
+                </div>
+                <div className="flex-1 leading-snug text-right">
+                  {formatUserFriendlyPaymentError(error)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  className={`p-0.5 rounded transition-colors cursor-pointer shrink-0 ${
+                    isDark ? "text-rose-300 hover:text-white" : "text-rose-600 hover:text-rose-900"
+                  }`}
+                  title="סגור"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 
@@ -746,8 +799,27 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             </div>
 
             {error && (
-              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2 rounded-xl text-xs font-semibold text-center mb-1">
-                {error}
+              <div className={`p-3 rounded-xl border text-xs font-semibold flex items-start gap-2 shadow-sm mb-1 animate-in fade-in ${
+                isDark
+                  ? "bg-rose-950/90 border-rose-500/80 text-rose-100 shadow-rose-950/50"
+                  : "bg-rose-50 border-rose-300 text-rose-900 shadow-rose-100"
+              }`}>
+                <div className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-black">
+                  !
+                </div>
+                <div className="flex-1 leading-snug text-right">
+                  {formatUserFriendlyPaymentError(error)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  className={`p-0.5 rounded transition-colors cursor-pointer shrink-0 ${
+                    isDark ? "text-rose-300 hover:text-white" : "text-rose-600 hover:text-rose-900"
+                  }`}
+                  title="סגור"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 
@@ -927,8 +999,27 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             </div>
 
             {error && (
-              <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 p-2 rounded-xl text-xs font-semibold text-center">
-                {error}
+              <div className={`p-3.5 rounded-xl border text-xs sm:text-sm font-semibold flex items-start gap-2.5 shadow-sm animate-in fade-in ${
+                isDark
+                  ? "bg-rose-950/90 border-rose-500/80 text-rose-100 shadow-rose-950/50"
+                  : "bg-rose-50 border-rose-300 text-rose-900 shadow-rose-100"
+              }`}>
+                <div className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-black">
+                  !
+                </div>
+                <div className="flex-1 leading-snug text-right">
+                  {formatUserFriendlyPaymentError(error)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  className={`p-0.5 rounded transition-colors cursor-pointer shrink-0 ${
+                    isDark ? "text-rose-300 hover:text-white" : "text-rose-600 hover:text-rose-900"
+                  }`}
+                  title="סגור"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             )}
 

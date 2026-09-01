@@ -3,6 +3,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { Ambassador, Campaign, Donation } from "@/lib/types/campaign";
+import { findExistingContact } from "@/features/crm/mergeContacts";
 
 /**
  * Fetch all available campaigns for selection in HomeEditor
@@ -276,73 +277,94 @@ export async function recordPendingDonationAction(data: {
     // Save or update contact in CRM with status "ממתין לתשלום"
     let contactId = "";
     try {
-      const contactRef = await adminDb.collection("contacts").add({
-        ownerId: crmOwnerId,
-        status: "active",
-        conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
-        conta_phone: phone || "",
-        email: email || "",
-        lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""} - ממתין לתשלום`,
-        campaign_role: "donor",
-        campaign_id: targetCampaignId,
-        campaign_title: campaignTitle,
-        campaign_donation_mode: isRecurring ? "recurring" : "one_time",
-        campaign_amount: Number(amount),
-        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
-        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
-        campaign_tier: tier || "",
-        campaign_is_anonymous: Boolean(isAnonymous),
-        campaign_dedication: dedication || "",
-        campaign_ambassador_name: ambassadorName || "",
-        campaign_payment_status: "pending",
-        campaign_payment_method: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
-        referred_by_ambassador: ambassadorName || null,
-        total_donated: 0,
-        monthly_amount: monthlyAmount || null,
-        is_standing_order: Boolean(isRecurring),
-        dedication: dedication || "",
+      const existing = await findExistingContact(crmOwnerId, phone, email);
 
-        campaign_donations_history: [
-          {
-            id: donationRef.id,
-            campaignId: targetCampaignId,
-            campaignTitle,
-            amount: Number(amount),
-            monthlyAmount: monthlyAmount || null,
-            recurringMonths: recurringMonths || null,
-            isRecurring: Boolean(isRecurring),
-            tier: tier || "",
-            dedication: dedication || "",
-            isAnonymous: Boolean(isAnonymous),
-            ambassadorName: ambassadorName || "",
-            paymentStatus: "pending",
-            paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
-            date: new Date().toISOString(),
-          }
-        ],
-        payments: [
-          {
-            amount: Number(amount),
-            monthlyAmount: monthlyAmount || null,
-            isRecurring: Boolean(isRecurring),
-            date: new Date().toISOString(),
-            method: isRecurring ? "kesher_standing_order" : "kesher_credit_card",
-            status: "pending",
-            kesherStatus: "pending_payment",
-          },
-        ],
-        events: [
-          {
-            title: `מעבר לעמוד תשלום בקמפיין ${campaignTitle} (ממתין לתשלום)`,
-            type: "donation_pending",
-            amount: Number(amount),
-            date: new Date().toISOString(),
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      contactId = contactRef.id;
+      const donationHistoryItem = {
+        id: donationRef.id,
+        campaignId: targetCampaignId,
+        campaignTitle,
+        amount: Number(amount),
+        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+        recurringMonths: recurringMonths ? Number(recurringMonths) : null,
+        isRecurring: Boolean(isRecurring),
+        tier: tier || "",
+        dedication: dedication || "",
+        isAnonymous: Boolean(isAnonymous),
+        ambassadorName: ambassadorName || "",
+        paymentStatus: "pending" as const,
+        paymentMethod: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
+        date: new Date().toISOString(),
+      };
+
+      const paymentItem = {
+        amount: Number(amount),
+        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+        isRecurring: Boolean(isRecurring),
+        date: new Date().toISOString(),
+        method: isRecurring ? "kesher_standing_order" : "kesher_credit_card",
+        status: "pending",
+        kesherStatus: "pending_payment",
+      };
+
+      const eventItem = {
+        title: `מעבר לעמוד תשלום בקמפיין ${campaignTitle} (ממתין לתשלום)`,
+        type: "donation_pending",
+        amount: Number(amount),
+        date: new Date().toISOString(),
+      };
+
+      if (existing) {
+        contactId = existing.id;
+        const currentHist = existing.data.campaign_donations_history || [];
+        const currentPayments = existing.data.payments || [];
+        const currentEvents = existing.data.events || [];
+
+        await adminDb.collection("contacts").doc(existing.id).update({
+          conta_name: existing.data.conta_name && existing.data.conta_name !== "אנונימי" && existing.data.conta_name !== "תורם קמפיין" 
+            ? existing.data.conta_name 
+            : (donorName || existing.data.conta_name || "תורם קמפיין"),
+          email: existing.data.email || email || "",
+          conta_phone: existing.data.conta_phone || phone || "",
+          campaign_amount: (Number(existing.data.campaign_amount || 0) + Number(amount)),
+          campaign_donations_history: [donationHistoryItem, ...currentHist],
+          payments: [paymentItem, ...currentPayments],
+          events: [eventItem, ...currentEvents],
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        const contactRef = await adminDb.collection("contacts").add({
+          ownerId: crmOwnerId,
+          status: "active",
+          conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
+          conta_phone: phone || "",
+          email: email || "",
+          lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""} - ממתין לתשלום`,
+          campaign_role: "donor",
+          campaign_id: targetCampaignId,
+          campaign_title: campaignTitle,
+          campaign_donation_mode: isRecurring ? "recurring" : "one_time",
+          campaign_amount: Number(amount),
+          campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
+          campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
+          campaign_tier: tier || "",
+          campaign_is_anonymous: Boolean(isAnonymous),
+          campaign_dedication: dedication || "",
+          campaign_ambassador_name: ambassadorName || "",
+          campaign_payment_status: "pending",
+          campaign_payment_method: isRecurring ? "kesher_standing_order_creditType_10" : "kesher_credit_card_creditType_1",
+          referred_by_ambassador: ambassadorName || null,
+          total_donated: 0,
+          monthly_amount: monthlyAmount || null,
+          is_standing_order: Boolean(isRecurring),
+          dedication: dedication || "",
+          campaign_donations_history: [donationHistoryItem],
+          payments: [paymentItem],
+          events: [eventItem],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        contactId = contactRef.id;
+      }
     } catch (crmErr) {
       console.warn("CRM pending donor sync warning:", crmErr);
     }
@@ -707,83 +729,112 @@ export async function recordDonationAction(data: {
       const campaignTitle = campaignDoc.data()?.title || campaignId;
       const crmOwnerId = campaignDoc.data()?.ownerId || "1";
 
-      await adminDb.collection("contacts").add({
-        ownerId: crmOwnerId,
-        status: "active",
-        conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
-        conta_phone: phone || "",
-        email: email || "",
-        lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
-        campaign_role: "donor",
-        campaign_id: campaignId,
-        campaign_title: campaignTitle,
-        campaign_donation_mode: isRecurring ? "recurring" : "one_time",
-        campaign_amount: Number(amount),
-        campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
-        campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
-        campaign_tier: tier || "",
+      const existing = await findExistingContact(crmOwnerId, phone, email);
 
-        campaign_is_anonymous: Boolean(isAnonymous),
-        campaign_dedication: dedication || "",
-        campaign_ambassador_name: ambassadorName || "",
-        campaign_payment_status: "completed",
-        campaign_payment_method: paymentMethod || (isRecurring ? "kesher_standing_order" : "kesher_credit_card"),
-        campaign_transaction_id: transactionId || "",
-        campaign_receipt_url: receiptUrl || "",
-        referred_by_ambassador: ambassadorName || null,
-        total_donated: Number(amount),
-        total_spent: Number(amount),
-        order_count: 1,
-        last_order_date: new Date().toISOString(),
-        monthly_amount: monthlyAmount || null,
-        is_standing_order: Boolean(isRecurring),
+      const donationHistoryItem = {
+        id: donationRef.id,
+        campaignId,
+        campaignTitle,
+        amount: Number(amount),
+        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+        recurringMonths: recurringMonths ? Number(recurringMonths) : null,
+        isRecurring: Boolean(isRecurring),
+        tier: tier || "",
         dedication: dedication || "",
-        campaign_donations_history: [
-          {
-            id: donationRef.id,
-            campaignId,
-            campaignTitle,
-            amount: Number(amount),
-            monthlyAmount: monthlyAmount || null,
-            recurringMonths: recurringMonths || null,
-            isRecurring: Boolean(isRecurring),
-            tier: tier || "",
-            dedication: dedication || "",
-            isAnonymous: Boolean(isAnonymous),
-            ambassadorName: ambassadorName || "",
-            paymentStatus: "completed",
-            paymentMethod: paymentMethod || (isRecurring ? "kesher_standing_order" : "kesher_credit_card"),
-            transactionId: transactionId || "",
-            receiptUrl: receiptUrl || "",
-            date: new Date().toISOString(),
-          }
-        ],
-        payments: [
-          {
-            amount: Number(amount),
-            monthlyAmount: monthlyAmount || null,
-            isRecurring: Boolean(isRecurring),
-            date: new Date().toISOString(),
-            method: paymentMethod || "kesher_api",
-            status: "success",
-            kesherStatus: "success",
-            transactionId: transactionId || "",
-            receiptLink: receiptUrl || "",
-          },
-        ],
-        events: [
-          {
-            title: `תרומה בקמפיין ${campaignTitle}`,
-            type: "donation",
-            amount: Number(amount),
-            date: new Date().toISOString(),
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+        isAnonymous: Boolean(isAnonymous),
+        ambassadorName: ambassadorName || "",
+        paymentStatus: "completed" as const,
+        paymentMethod: paymentMethod || (isRecurring ? "kesher_standing_order" : "kesher_credit_card"),
+        transactionId: transactionId || "",
+        receiptUrl: receiptUrl || "",
+        date: new Date().toISOString(),
+      };
+
+      const paymentItem = {
+        amount: Number(amount),
+        monthlyAmount: monthlyAmount ? Number(monthlyAmount) : null,
+        isRecurring: Boolean(isRecurring),
+        date: new Date().toISOString(),
+        method: paymentMethod || "kesher_api",
+        status: "success",
+        kesherStatus: "success",
+        transactionId: transactionId || "",
+        receiptLink: receiptUrl || "",
+      };
+
+      const eventItem = {
+        title: `תרומה בקמפיין ${campaignTitle}`,
+        type: "donation",
+        amount: Number(amount),
+        date: new Date().toISOString(),
+      };
+
+      if (existing) {
+        const currentHist = existing.data.campaign_donations_history || [];
+        const currentPayments = existing.data.payments || [];
+        const currentEvents = existing.data.events || [];
+
+        await adminDb.collection("contacts").doc(existing.id).update({
+          conta_name: existing.data.conta_name && existing.data.conta_name !== "אנונימי" && existing.data.conta_name !== "תורם קמפיין"
+            ? existing.data.conta_name
+            : (donorName || existing.data.conta_name || "תורם קמפיין"),
+          email: existing.data.email || email || "",
+          conta_phone: existing.data.conta_phone || phone || "",
+          lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
+          campaign_role: "donor",
+          campaign_id: campaignId,
+          campaign_title: campaignTitle,
+          campaign_payment_status: "completed",
+          total_donated: (Number(existing.data.total_donated || 0) + Number(amount)),
+          total_spent: (Number(existing.data.total_spent || 0) + Number(amount)),
+          campaign_amount: (Number(existing.data.campaign_amount || 0) + Number(amount)),
+          order_count: (Number(existing.data.order_count || 0) + 1),
+          last_order_date: new Date().toISOString(),
+          campaign_donations_history: [donationHistoryItem, ...currentHist],
+          payments: [paymentItem, ...currentPayments],
+          events: [eventItem, ...currentEvents],
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        await adminDb.collection("contacts").add({
+          ownerId: crmOwnerId,
+          status: "active",
+          conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
+          conta_phone: phone || "",
+          email: email || "",
+          lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
+          campaign_role: "donor",
+          campaign_id: campaignId,
+          campaign_title: campaignTitle,
+          campaign_donation_mode: isRecurring ? "recurring" : "one_time",
+          campaign_amount: Number(amount),
+          campaign_monthly_amount: monthlyAmount ? Number(monthlyAmount) : null,
+          campaign_recurring_months: recurringMonths ? Number(recurringMonths) : null,
+          campaign_tier: tier || "",
+          campaign_is_anonymous: Boolean(isAnonymous),
+          campaign_dedication: dedication || "",
+          campaign_ambassador_name: ambassadorName || "",
+          campaign_payment_status: "completed",
+          campaign_payment_method: paymentMethod || (isRecurring ? "kesher_standing_order" : "kesher_credit_card"),
+          campaign_transaction_id: transactionId || "",
+          campaign_receipt_url: receiptUrl || "",
+          referred_by_ambassador: ambassadorName || null,
+          total_donated: Number(amount),
+          total_spent: Number(amount),
+          order_count: 1,
+          last_order_date: new Date().toISOString(),
+          monthly_amount: monthlyAmount || null,
+          is_standing_order: Boolean(isRecurring),
+          dedication: dedication || "",
+          campaign_donations_history: [donationHistoryItem],
+          payments: [paymentItem],
+          events: [eventItem],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
     } catch (crmErr) {
-      console.warn("CRM donor sync warning:", crmErr);
+      console.warn("CRM complete donor sync warning:", crmErr);
     }
 
     revalidatePath(`/c/${campaignId}`);

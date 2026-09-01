@@ -12,11 +12,14 @@ export function ConnectionTab() {
 
   const checkConnection = useCallback(async () => {
     setLoading(true);
+    console.log("[WhatsApp Frontend] 🔄 Checking WhatsApp connection status...");
     try {
       const res = await getWhatsAppConnection();
+      console.log("[WhatsApp Frontend] ✅ getWhatsAppConnection result:", res);
       setConnection(res);
     } catch (e) {
-      setConnection({ status: "error", error: "שגיאה בבדיקת החיבור" });
+      console.error("[WhatsApp Frontend] ❌ checkConnection error:", e);
+      setConnection({ status: "error", error: "שגיאה בבדיקת החיבור: " + (e as Error).message });
     }
     setLoading(false);
   }, []);
@@ -29,15 +32,18 @@ export function ConnectionTab() {
   useEffect(() => {
     if (connection.status !== "qr") return;
 
+    console.log("[WhatsApp Frontend] ⏳ Starting QR scanning poll interval...");
     const interval = setInterval(async () => {
       try {
         const res = await getWhatsAppConnection();
+        console.log("[WhatsApp Frontend] QR Poll check:", res.status);
         if (res.status === "authorized") {
+          console.log("[WhatsApp Frontend] 🎉 Device paired successfully!");
           setConnection(res);
           clearInterval(interval);
         }
       } catch (err) {
-        console.warn("QR Poll connection check failed:", err);
+        console.warn("[WhatsApp Frontend] QR Poll connection check failed:", err);
       }
     }, 3000);
 
@@ -46,11 +52,17 @@ export function ConnectionTab() {
 
   const handleConnect = async () => {
     setLoading(true);
+    console.log("[WhatsApp Frontend] 🚀 'התחבר באמצעות קוד QR' clicked. Requesting QR from server...");
     try {
       const res = await getWhatsAppQR();
+      console.log("[WhatsApp Frontend] ✅ getWhatsAppQR response:", res);
       setConnection(res);
+      if (res.status === "error" || res.status === "notConfigured") {
+        console.warn("[WhatsApp Frontend] ⚠️ Non-successful QR response:", res.error);
+      }
     } catch (e) {
-      setConnection({ status: "error", error: "שגיאה בקבלת קוד QR" });
+      console.error("[WhatsApp Frontend] ❌ getWhatsAppQR exception:", e);
+      setConnection({ status: "error", error: "שגיאה בקבלת קוד QR: " + (e as Error).message });
     }
     setLoading(false);
   };
@@ -134,6 +146,38 @@ export function ConnectionTab() {
         </div>
       )}
 
+      {connection.status === "notConfigured" && (
+        <div className="space-y-6">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-4 text-amber-800">
+            <AlertCircle className="w-8 h-8 shrink-0 text-amber-600 mt-0.5" />
+            <div>
+              <h4 className="font-extrabold text-sm md:text-base">טרם הוגדרו מפתחות Green API</h4>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                {connection.error || "כדי להשתמש בשירות הוואטסאפ, יש להזין Instance ID ו-API Token בהגדרות המערכת או לבקש ממנהל המערכת להגדירם."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 py-2">
+            <Button 
+              onClick={checkConnection} 
+              disabled={loading}
+              variant="outline"
+              className="rounded-2xl font-bold border-slate-200 text-slate-700 flex items-center gap-2 h-11 px-5"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              בדוק שוב
+            </Button>
+            <a 
+              href="/admin/settings" 
+              className="inline-flex items-center justify-center rounded-2xl font-bold bg-amber-500 hover:bg-amber-600 text-white h-11 px-6 text-sm shadow-sm transition-colors"
+            >
+              מעבר להגדרות ניהול
+            </a>
+          </div>
+        </div>
+      )}
+
       {connection.status === "notAuthorized" && (
         <div className="space-y-6">
           <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-center gap-4 text-amber-800">
@@ -150,8 +194,17 @@ export function ConnectionTab() {
               disabled={loading}
               className="rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 h-12 px-6 shadow-md"
             >
-              <QrCode className="w-5 h-5" />
-              התחבר באמצעות קוד QR
+              {loading ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  טוען קוד QR...
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-5 h-5" />
+                  התחבר באמצעות קוד QR
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -192,11 +245,11 @@ export function ConnectionTab() {
 
       {connection.status === "error" && (
         <div className="space-y-6">
-          <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-4 text-red-700">
-            <AlertCircle className="w-8 h-8 shrink-0 text-red-600" />
+          <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-4 text-red-700">
+            <AlertCircle className="w-8 h-8 shrink-0 text-red-600 mt-0.5" />
             <div>
               <h4 className="font-extrabold text-sm md:text-base">שגיאה בחיבור לוואטסאפ</h4>
-              <p className="text-xs text-red-600/90 mt-0.5">{connection.error}</p>
+              <p className="text-xs text-red-600/90 mt-1 leading-relaxed">{connection.error}</p>
             </div>
           </div>
 
@@ -206,7 +259,7 @@ export function ConnectionTab() {
               disabled={loading}
               className="rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 h-11 px-5"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               נסה שוב
             </Button>
           </div>

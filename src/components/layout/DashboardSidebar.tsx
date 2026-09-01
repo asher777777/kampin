@@ -26,7 +26,8 @@ import {
   ExternalLink,
   ArrowRight,
   Receipt,
-  Wand2
+  Wand2,
+  BarChart3
 } from "lucide-react";
 import { QuickActionsModal } from "./QuickActionsModal";
 import { Button } from "@/components/ui/Button";
@@ -91,6 +92,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
         { name: "תצוגת פסיפס", href: "/dashboard/mosaic", icon: LayoutGrid },
         { name: "יומן המחולל", href: "/dashboard/calendar", icon: Calendar },
         { name: "ניהול CRM", href: "/dashboard/crm", icon: Users },
+        { name: "דוחות ואנליטיקה", href: "/dashboard/crm/analytics", icon: BarChart3 },
         { name: "הוצאות", href: "/dashboard/expenses", icon: Receipt },
         { name: "קבלות ידניות", href: "/dashboard/receipts", icon: FileText },
         { name: "יצירת תוכן", href: "/dashboard/services", icon: Sparkles },

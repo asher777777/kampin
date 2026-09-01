@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { getWhatsAppSettings } from "@/features/whatsapp/actions";
 
 export type Trigger = 
   | { type: "webhook"; webhookId: string }
@@ -45,12 +46,8 @@ async function executeStep(step: ActionStep, payload: any, ownerId: string) {
       const message = parseTemplate(step.config.messageTemplate, payload);
       if (!phone) throw new Error("WhatsApp: Phone number is empty after parsing template.");
 
-      const settingsRef = adminDb.collection("whatsapp_settings").doc(ownerId);
-      const settingsSnap = await settingsRef.get();
-      if (!settingsSnap.exists) throw new Error("WhatsApp settings not found for user.");
-      
-      const settings = settingsSnap.data() as { idInstance?: string; apiToken?: string };
-      if (!settings.idInstance || !settings.apiToken) throw new Error("WhatsApp settings incomplete.");
+      const settings = await getWhatsAppSettings(ownerId);
+      if (!settings.idInstance || !settings.apiToken) throw new Error("WhatsApp settings not found or incomplete.");
 
       let cleanPhone = phone.replace(/\D/g, "");
       if (cleanPhone.startsWith("0")) cleanPhone = "972" + cleanPhone.slice(1);

@@ -18,7 +18,7 @@ export function WhatsAppDashboard() {
   ];
 
   return (
-    <div className="space-y-6 text-right" dir="rtl">
+    <div className="w-full max-w-6xl mx-auto px-4 md:px-8 py-6 h-full overflow-y-auto pb-36 space-y-6 text-right" dir="rtl">
       {/* Subpage Header */}
       <div>
         <h2 className="text-3xl font-black text-slate-800 flex items-center gap-2">

@@ -391,7 +391,11 @@ export async function deleteContact(id: string) {
 }
 
 // 6. Bulk Action
-export async function handleBulkAction(ids: string[], action: "trash" | "restore" | "delete_permanent" | "assign_community", options?: { communityId?: string }) {
+export async function handleBulkAction(
+  ids: string[], 
+  action: "trash" | "restore" | "delete_permanent" | "assign_community" | "add_tag" | "remove_tag", 
+  options?: { communityId?: string; tag?: string }
+) {
   try {
     const ownerId = await getUserId();
     const contactsRef = adminDb.collection("contacts");
@@ -404,14 +408,36 @@ export async function handleBulkAction(ids: string[], action: "trash" | "restore
       const docSnap = await docRef.get();
       
       if (docSnap.exists && docSnap.data()?.ownerId === ownerId) {
+        const data = docSnap.data() || {};
         if (action === "trash") {
           batch.update(docRef, { status: "trashed", updatedAt: new Date().toISOString() });
         } else if (action === "restore") {
           batch.update(docRef, { status: "active", updatedAt: new Date().toISOString() });
         } else if (action === "delete_permanent") {
           batch.delete(docRef);
+        } else if (action === "add_tag" && options?.tag?.trim()) {
+          const newTag = options.tag.trim();
+          if (data.tg1 !== newTag && data.tg2 !== newTag && data.tg3 !== newTag) {
+            const updates: any = { updatedAt: new Date().toISOString() };
+            if (!data.tg1) updates.tg1 = newTag;
+            else if (!data.tg2) updates.tg2 = newTag;
+            else if (!data.tg3) updates.tg3 = newTag;
+            else updates.tg1 = newTag;
+            batch.update(docRef, updates);
+          }
+        } else if (action === "remove_tag" && options?.tag?.trim()) {
+          const targetTag = options.tag.trim();
+          const updates: any = {};
+          let changed = false;
+          if (data.tg1 === targetTag) { updates.tg1 = ""; changed = true; }
+          if (data.tg2 === targetTag) { updates.tg2 = ""; changed = true; }
+          if (data.tg3 === targetTag) { updates.tg3 = ""; changed = true; }
+          if (changed) {
+            updates.updatedAt = new Date().toISOString();
+            batch.update(docRef, updates);
+          }
         } else if (action === "assign_community" && options?.communityId) {
-          let currentCommunities = docSnap.data()?.communityIds || [];
+          let currentCommunities = data.communityIds || [];
           if (!currentCommunities.includes(options.communityId)) {
             currentCommunities = [...currentCommunities, options.communityId];
             
@@ -439,6 +465,47 @@ export async function handleBulkAction(ids: string[], action: "trash" | "restore
   } catch (error) {
     console.error("Error in handleBulkAction:", error);
     throw error;
+  }
+}
+
+export async function deleteTagGlobally(tag: string) {
+  try {
+    const ownerId = await getUserId();
+    const cleanTag = tag.trim();
+    if (!cleanTag) return { success: false, error: "שם התגית ריק" };
+
+    const snapshot = await adminDb
+      .collection("contacts")
+      .where("ownerId", "==", ownerId)
+      .get();
+
+    const batch = adminDb.batch();
+    let updatedCount = 0;
+
+    snapshot.docs.forEach((doc: any) => {
+      const data = doc.data();
+      let changed = false;
+      const updates: any = {};
+
+      if (data.tg1 === cleanTag) { updates.tg1 = ""; changed = true; }
+      if (data.tg2 === cleanTag) { updates.tg2 = ""; changed = true; }
+      if (data.tg3 === cleanTag) { updates.tg3 = ""; changed = true; }
+
+      if (changed) {
+        updates.updatedAt = new Date().toISOString();
+        batch.update(doc.ref, updates);
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+    revalidatePath("/dashboard/crm");
+    return { success: true, updatedCount };
+  } catch (e: any) {
+    console.error("Error in deleteTagGlobally:", e);
+    return { success: false, error: e.message || String(e) };
   }
 }
 

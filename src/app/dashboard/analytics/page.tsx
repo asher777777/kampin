@@ -59,24 +59,24 @@ export default function AnalyticsPage() {
     <div className="bg-slate-50 min-h-screen">
       <RhombusMenu
         topRight={{
-          label: "דוחות הכנסות",
+          label: "דוחות הכנסות ו-CRM",
           icon: incomesIcon,
-          href: "#",
+          href: "/dashboard/crm/analytics",
         }}
         topLeft={{
           label: "דוחות הוצאות",
           icon: expensesIcon,
-          href: "#",
+          href: "/dashboard/expenses",
         }}
         bottomRight={{
           label: "דוח תוכן",
           icon: contentIcon,
-          href: "#",
+          href: "/dashboard/services",
         }}
         bottomLeft={{
           label: "דוח פרויקטים",
           icon: projectsIcon,
-          href: "#",
+          href: "/dashboard/generator",
         }}
         center={{
           content: centerContent

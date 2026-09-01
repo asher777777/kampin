@@ -3,7 +3,7 @@ export interface WhatsAppSettings {
   apiToken: string;
 }
 
-export type WhatsAppConnectionStatus = "authorized" | "notAuthorized" | "checking" | "qr" | "error";
+export type WhatsAppConnectionStatus = "authorized" | "notAuthorized" | "notConfigured" | "checking" | "qr" | "error";
 
 export interface WhatsAppConnectionState {
   status: WhatsAppConnectionStatus;

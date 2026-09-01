@@ -8,6 +8,7 @@ import {
   handleBulkAction, 
   importContacts 
 } from "@/features/crm/actions";
+import { mergeDuplicateContacts } from "@/features/crm/mergeContacts";
 import { getCommunities } from "@/features/communities/actions";
 import dynamic from "next/dynamic";
 import { Contact } from "@/features/crm/types";
@@ -40,7 +41,8 @@ import {
   MoreVertical,
   Edit,
   Phone,
-  Menu
+  Menu,
+  BarChart3
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import * as XLSX from "xlsx/xlsx.mjs";
@@ -565,6 +567,17 @@ export default function CRMDashboardPage() {
           </div>
 
           <div className="relative shrink-0">
+            <Link
+                href="/dashboard/crm/analytics"
+                className="h-10 px-3 rounded-full flex items-center justify-center gap-1.5 hover:bg-[#222] text-amber-400 bg-[#181818] shadow-sm border border-white/5 text-xs font-bold transition-colors"
+                title="דוחות ואנליטיקה מתקדמת"
+            >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">דוחות ואנליטיקה</span>
+            </Link>
+          </div>
+
+          <div className="relative shrink-0">
             <Button
                 variant="ghost"
                 onClick={() => setTabsMenuOpen(!tabsMenuOpen)}
@@ -576,7 +589,7 @@ export default function CRMDashboardPage() {
             {tabsMenuOpen && (
                <>
                  <div className="fixed inset-0 z-40" onClick={() => setTabsMenuOpen(false)} />
-                 <div className="absolute top-full left-0 mt-2 bg-[#181818] border border-white/5 shadow-2xl rounded-2xl p-2 z-50 flex flex-col w-48 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                 <div className="absolute top-full left-0 mt-2 bg-[#181818] border border-white/5 shadow-2xl rounded-2xl p-2 z-50 flex flex-col w-52 animate-in fade-in slide-in-from-top-2 overflow-hidden">
                     <button 
                       onClick={() => { setStatus("active"); setPage(1); setTabsMenuOpen(false); }} 
                       className={`flex items-center gap-3 px-3 py-3 w-full text-right text-sm transition-colors ${status === "active" ? "bg-[#222] text-white font-bold" : "text-gray-400 hover:bg-[#222] hover:text-white font-medium"}`}
@@ -592,6 +605,38 @@ export default function CRMDashboardPage() {
                        <Users className="w-4 h-4" /> 
                        <span>קהילות ({communities.length})</span>
                     </Link>
+                    <Link 
+                      href="/dashboard/crm/analytics" 
+                      onClick={() => setTabsMenuOpen(false)} 
+                      className="flex items-center gap-3 px-3 py-3 w-full text-right text-sm text-amber-400 hover:bg-[#222] hover:text-amber-300 transition-colors font-medium"
+                    >
+                       <BarChart3 className="w-4 h-4" /> 
+                       <span>דוחות ואנליטיקה</span>
+                    </Link>
+                    <button 
+                      onClick={async () => {
+                        setTabsMenuOpen(false);
+                        if (!window.confirm("האם לאחד כרטיסי איש קשר כפולים? כל נתוני התשלום, התרומות והאירועים יישמרו ויאוחדו תחת כרטיס אחד לכל לקוח.")) return;
+                        setActionLoading(true);
+                        try {
+                          const res = await mergeDuplicateContacts();
+                          if (res.success) {
+                            alert(`איחוד הכפילויות הושלם בהצלחה! אוחדו ${res.clustersMerged} קבוצות כפולות, והוסרו ${res.totalRemoved} כרטיסים כפולים.`);
+                            loadData();
+                          } else {
+                            alert("שגיאה: " + res.error);
+                          }
+                        } catch (e: any) {
+                          alert("שגיאה: " + e.message);
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      }} 
+                      className="flex items-center gap-3 px-3 py-3 w-full text-right text-sm text-indigo-400 hover:bg-[#222] hover:text-indigo-300 transition-colors font-medium cursor-pointer"
+                    >
+                       <RefreshCw className="w-4 h-4 text-indigo-400" /> 
+                       <span>איחוד כפילויות</span>
+                    </button>
                     <button 
                       onClick={() => { setStatus("trashed"); setPage(1); setTabsMenuOpen(false); }} 
                       className={`flex items-center gap-3 px-3 py-3 w-full text-right text-sm transition-colors ${status === "trashed" ? "bg-rose-900/20 text-rose-400 font-bold" : "text-gray-400 hover:bg-[#222] hover:text-white font-medium"}`}
