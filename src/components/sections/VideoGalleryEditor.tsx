@@ -14,7 +14,7 @@ import {
   Sparkles, 
   Layers,
   Compass,
-  Plus
+  CheckCircle2
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { VideoGalleryImageItem } from "./VideoGallery";
@@ -28,7 +28,7 @@ export interface VideoGalleryConfig {
   objectFit?: "cover" | "contain" | "fill" | "scale-down";
   titleEffect?: "cinematic" | "glow" | "badge" | "fade-up";
   textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
-  desktopHeight?: "normal" | "tall" | "extra-tall" | string;
+  desktopHeight?: "natural" | "auto" | "16:9" | "21:9" | "3:1" | "2.35:1" | "normal" | "tall" | "extra-tall" | string;
   anchorId?: string;
   backgroundColor?: string;
 }
@@ -157,7 +157,7 @@ export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: V
               : "border-transparent text-slate-400 hover:text-white"
           }`}
         >
-          הגדרות עיצוב ותצוגה
+          הגדרות עיצוב, יחסי גובה ומידות
         </button>
       </div>
 
@@ -356,27 +356,107 @@ export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: V
         <div className="space-y-6 animate-in fade-in duration-300">
            <div className="bg-[#1e293b] p-5 rounded-xl border border-slate-700 space-y-6">
               
-              {/* 1. Object Fit Mode (אופי תצוגת התמונה) */}
+              {/* 1. Dimensions & Height Mode (מימדי גובה ויחס תמונה) */}
               <div>
                 <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <Maximize2 className="w-4 h-4 text-amber-400" /> אופי תצוגת התמונה (כיסוי / מכיל / מתוח)
+                  <Layers className="w-4 h-4 text-amber-400" /> גובה וממדי תצוגת הגלריה (דסקטופ ומובייל)
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { 
+                      id: "natural", 
+                      label: "גובה טבעי מקורי (100% ללא חיתוך)", 
+                      desc: "מציג בדיוק את מלוא התמונה לפי יחס הגובה-רוחב המקורי שלה ללא שום חיתוך. מומלץ ביותר לבאנרים מעוצבים!",
+                      recommended: true
+                    },
+                    { 
+                      id: "16:9", 
+                      label: "באנר קולנועי רחב (16:9)", 
+                      desc: "יחס קלאסי רחב ומאוזן, תואם פורמט מסכים וסרטונים" 
+                    },
+                    { 
+                      id: "21:9", 
+                      label: "באנר פנורמי (21:9)", 
+                      desc: "באנר פנורמי רחב במיוחד בסגנון אתרי יוקרה" 
+                    },
+                    { 
+                      id: "3:1", 
+                      label: "באנר עליון צר (3:1)", 
+                      desc: "באנר צר וקומפקטי בראש העמוד" 
+                    },
+                    { 
+                      id: "2.35:1", 
+                      label: "באנר סינמסקופ (2.35:1)", 
+                      desc: "יחס קולנועי פנורמי עמוק" 
+                    },
+                    { 
+                      id: "tall", 
+                      label: "גובה מסך מוגדל (72vh)", 
+                      desc: "תופס כ-72% מגובה מסך הצופה" 
+                    },
+                    { 
+                      id: "normal", 
+                      label: "גובה מסך סטנדרטי (60vh)", 
+                      desc: "תופס כ-60% מגובה מסך הצופה" 
+                    },
+                    { 
+                      id: "extra-tall", 
+                      label: "גובה מסך ענק (85vh)", 
+                      desc: "תופס כמעט את כל גובה המסך (85%)" 
+                    }
+                  ].map((h) => {
+                    const isSelected = (config.desktopHeight || "natural") === h.id || ((config.desktopHeight === "auto") && h.id === "natural");
+                    return (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => updateField("desktopHeight", h.id)}
+                        className={`p-3.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col gap-1.5 relative ${
+                          isSelected
+                            ? "bg-amber-500/20 text-white border-amber-400 shadow-[0_0_18px_rgba(245,158,11,0.3)] ring-1 ring-amber-400/50"
+                            : "bg-[#0f172a] text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-bold ${isSelected ? "text-amber-300" : "text-slate-200"}`}>
+                            {h.label}
+                          </span>
+                          {h.recommended && (
+                            <span className="text-[10px] bg-amber-500 text-black font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                              מומלץ
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-400 leading-relaxed">
+                          {h.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Object Fit Mode (התאמת תמונה במסגרת) */}
+              <div>
+                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                  <Maximize2 className="w-4 h-4 text-amber-400" /> אופן מילוי התמונה (Object Fit)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   {[
                     { 
                       id: "cover", 
                       label: "כיסוי מלא (Cover)", 
-                      desc: "ממלא את המסגרת באופן פרופורציונלי (ברירת מחדל)" 
+                      desc: "ממלא את מלוא רוחב וגובה המסגרת" 
                     },
                     { 
                       id: "contain", 
-                      label: "מכיל מלא (Contain)", 
-                      desc: "מציג את מלוא התמונה ללא שום חיתוך (אידיאלי לפוסטרים)" 
+                      label: "מכיל מלא - ללא חיתוך (Contain)", 
+                      desc: "מציג 100% מכל שטח התמונה ללא שום חיתוך של שוליים" 
                     },
                     { 
                       id: "fill", 
-                      label: "מתוח (Fill / Stretch)", 
-                      desc: "מתיחה של התמונה לכל רוחב וגובה המסגרת" 
+                      label: "מתיחה (Fill / Stretch)", 
+                      desc: "מתיחת התמונה לכל רוחב וגובה המסגרת" 
                     },
                     { 
                       id: "scale-down", 
@@ -408,7 +488,38 @@ export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: V
                 </div>
               </div>
 
-              {/* 2. Title Display Effect */}
+              {/* 3. Transition Effect */}
+              <div>
+                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-amber-400" /> אפקט מעבר בין תמונות בגלריה
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { id: "fade", label: "מעבר הדרגתי (Fade)" },
+                    { id: "zoom-in", label: "התקרבות קולנועית (Zoom)" },
+                    { id: "slide", label: "החלקה חלקה (Slide)" },
+                    { id: "digital-squares", label: "ריבועים דיגיטליים" }
+                  ].map((eff) => {
+                    const isSelected = (config.effect || "fade") === eff.id;
+                    return (
+                      <button
+                        key={eff.id}
+                        type="button"
+                        onClick={() => updateField("effect", eff.id)}
+                        className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer text-center ${
+                          isSelected
+                            ? "bg-amber-500 text-black font-bold border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                            : "bg-[#0f172a] text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white"
+                        }`}
+                      >
+                        {eff.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Title Display Effect */}
               <div>
                 <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-400" /> אפקט תצוגת הכותרת לתמונות
@@ -460,7 +571,7 @@ export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: V
                 </div>
               </div>
 
-              {/* 3. Default Text Position */}
+              {/* 5. Default Text Position */}
               <div>
                 <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
                   <Compass className="w-4 h-4 text-amber-400" /> מיקום כותרת ברירת מחדל
@@ -486,89 +597,6 @@ export const VideoGalleryEditor = ({ config, onChange, initialTab = "media" }: V
                         }`}
                       >
                         {pos.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 4. Transition Effect */}
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-amber-400" /> אפקט החלפת תמונות בגלריה
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: "fade", label: "מעבר הדרגתי (Fade)" },
-                    { id: "zoom-in", label: "התקרבות קולנועית (Zoom)" },
-                    { id: "slide", label: "החלקה חלקה (Slide)" },
-                    { id: "digital-squares", label: "ריבועים דיגיטליים" }
-                  ].map((eff) => {
-                    const isSelected = (config.effect || "fade") === eff.id;
-                    return (
-                      <button
-                        key={eff.id}
-                        type="button"
-                        onClick={() => updateField("effect", eff.id)}
-                        className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer text-center ${
-                          isSelected
-                            ? "bg-amber-500 text-black font-bold border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                            : "bg-[#0f172a] text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white"
-                        }`}
-                      >
-                        {eff.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 5. Dimensions & Height (ממדי וגובה התצוגה) */}
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-400" /> גובה וממדי תצוגה (דסקטופ ומובייל)
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    { 
-                      id: "auto", 
-                      label: "לפי ממדי התמונה (Auto)", 
-                      desc: "גובה ורוחב טבעיים במדויק לפי התמונה, גם במובייל וגם בדסקטופ" 
-                    },
-                    { 
-                      id: "tall", 
-                      label: "מוגדל בדסקטופ (72vh)", 
-                      desc: "תוספת 20% גובה לחוויה קולנועית (מומלץ)" 
-                    },
-                    { 
-                      id: "normal", 
-                      label: "סטנדרטי (60vh)", 
-                      desc: "גובה מסך סטנדרטי בדסקטופ" 
-                    },
-                    { 
-                      id: "extra-tall", 
-                      label: "ענק (85vh)", 
-                      desc: "תופס כמעט את כל גובה המסך" 
-                    }
-                  ].map((h) => {
-                    const isSelected = (config.desktopHeight || "tall") === h.id || ((config.desktopHeight === "natural") && h.id === "auto");
-                    return (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => updateField("desktopHeight", h.id)}
-                        className={`p-3 rounded-xl border text-right transition-all cursor-pointer flex flex-col gap-1 ${
-                          isSelected
-                            ? "bg-amber-500/15 text-white border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)]"
-                            : "bg-[#0f172a] text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white"
-                        }`}
-                      >
-                        <span className={`text-xs font-bold ${isSelected ? "text-amber-300" : "text-slate-200"}`}>
-                          {h.label}
-                        </span>
-                        <span className="text-[11px] text-slate-400 leading-relaxed">
-                          {h.desc}
-                        </span>
                       </button>
                     );
                   })}

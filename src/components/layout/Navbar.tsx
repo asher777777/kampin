@@ -156,9 +156,11 @@ export const Navbar = ({
           : (headerBgColor ? "backdrop-blur-md" : "")
       )}
       style={{
-        backgroundColor: headerBgColor
+        backgroundColor: headerBgColor !== undefined
           ? headerBgColor
-          : (isScrolled && isSticky ? "var(--background, rgba(255, 255, 255, 0.9))" : "transparent"),
+          : (isSticky 
+              ? (isScrolled ? "var(--background, rgba(255, 255, 255, 0.9))" : "transparent") 
+              : "var(--background, #ffffff)"),
       }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">

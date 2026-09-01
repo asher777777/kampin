@@ -21,7 +21,7 @@ export interface VideoGalleryProps {
   objectFit?: "cover" | "contain" | "fill" | "scale-down";
   titleEffect?: "cinematic" | "glow" | "badge" | "fade-up";
   textPosition?: "bottom" | "top" | "center" | "bottom-right" | "bottom-left";
-  heightDesktop?: "normal" | "tall" | "extra-tall" | "auto" | "natural" | string;
+  heightDesktop?: "normal" | "tall" | "extra-tall" | "auto" | "natural" | "16:9" | "21:9" | "3:1" | "2.35:1" | string;
   backgroundColor?: string;
 }
 
@@ -121,7 +121,7 @@ export const VideoGallery = ({
   objectFit = "cover",
   titleEffect = "cinematic",
   textPosition = "bottom",
-  heightDesktop = "tall",
+  heightDesktop = "natural",
   backgroundColor = "#0f172a",
 }: VideoGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -132,7 +132,9 @@ export const VideoGallery = ({
   const normalizedImages = useMemo(() => normalizeImages(images), [images]);
   const fitClass = getObjectFitClass(objectFit);
   const resolvedObjectFit: React.CSSProperties["objectFit"] = (objectFit as any) || "cover";
-  const isAutoHeight = heightDesktop === "auto" || heightDesktop === "natural";
+
+  // Check if natural height mode is selected
+  const isNaturalMode = heightDesktop === "natural" || heightDesktop === "auto" || !heightDesktop;
 
   // Background gallery rotation
   useEffect(() => {
@@ -239,7 +241,7 @@ export const VideoGallery = ({
   const renderGalleryBackground = () => {
     if (normalizedImages.length === 0) {
       return (
-        <div className={cn("bg-slate-900 flex items-center justify-center text-slate-500 py-20", isAutoHeight ? "w-full min-h-[300px]" : "absolute inset-0")}>
+        <div className="w-full bg-slate-900 flex items-center justify-center text-slate-500 py-24">
           לא הוגדרו תמונות לגלריה
         </div>
       );
@@ -249,40 +251,49 @@ export const VideoGallery = ({
     const current = normalizedImages[safeCurrentIndex];
 
     // ==========================================
-    // 1. Natural / Auto Dimensions Mode (Mobile & Desktop)
+    // 1. Natural Proportional Mode (100% Uncropped Full Width)
     // ==========================================
-    if (isAutoHeight) {
-      const imgStyle: React.CSSProperties = {
-        objectFit: resolvedObjectFit,
-        maxHeight: "88vh",
-        maxWidth: "100%",
-        width: resolvedObjectFit === "fill" ? "100%" : resolvedObjectFit === "cover" ? "100%" : "auto",
-        height: resolvedObjectFit === "fill" ? "65vh" : "auto",
-        display: "block",
-        margin: "0 auto",
-      };
+    if (isNaturalMode) {
+      return (
+        <div className="w-full relative overflow-hidden flex items-center justify-center">
+          {/* Main active image dictates natural container height */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={safeCurrentIndex}
+              initial={
+                effect === "zoom-in" ? { opacity: 0, scale: 1.05 } :
+                effect === "slide" ? { opacity: 0, x: 40 } :
+                { opacity: 0 }
+              }
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={
+                effect === "zoom-in" ? { opacity: 0, scale: 0.98 } :
+                effect === "slide" ? { opacity: 0, x: -40 } :
+                { opacity: 0 }
+              }
+              transition={{
+                duration: effect === "zoom-in" ? 1.0 : effect === "slide" ? 0.7 : 0.8,
+                ease: "easeOut"
+              }}
+              className="w-full relative flex items-center justify-center"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={current.url}
+                alt={current.title || `Gallery ${safeCurrentIndex}`}
+                className={cn(
+                  "w-full h-auto max-w-full block transition-all",
+                  fitClass
+                )}
+                style={{
+                  objectFit: resolvedObjectFit,
+                  display: "block",
+                  margin: "0 auto",
+                }}
+              />
 
-      if (effect === "digital-squares") {
-        return (
-          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={safeCurrentIndex}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.8 }}
-                className="w-full relative flex items-center justify-center"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={current.url}
-                  alt={current.title || `Gallery ${safeCurrentIndex}`}
-                  style={imgStyle}
-                  className={cn("transition-all duration-500", fitClass)}
-                />
-                
-                {/* Digital squares effect layer */}
+              {/* Digital squares effect overlay */}
+              {effect === "digital-squares" && (
                 <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 pointer-events-none">
                   {Array.from({ length: 100 }).map((_, i) => (
                     <motion.div
@@ -290,89 +301,15 @@ export const VideoGallery = ({
                       initial={{ opacity: 1 }}
                       animate={{ opacity: 0 }}
                       transition={{ 
-                        duration: 0.8, 
-                        delay: Math.random() * 0.5, 
+                        duration: 0.7, 
+                        delay: Math.random() * 0.4, 
                         ease: "easeOut"
                       }}
                       className="bg-black/50"
                     />
                   ))}
                 </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        );
-      }
-
-      if (effect === "zoom-in") {
-        return (
-          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={safeCurrentIndex}
-                initial={{ opacity: 0, scale: 1.06 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-                className="w-full relative flex items-center justify-center"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={current.url}
-                  alt={current.title || "Gallery"}
-                  style={imgStyle}
-                  className={cn("transition-all duration-500", fitClass)}
-                />
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        );
-      }
-
-      if (effect === "slide") {
-        return (
-          <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={safeCurrentIndex}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full relative flex items-center justify-center"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={current.url}
-                  alt={current.title || "Gallery"}
-                  style={imgStyle}
-                  className={cn("transition-all duration-500", fitClass)}
-                />
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        );
-      }
-
-      // Default Fade in auto height
-      return (
-        <div className="w-full relative flex items-center justify-center overflow-hidden bg-inherit">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={safeCurrentIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.9 }}
-              className="w-full relative flex items-center justify-center"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={current.url}
-                alt={current.title || "Gallery"}
-                style={imgStyle}
-                className={cn("transition-all duration-500", fitClass)}
-              />
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -380,7 +317,7 @@ export const VideoGallery = ({
     }
 
     // ==========================================
-    // 2. Fixed Height Modes (tall, normal, extra-tall)
+    // 2. Aspect Ratio & Fixed Modes (16:9, 21:9, 3:1, 2.35:1, tall, normal, extra-tall)
     // ==========================================
     if (effect === "digital-squares") {
       return (
@@ -393,16 +330,14 @@ export const VideoGallery = ({
                 idx === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
               )}
             >
-              <Image 
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
                 src={imgObj.url} 
                 alt={imgObj.title || `Gallery ${idx}`} 
-                fill 
-                sizes="100vw"
                 style={{ objectFit: resolvedObjectFit }}
-                className={cn("transition-all duration-700", fitClass)} 
+                className={cn("w-full h-full transition-all duration-700", fitClass)} 
               />
               
-              {/* Digital squares effect layer */}
               {idx === currentIndex && (
                 <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 pointer-events-none">
                    {Array.from({ length: 100 }).map((_, i) => (
@@ -432,19 +367,18 @@ export const VideoGallery = ({
           <AnimatePresence initial={false}>
             <motion.div
               key={safeCurrentIndex}
-              initial={{ opacity: 0, scale: 1.15 }}
+              initial={{ opacity: 0, scale: 1.12 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 1.8, ease: "easeOut" }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
               className="absolute inset-0"
             >
-              <Image 
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
                 src={current.url} 
                 alt={current.title || "Gallery"} 
-                fill 
-                sizes="100vw"
                 style={{ objectFit: resolvedObjectFit }}
-                className={cn("transition-all duration-700", fitClass)} 
+                className={cn("w-full h-full transition-all duration-700", fitClass)} 
               />
             </motion.div>
           </AnimatePresence>
@@ -458,19 +392,18 @@ export const VideoGallery = ({
           <AnimatePresence initial={false}>
             <motion.div
               key={safeCurrentIndex}
-              initial={{ opacity: 0, x: 60 }}
+              initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -60 }}
-              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               className="absolute inset-0"
             >
-              <Image 
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
                 src={current.url} 
                 alt={current.title || "Gallery"} 
-                fill 
-                sizes="100vw"
                 style={{ objectFit: resolvedObjectFit }}
-                className={cn("transition-all duration-700", fitClass)} 
+                className={cn("w-full h-full transition-all duration-700", fitClass)} 
               />
             </motion.div>
           </AnimatePresence>
@@ -478,25 +411,24 @@ export const VideoGallery = ({
       );
     }
 
-    // Default Fade effect (fixed container)
+    // Default Fade effect in fixed/aspect ratio container
     return (
       <div className="absolute inset-0 overflow-hidden">
         <AnimatePresence initial={false}>
           <motion.div
             key={safeCurrentIndex}
-            initial={{ opacity: 0, scale: 1.04 }}
+            initial={{ opacity: 0, scale: 1.03 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.5 }}
+            transition={{ duration: 1.2 }}
             className="absolute inset-0"
           >
-            <Image 
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
               src={current.url} 
               alt={current.title || "Gallery"} 
-              fill 
-              sizes="100vw"
               style={{ objectFit: resolvedObjectFit }}
-              className={cn("transition-all duration-700", fitClass)} 
+              className={cn("w-full h-full transition-all duration-700", fitClass)} 
             />
           </motion.div>
         </AnimatePresence>
@@ -524,7 +456,7 @@ export const VideoGallery = ({
             exit={{ opacity: 0, y: activePosition === "top" ? -20 : -20 }}
             transition={{ duration: 0.6 }}
             className={cn(
-              "absolute inset-x-0 z-30 px-6 flex items-center text-center pointer-events-none",
+              "absolute inset-x-0 z-20 px-6 flex items-center text-center pointer-events-none",
               activePosition === "top" 
                 ? "top-0 pt-6 md:pt-8 pb-14 bg-gradient-to-b from-black/90 via-black/50 to-transparent justify-center" 
                 : "bottom-0 pb-6 md:pb-8 pt-16 bg-gradient-to-t from-black/90 via-black/50 to-transparent justify-center"
@@ -549,7 +481,7 @@ export const VideoGallery = ({
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.7 }}
             className={cn(
-              "absolute z-30 max-w-2xl px-6 md:px-8 py-3 md:py-4 rounded-3xl bg-amber-950/80 backdrop-blur-lg border border-amber-400/50 shadow-[0_0_35px_rgba(245,158,11,0.35)] text-center mx-4 pointer-events-none flex items-center",
+              "absolute z-20 max-w-2xl px-6 md:px-8 py-3 md:py-4 rounded-3xl bg-amber-950/80 backdrop-blur-lg border border-amber-400/50 shadow-[0_0_35px_rgba(245,158,11,0.35)] text-center mx-4 pointer-events-none flex items-center",
               posClass
             )}
             dir="rtl"
@@ -572,7 +504,7 @@ export const VideoGallery = ({
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.5 }}
             className={cn(
-              "absolute z-30 px-5 py-2.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white shadow-xl text-center mx-4 pointer-events-none flex items-center",
+              "absolute z-20 px-5 py-2.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white shadow-xl text-center mx-4 pointer-events-none flex items-center",
               posClass
             )}
             dir="rtl"
@@ -593,7 +525,7 @@ export const VideoGallery = ({
           exit={{ opacity: 0, y: activePosition === "top" ? -15 : -15, scale: 0.96 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className={cn(
-            "absolute z-30 max-w-3xl mx-4 px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-black/70 backdrop-blur-md border border-amber-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.6)] flex items-center gap-3 text-center pointer-events-none",
+            "absolute z-20 max-w-3xl mx-4 px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-black/70 backdrop-blur-md border border-amber-500/40 shadow-[0_10px_35px_rgba(0,0,0,0.6)] flex items-center gap-3 text-center pointer-events-none",
             posClass
           )}
           dir="rtl"
@@ -607,52 +539,69 @@ export const VideoGallery = ({
     );
   };
 
-  // Compute desktop & mobile height
-  const getHeightClasses = () => {
-    if (isAutoHeight) {
+  // Compute container dimension classes
+  const getDimensionClasses = () => {
+    if (isNaturalMode) {
       return "h-auto min-h-0 py-0";
     }
+    // Aspect Ratio Presets
+    if (heightDesktop === "16:9") {
+      return "aspect-[16/9] w-full min-h-[220px]";
+    }
+    if (heightDesktop === "21:9") {
+      return "aspect-[21/9] w-full min-h-[200px]";
+    }
+    if (heightDesktop === "3:1") {
+      return "aspect-[3/1] w-full min-h-[180px]";
+    }
+    if (heightDesktop === "2.35:1") {
+      return "aspect-[2.35/1] w-full min-h-[200px]";
+    }
+    // Viewport Height Modes
     if (heightDesktop === "normal") {
       return "h-[40vh] sm:h-[50vh] md:h-[60vh] min-h-[220px] sm:min-h-[300px] md:min-h-[400px]";
     }
     if (heightDesktop === "extra-tall") {
       return "h-[55vh] sm:h-[70vh] md:h-[85vh] min-h-[320px] sm:min-h-[450px] md:min-h-[580px]";
     }
-    // "tall" or default (+20% on desktop)
-    return "h-[48vh] sm:h-[58vh] md:h-[72vh] min-h-[260px] sm:min-h-[360px] md:min-h-[480px]";
+    if (heightDesktop === "tall") {
+      return "h-[48vh] sm:h-[58vh] md:h-[72vh] min-h-[260px] sm:min-h-[360px] md:min-h-[480px]";
+    }
+    // Default fallback to natural
+    return "h-auto min-h-0 py-0";
   };
 
   return (
     <section 
       id={id} 
       className={cn(
-        "relative w-full flex items-center justify-center overflow-hidden group transition-all duration-500",
-        getHeightClasses()
+        "relative w-full overflow-hidden group transition-all duration-500",
+        getDimensionClasses()
       )}
       style={{ backgroundColor: backgroundColor || "#0f172a" }}
     >
-      {/* Background layer */}
+      {/* Background Gallery Layer */}
       {renderGalleryBackground()}
       
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 transition-colors duration-500 z-10 pointer-events-none" />
 
-      {/* Title Overlay */}
+      {/* Animated Title Overlay */}
       {renderTitleOverlay()}
 
-      {/* Center Play Button */}
+      {/* Center Play Button - absolutely centered with zero layout displacement */}
       {videoUrl && (
-        <button
-          type="button"
-          onClick={handleOpen}
-          className="relative z-20 group/btn flex items-center justify-center cursor-pointer"
-          aria-label="הפעל וידאו"
-        >
-          <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
-          <div className="relative w-20 h-20 md:w-28 md:h-28 bg-black/40 backdrop-blur-md border-2 border-amber-400/50 hover:border-amber-400 rounded-full flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
-            <Play className="w-9 h-9 md:w-12 md:h-12 text-amber-300 ml-1.5 drop-shadow" fill="currentColor" />
-          </div>
-        </button>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+          <button
+            type="button"
+            onClick={handleOpen}
+            className="pointer-events-auto group/btn flex items-center justify-center cursor-pointer transition-transform duration-300 hover:scale-105"
+            aria-label="הפעל וידאו"
+          >
+            <div className="absolute inset-0 bg-amber-500/25 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
+            <div className="relative w-16 h-16 md:w-24 md:h-24 bg-black/50 backdrop-blur-md border-2 border-amber-400/70 hover:border-amber-300 rounded-full flex items-center justify-center hover:bg-black/70 shadow-[0_0_35px_rgba(245,158,11,0.4)]">
+              <Play className="w-8 h-8 md:w-11 md:h-11 text-amber-300 ml-1 drop-shadow" fill="currentColor" />
+            </div>
+          </button>
+        </div>
       )}
 
       {/* Video Modal */}

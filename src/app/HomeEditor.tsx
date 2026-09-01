@@ -59,7 +59,8 @@ import {
   Eye,
   EyeOff,
   Monitor,
-  Folder
+  Folder,
+  Pin
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -3326,15 +3327,44 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 <h3 className="text-sm font-bold text-white">ממשק עריכת אזורי עמוד הבית</h3>
                 <p className="text-[11px] text-slate-400">בחר אזור לעריכה. רק אזור אחד פתוח בכל פעם למניעת עומס ולחוויית משתמש מושלמת.</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(true);
+                    setActiveAccordion("logo");
+                  }}
+                  className="flex items-center gap-1.5 bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition-all text-xs font-bold cursor-pointer"
+                  title="ערוך לוגו, צבעים ומאפייני הדר"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span>ערוך תפריט עליון (הדר)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGlobalSettings(prev => ({ ...prev, headerSticky: prev.headerSticky === false ? true : false }))}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                    globalSettings.headerSticky !== false
+                      ? "bg-amber-500/15 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                      : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                  )}
+                  title="לחץ לשינוי מצב הדבקת תפריט עליון (דביק בראש הדף או סטטי מעל התוכן)"
+                >
+                  <Pin className="h-3.5 w-3.5" />
+                  <span>{globalSettings.headerSticky !== false ? "הדר דביק (נעול)" : "הדר סטטי (ללא הדבקה)"}</span>
+                </button>
+
                 <button
                   onClick={handleOpenDrawer}
-                  className="flex items-center gap-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 border border-pink-500/30 px-3 py-1.5 rounded-xl transition-all text-xs font-bold"
+                  className="flex items-center gap-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 border border-pink-500/30 px-3 py-1.5 rounded-xl transition-all text-xs font-bold cursor-pointer"
                   title="הגדרות אתר וצבעים גלובליים"
                 >
                   <Settings2 className="h-4 w-4" />
                   הגדרות כלליות
                 </button>
+
                 <div className="flex items-center gap-2 bg-black/30 border border-white/5 px-3 py-1.5 rounded-xl hidden sm:flex">
                   <span className="text-xs font-semibold text-slate-350">הצג תפריט עליון:</span>
                   <input
