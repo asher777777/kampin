@@ -91,9 +91,20 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Payment Method Selection (for one-time donations)
-  const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit" | "google_pay">("credit_card");
+  const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit" | "google_pay">(initialPaymentMethod || "credit_card");
   const [iframeUrl, setIframeUrl] = useState<string>("");
   const [bitStatus, setBitStatus] = useState<{ message: string; bitUrl?: string; phone?: string } | null>(null);
+
+  // Set initial payment method when drawer opens or prop changes
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialPaymentMethod) {
+        setPaymentMethodType(initialPaymentMethod);
+      }
+      setBitStatus(null);
+      setIframeUrl("");
+    }
+  }, [isOpen, initialPaymentMethod]);
 
   // Load saved donor info from localStorage for instant autofill
   React.useEffect(() => {
@@ -317,7 +328,11 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
           bitUrl: data.bitUrl,
           phone
         });
-        if (data.bitUrl) {
+        const isMobile = typeof window !== "undefined" && (
+          /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          window.innerWidth < 768
+        );
+        if (data.bitUrl && isMobile) {
           try {
             window.location.href = data.bitUrl;
           } catch (e) {}
@@ -1018,7 +1033,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             ) : paymentMethodType === "bit" && donationMode === "one_time" ? (
               /* BIT PAYMENT CARD */
               bitStatus ? (
-                <div className={`p-5 rounded-2xl border text-center space-y-3.5 animate-in fade-in zoom-in-95 ${
+                <div className={`p-5 rounded-2xl border text-center space-y-4 animate-in fade-in zoom-in-95 ${
                   isDark ? "bg-gradient-to-b from-emerald-950/90 via-slate-900 to-slate-900 border-emerald-500/50 shadow-2xl" : "bg-emerald-50 border-emerald-300 shadow-lg"
                 }`}>
                   <div className="relative w-12 h-12 mx-auto">
@@ -1029,34 +1044,50 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <h4 className={`font-black text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>
-                      בקשת התשלום נשלחה בהצלחה! 📲
+                    <h4 className={`font-black text-base ${isDark ? "text-white" : "text-slate-900"}`}>
+                      בקשת התשלום נשלחה ל-Bit בהצלחה! 📲
                     </h4>
                     <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-slate-200" : "text-slate-700"}`}>
-                      {bitStatus.message}
+                      נשלחה התראה / מסרון למכשיר הנייד. ניתן גם לסרוק את הקוד או לפתוח ישירות בנייד לאישור תרומה על סך <strong>₪{calculatedTotal.toLocaleString()}</strong>:
                     </p>
-                    {bitStatus.phone && (
-                      <div className={`inline-block px-3 py-1 rounded-full text-xs font-mono font-bold mt-1 ${
-                        isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-800"
-                      }`}>
-                        נשלח למספר: {bitStatus.phone}
-                      </div>
-                    )}
                   </div>
 
-                  <div className="space-y-2 pt-1">
-                    {bitStatus.bitUrl && (
-                      <a
-                        href={bitStatus.bitUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer font-bold"
-                      >
-                        <span>פתח את אפליקציית Bit במכשיר</span>
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
+                  {/* QR CODE FOR INSTANT SCAN FROM PHONE CAMERA */}
+                  {bitStatus.bitUrl && (
+                    <div className="p-3 bg-white rounded-2xl inline-block shadow-lg border border-emerald-400 mx-auto">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(bitStatus.bitUrl)}`} 
+                        alt="סרוק עם מצלמת הנייד לתשלום ב-Bit" 
+                        className="w-32 h-32 mx-auto rounded-lg"
+                      />
+                      <p className="text-[11px] font-bold text-slate-800 mt-1.5 flex items-center justify-center gap-1">
+                        <span>📸 סרוק במצלמת הנייד לפתיחה ב-Bit</span>
+                      </p>
+                    </div>
+                  )}
 
+                  {bitStatus.phone && (
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                      <div className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                        isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        📱 נשלח למספר: {bitStatus.phone}
+                      </div>
+
+                      {bitStatus.bitUrl && (
+                        <a
+                          href={`https://api.whatsapp.com/send?phone=972${bitStatus.phone.replace(/^0/, '')}&text=${encodeURIComponent('קישור ישיר לאישור תשלום Bit על סך ₪' + calculatedTotal.toLocaleString() + ':\n' + bitStatus.bitUrl)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                        >
+                          <span>פתח ב-WhatsApp 💬</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-2 pt-1">
                     <button
                       type="button"
                       onClick={async () => {
@@ -1065,7 +1096,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                           onDonationCompleted();
                         }
                       }}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-sm flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>אישרתי את התשלום באפליקציה ✓</span>

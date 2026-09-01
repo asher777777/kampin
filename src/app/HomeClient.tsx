@@ -500,7 +500,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
       {/* Sticky Bottom Bar for Campaign */}
       {(config.campaignHeader?.visible !== false || config.campaignDonors?.visible !== false) && (
         <CampaignStickyBar
-          onOpenDonate={(mode) => handleOpenDonationDrawer(undefined, mode)}
+          onOpenDonate={(mode, paymentMethod) => handleOpenDonationDrawer(undefined, mode, paymentMethod)}
         />
       )}
 

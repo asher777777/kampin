@@ -259,9 +259,10 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
 
       {/* Sticky Bottom Donation Bar */}
       <CampaignStickyBar
-        onOpenDonate={(mode) => {
+        onOpenDonate={(mode, paymentMethod) => {
           setSelectedTierIdForDrawer(undefined);
           setDrawerInitialMode(mode);
+          setDrawerInitialPaymentMethod(paymentMethod);
           setIsDonationDrawerOpen(true);
         }}
         mainCampaignUrl={mainCampaignUrl}
@@ -283,6 +284,7 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
         ambassadorName={currentAmbassador?.name}
         initialSelectedTierId={selectedTierIdForDrawer}
         initialDonationMode={drawerInitialMode}
+        initialPaymentMethod={drawerInitialPaymentMethod}
         configTiers={config?.campaignTiers?.tiers}
         configDonationType={config?.campaignTiers?.donationType}
         drawerConfig={{
