@@ -20,7 +20,7 @@ interface DonationDrawerProps {
   configRecurringMonths?: number;
   initialSelectedTierId?: string;
   initialDonationMode?: "one_time" | "recurring";
-  initialPaymentMethod?: "credit_card" | "bit" | "google_pay";
+  initialPaymentMethod?: "credit_card" | "bit";
   drawerConfig?: any;
 }
 
@@ -91,7 +91,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Payment Method Selection (for one-time donations)
-  const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit" | "google_pay">(initialPaymentMethod || "credit_card");
+  const [paymentMethodType, setPaymentMethodType] = useState<"credit_card" | "bit">(initialPaymentMethod || "credit_card");
   const [iframeUrl, setIframeUrl] = useState<string>("");
   const [bitStatus, setBitStatus] = useState<{ message: string; bitUrl?: string; phone?: string } | null>(null);
 
@@ -936,11 +936,11 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
             {donationMode === "one_time" && !iframeUrl && (
               <div className="space-y-1.5">
                 <label className={`text-[11px] font-bold block ${isDark ? "text-slate-300" : "text-slate-700"}`}>בחר אמצעי תשלום:</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethodType("credit_card")}
-                    className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    className={`py-2.5 px-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       paymentMethodType === "credit_card"
                         ? isDark
                           ? "bg-slate-800 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500"
@@ -951,13 +951,13 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                     }`}
                   >
                     <CreditCard className={`w-4 h-4 ${paymentMethodType === "credit_card" ? "text-emerald-500" : "text-slate-400"}`} />
-                    <span className="text-[11px] font-bold">כרטיס אשראי</span>
+                    <span className="text-xs font-bold">כרטיס אשראי</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPaymentMethodType("bit")}
-                    className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    className={`py-2.5 px-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       paymentMethodType === "bit"
                         ? isDark
                           ? "bg-emerald-950/80 border-emerald-400 text-emerald-300 shadow-sm ring-1 ring-emerald-400"
@@ -967,32 +967,10 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                           : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <div className="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center">
                       bit
                     </div>
-                    <span className="text-[11px] font-bold">Bit</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethodType("google_pay")}
-                    className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                      paymentMethodType === "google_pay"
-                        ? isDark
-                          ? "bg-indigo-950/80 border-indigo-400 text-indigo-200 shadow-sm ring-1 ring-indigo-400"
-                          : "bg-indigo-50 border-indigo-500 text-indigo-950 shadow-sm ring-1 ring-indigo-500"
-                        : isDark
-                          ? "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-0.5 text-[11px] font-black leading-none">
-                      <span className="text-blue-500">G</span>
-                      <span className="text-red-500">P</span>
-                      <span className="text-amber-500">a</span>
-                      <span className="text-green-500">y</span>
-                    </div>
-                    <span className="text-[11px] font-bold">Google Pay</span>
+                    <span className="text-xs font-bold">Bit</span>
                   </button>
                 </div>
               </div>
@@ -1145,40 +1123,6 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                   </button>
                 </div>
               )
-            ) : paymentMethodType === "google_pay" && donationMode === "one_time" ? (
-              /* GOOGLE PAY / APPLE PAY CARD */
-              <div className={`p-4 rounded-2xl border text-center space-y-2.5 ${
-                isDark ? "bg-gradient-to-b from-indigo-950/60 to-slate-900 border-indigo-500/40" : "bg-indigo-50/70 border-indigo-300"
-              }`}>
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/30">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div className="space-y-0.5">
-                  <h4 className={`font-black text-xs sm:text-sm ${isDark ? "text-white" : "text-slate-900"}`}>תשלום בארנק דיגיטלי (Google Pay)</h4>
-                  <p className={`text-[11px] max-w-sm mx-auto leading-tight ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                    תשלום מיידי בנגיעה אחת ללא צורך בהקלדת פרטי כרטיס אשראי.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handlePayWithDigitalWallet("google_pay")}
-                  className={`w-full py-2.5 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
-                    isDark ? "bg-white hover:bg-slate-100 text-slate-950" : "bg-slate-900 hover:bg-slate-800 text-white"
-                  }`}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>מתחבר לארנק הדיגיטלי...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>שלם ₪{calculatedTotal.toLocaleString()} ב-Google Pay</span>
-                    </>
-                  )}
-                </button>
-              </div>
             ) : (
               /* DIRECT CREDIT CARD FORM WITH BROWSER AUTOFILL */
               <form onSubmit={handleProcessPayment} className="space-y-2.5 text-sm">

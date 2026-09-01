@@ -50,7 +50,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const [isDonationDrawerOpen, setIsDonationDrawerOpen] = useState(false);
   const [selectedTierIdForDrawer, setSelectedTierIdForDrawer] = useState<string | undefined>();
   const [drawerInitialMode, setDrawerInitialMode] = useState<"one_time" | "recurring" | undefined>();
-  const [drawerInitialPaymentMethod, setDrawerInitialPaymentMethod] = useState<"credit_card" | "bit" | "google_pay" | undefined>();
+  const [drawerInitialPaymentMethod, setDrawerInitialPaymentMethod] = useState<"credit_card" | "bit" | undefined>();
   const [config, setConfig] = useState<HomePageConfig>(initialConfig);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     ...(initialGlobalSettings || { siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] }),
@@ -131,7 +131,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const handleOpenDonationDrawer = (
     tierId?: string,
     mode?: "one_time" | "recurring",
-    paymentMethod?: "credit_card" | "bit" | "google_pay"
+    paymentMethod?: "credit_card" | "bit"
   ) => {
     setSelectedTierIdForDrawer(tierId);
     setDrawerInitialMode(mode);

@@ -5,7 +5,7 @@ import { Share2, Heart, Copy, Check, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 interface CampaignStickyBarProps {
-  onOpenDonate: (mode?: "one_time" | "recurring", paymentMethod?: "credit_card" | "bit" | "google_pay") => void;
+  onOpenDonate: (mode?: "one_time" | "recurring", paymentMethod?: "credit_card" | "bit") => void;
   onOpenShare?: () => void;
   mainCampaignUrl?: string;
   isAmbassadorView?: boolean;
