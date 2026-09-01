@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import * as LucideIcons from "lucide-react";
 import { X, Heart, CreditCard, Lock, Check, Repeat, Calendar, User, ArrowRight, ShieldCheck, FileText, Loader2, ArrowLeft, FlaskConical, Share2, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { recordPendingDonationAction, completeDonationAction, failDonationAction, recordDonationAction } from "@/features/campaigns/actions";
+import { initiateKesherDigitalWalletAction } from "@/features/kesher/actions";
 import { DonationTier } from "@/lib/types/campaign";
 import { CampaignTiersList, defaultTiers } from "./CampaignTiersList";
 
@@ -291,43 +292,38 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         return;
       }
 
-      if (walletType === "bit" && (!phone || phone.replace(/[^0-9]/g, "").length < 9)) {
-        setError("לתשלום ישיר באפליקציית Bit יש להזין מספר טלפון נייד תקין בשלב הפרטים (חזור לשלב הקודם).");
+      const cleanDigits = (phone || "").replace(/[^0-9]/g, "");
+      if (walletType === "bit" && (cleanDigits.length < 9 || !cleanDigits.startsWith("05"))) {
+        setError("לתשלום ישיר באפליקציית Bit יש להזין מספר טלפון נייד ישראלי תקין (המתחיל ב-05) בשלב הפרטים.");
         setLoading(false);
         return;
       }
 
-      // PRODUCTION KESHER CALL
-      const res = await fetch("/api/kesher/get-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId: targetCampId,
-          amount: calculatedTotal,
-          clientName: donorName || "תורם קמפיין",
-          phone,
-          email,
-          walletType,
-          details: `תרומה בקמפיין - ${walletType === "bit" ? "ביט" : "Google Pay"}`,
-          transactionId: pendingDonationId || `Donation-${targetCampId}-${Date.now()}`,
-          installments: 1,
-        }),
+      const data = await initiateKesherDigitalWalletAction({
+        campaignId: targetCampId,
+        amount: calculatedTotal,
+        clientName: donorName || "תורם קמפיין",
+        phone,
+        email,
+        walletType,
+        details: `תרומה בקמפיין - ${walletType === "bit" ? "ביט" : "Google Pay"}`,
+        transactionId: pendingDonationId || `Donation-${targetCampId}-${Date.now()}`,
+        installments: 1,
       });
 
-      const data = await res.json();
-      if (data.success && (data.isSmsSent || data.bitUrl || walletType === "bit")) {
+      if (data.success && (data.bitUrl || (data as any).isDirectBit)) {
         setBitStatus({
-          message: data.message || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום באפליקציית Bit.",
+          message: data.message || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
           bitUrl: data.bitUrl,
           phone
         });
         if (data.bitUrl) {
           try {
-            window.open(data.bitUrl, "_blank");
+            window.location.href = data.bitUrl;
           } catch (e) {}
         }
-      } else if (data.success && data.iframeUrl) {
-        setIframeUrl(data.iframeUrl);
+      } else if (data.success && (data as any).iframeUrl) {
+        setIframeUrl((data as any).iframeUrl);
       } else {
         setError(data.error || "שגיאה בהפקת קישור לתשלום דיגיטלי מול קשר. ודא כי פרטי מסוף קשר מוגדרים במערכת.");
       }
@@ -448,7 +444,15 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
       });
 
 
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch (parseErr) {
+        console.error("Kesher send-transaction non-JSON response:", resText);
+        throw new Error("שגיאה בתקשורת עם השרת. אנא נסה שוב.");
+      }
+
       console.log("Kesher payment response:", data);
 
       if (data.success || data.code === 499 || data.code === 0) {
@@ -1026,7 +1030,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
 
                   <div className="space-y-1">
                     <h4 className={`font-black text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>
-                      בקשת התשלום נשלחה ל-Bit בהצלחה! 📲
+                      בקשת התשלום נשלחה בהצלחה! 📲
                     </h4>
                     <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isDark ? "text-slate-200" : "text-slate-700"}`}>
                       {bitStatus.message}
@@ -1046,7 +1050,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
                         href={bitStatus.bitUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer font-bold"
                       >
                         <span>פתח את אפליקציית Bit במכשיר</span>
                         <ExternalLink className="w-4 h-4" />

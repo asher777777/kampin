@@ -45,7 +45,7 @@ export async function POST(request: Request) {
           transaction: {
             FirstName: firstName,
             LastName: lastName,
-            Total: Math.round(Number(amount) * 100), // סכום באגורות לפי התיעוד
+            Total: Math.round(Number(amount) * 100), // סכום באגורות
             Phone: validPhone,
             Currency: 1, // 1 לשקל
             CreditType: 1, // 1 = חיוב רגיל
@@ -78,31 +78,40 @@ export async function POST(request: Request) {
           console.error("Kesher Bit JSON Parse error:", bitResText);
         }
 
-        const bUrl = bitResult?.BitUrl || bitResult?.Url || bitResult?.bitUrl;
-        const isSuccess = bitResult?.RequestResult?.Status === true || 
-                          bitResult?.RequestResult?.Code === 0 || 
-                          bitResult?.RequestResult?.Code === 499 ||
-                          (bitResult?.RequestResult?.Description && (
-                            bitResult.RequestResult.Description.includes("מסרון") || 
-                            bitResult.RequestResult.Description.includes("טלפון") ||
-                            bitResult.RequestResult.Description.includes("הצלחה") ||
-                            bitResult.RequestResult.Description.includes("נא אשר")
-                          ));
+        const bUrl = bitResult?.BitOutput?.linkAndroid || 
+                     bitResult?.BitOutput?.linkIos || 
+                     bitResult?.BitOutput?.link || 
+                     bitResult?.BitUrl || 
+                     bitResult?.Url || 
+                     null;
 
-        if (bUrl || isSuccess) {
+        const isSuccess = bitResult?.RequestResult?.Status === true || 
+                          bitResult?.RequestResult?.Code === 30001087 || 
+                          bitResult?.RequestResult?.Code === 0 || 
+                          Boolean(bUrl);
+
+        if (isSuccess) {
           return NextResponse.json({
             success: true,
-            bitUrl: bUrl || null,
-            isSmsSent: true,
-            message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום באפליקציית Bit.",
-            transactionId: bitResult?.NumTransaction || "",
+            bitUrl: bUrl,
+            message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
+            transactionId: bitResult?.NumTransaction || bitResult?.CompanyTranId || "",
             isDirectBit: true
           });
         }
 
-        console.warn("SendBitTransaction returned notice, falling back to GetLinkToken:", bitResult);
+        const errorDesc = bitResult?.RequestResult?.Description || bitResult?.error || bitResText || "שגיאה בחיבור ל-Bit";
+        return NextResponse.json({
+          success: false,
+          error: `שגיאה מקשר (Bit): ${errorDesc}`
+        }, { status: 400 });
+
       } catch (bitErr: any) {
-        console.error("SendBitTransaction exception, falling back to GetLinkToken:", bitErr);
+        console.error("SendBitTransaction exception:", bitErr);
+        return NextResponse.json({
+          success: false,
+          error: `שגיאת תקשורת עם שרת קשר (Bit): ${bitErr.message}`
+        }, { status: 500 });
       }
     }
 

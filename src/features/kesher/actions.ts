@@ -587,3 +587,186 @@ export async function syncKesherClients(timeframe: "all" | "year" | "3months" | 
     return { success: false, error: error.message };
   }
 }
+
+export async function initiateKesherDigitalWalletAction(params: {
+  amount: number;
+  clientName?: string;
+  phone?: string;
+  email?: string;
+  walletType: "bit" | "google_pay";
+  campaignId?: string;
+  userId?: string;
+  details?: string;
+  transactionId?: string;
+  installments?: number;
+}) {
+  try {
+    const { amount, clientName, phone, email, walletType, campaignId, userId: reqUserId, details, transactionId, installments } = params;
+
+    const settings = await getEffectiveKesherSettings(reqUserId, campaignId);
+    if (!settings || !settings.userName || !settings.apiKey) {
+      return { success: false, error: "כרגע לא ניתן להשתמש בשירות התשלומים (פרטי חיבור לקשר חסרים). אנא פנה להנהלה." };
+    }
+
+    const rawName = (clientName || "").trim();
+    const nameParts = rawName.split(" ").filter(Boolean);
+    const firstName = nameParts[0] || "תורם";
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : firstName;
+    const cleanPhone = (phone || "").replace(/[^0-9]/g, "");
+    const validPhone = cleanPhone.length >= 9 ? cleanPhone : "0500000000";
+    const validEmail = (email && email.includes("@")) ? email.trim() : "donor@hakel.club";
+
+    // 1. Direct Bit transaction via SendBitTransaction API (Official Kesher Bit API)
+    if (walletType === "bit") {
+      const bitPayload = {
+        Json: {
+          userName: settings.userName,
+          password: settings.apiKey,
+          func: "SendBitTransaction",
+          format: "json",
+          transaction: {
+            FirstName: firstName,
+            LastName: lastName,
+            Total: Math.round(Number(amount) * 100), // סכום באגורות
+            Phone: validPhone,
+            Currency: 1, // 1 לשקל
+            CreditType: 1, // 1 = חיוב רגיל
+            NumPayment: 1,
+            ProjectNumber: "000"
+          }
+        },
+        format: "json"
+      };
+
+      console.log("================ KESHER SEND BIT API REQUEST (Server Action) ================");
+      console.log(JSON.stringify(bitPayload, null, 2));
+
+      const bitResponse = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bitPayload)
+      });
+
+      const bitResText = await bitResponse.text();
+      console.log("================ KESHER SEND BIT API RESPONSE ================");
+      console.log(bitResText);
+
+      let bitResult: any = null;
+      try {
+        bitResult = JSON.parse(bitResText);
+      } catch (e) {
+        console.error("Kesher Bit JSON Parse error:", bitResText);
+      }
+
+      const bUrl = bitResult?.BitOutput?.linkAndroid || 
+                   bitResult?.BitOutput?.linkIos || 
+                   bitResult?.BitOutput?.link || 
+                   bitResult?.BitUrl || 
+                   bitResult?.Url || 
+                   null;
+
+      const isSuccess = bitResult?.RequestResult?.Status === true || 
+                        bitResult?.RequestResult?.Code === 30001087 || 
+                        bitResult?.RequestResult?.Code === 0 || 
+                        Boolean(bUrl);
+
+      if (isSuccess) {
+        return {
+          success: true,
+          bitUrl: bUrl,
+          message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
+          transactionId: bitResult?.NumTransaction || bitResult?.CompanyTranId || "",
+          isDirectBit: true
+        };
+      }
+
+      const errorDesc = bitResult?.RequestResult?.Description || bitResult?.error || bitResText || "שגיאה בחיבור ל-Bit";
+      return {
+        success: false,
+        error: `שגיאה מקשר (Bit): ${errorDesc}`
+      };
+    }
+
+    // 2. GetLinkToken for Google Pay / External payment page
+    const paymentPageId = (settings.paymentPageId || process.env.KESHER_PAYMENT_PAGE_ID || "").trim();
+    if (!paymentPageId || paymentPageId === "000") {
+      return { 
+        success: false, 
+        error: "לתשלום באמצעות ארנק דיגיטלי יש להגדיר 'מספר דף תשלום' (Payment Page ID) בהגדרות קשר בלוח הבקרה." 
+      };
+    }
+
+    const reqData: any = {
+      PaymentPageId: paymentPageId,
+      Currency: 1,
+      Total: Number(amount),
+      FirstName: firstName,
+      LastName: lastName,
+      Mail: validEmail,
+      Tel: validPhone,
+      CreditType: installments && installments > 1 ? "4" : "1",
+      Date: new Date().toISOString().split("T")[0],
+      Comment: details || "תשלום / תרומה",
+      AddData: transactionId || `TXN_${Date.now()}`,
+      NumPayment: installments && installments > 1 ? installments : 1,
+      MaxPayments: installments && installments > 1 ? installments : 1,
+      Moked: "CommunityGenerator"
+    };
+
+    const payload = {
+      Json: {
+        userName: settings.userName,
+        password: settings.apiKey,
+        func: "GetLinkToken",
+        format: "json",
+        request: reqData
+      },
+      format: "json"
+    };
+
+    const response = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const resultText = await response.text();
+    let result: any = {};
+    try {
+      result = JSON.parse(resultText);
+    } catch (e) {
+      return { success: false, error: "שגיאה בפיענוח תשובת קשר" };
+    }
+
+    const token = result.Token;
+    const status = result.RequestResult?.Status;
+    const code = result.RequestResult?.Code;
+
+    if (!token || !status || code != 944) {
+      return { success: false, error: "שגיאה בהפקת טוקן לתשלום. " + (result.RequestResult?.Description || "") };
+    }
+
+    const paramsObj = new URLSearchParams();
+    paramsObj.append("token", token);
+    if (amount) paramsObj.append("total", String(amount));
+    paramsObj.append("currency", "1");
+    if (clientName) {
+      paramsObj.append("firstname", firstName);
+      paramsObj.append("lastname", lastName);
+    }
+    if (phone) paramsObj.append("tel", phone);
+    if (email) paramsObj.append("mail", email);
+    if (transactionId) paramsObj.append("addactiondata", transactionId);
+
+    return {
+      success: true,
+      token,
+      iframeUrl: `https://ultra.kesherhk.info/external/paymentPage/${paymentPageId}?${paramsObj.toString()}`
+    };
+
+  } catch (error: any) {
+    console.error("Error in initiateKesherDigitalWalletAction:", error);
+    return { success: false, error: error.message || "שגיאת שרת פנימית" };
+  }
+}
+
