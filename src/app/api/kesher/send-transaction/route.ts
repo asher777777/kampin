@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "כרגע לא ניתן להשתמש בשירות התשלומים. אנא פנה להנהלה." }, { status: 400 });
     }
 
-    let numPayments = 1;
+    let numPayments = 0;
     let creditType = 1;
 
     if (paymentFrequency === "recurring" || installments === 9999) {
@@ -56,6 +56,9 @@ export async function POST(request: Request) {
       // In Kesher, for installments, NumPayment is the total number minus the first payment
       numPayments = installments - 1;
       creditType = 8; // 8 is required by Kesher for installments (תשלומים)
+    } else {
+      numPayments = 0;
+      creditType = 1;
     }
 
     let finalExpiry = expiry;
