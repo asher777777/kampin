@@ -28,7 +28,7 @@ export const CampaignTiersList: React.FC<CampaignTiersListProps> = ({
   selectedTierId,
   onSelectTier,
   onSelectCustomTier,
-  theme = "dark",
+  theme = "light",
   drawerConfig,
 }) => {
   const isDark = theme === "dark";

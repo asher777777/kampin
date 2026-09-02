@@ -55,14 +55,19 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   
   // 1. Fetch landing / custom page configuration
   let pageConfig: any = null;
+  let detectedCollection = "landing";
 
   try {
     let docSnap = await adminDb.collection("landing").doc(id).get();
-    if (!docSnap.exists) {
-      docSnap = await adminDb.collection("pages").doc(id).get();
-    }
     if (docSnap.exists) {
       pageConfig = docSnap.data();
+      detectedCollection = "landing";
+    } else {
+      docSnap = await adminDb.collection("pages").doc(id).get();
+      if (docSnap.exists) {
+        pageConfig = docSnap.data();
+        detectedCollection = "pages";
+      }
     }
   } catch (error) {
     console.warn("Could not fetch page from DB:", error);
@@ -82,45 +87,38 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   // Set defaults for page configuration
   const config = {
     ...pageConfig,
-    hero: { enabled: false, ...pageConfig.hero },
-    services: { enabled: false, ...pageConfig.services },
-    richContent: { enabled: false, ...pageConfig.richContent },
-    landingSection: { enabled: false, ...pageConfig.landingSection },
-    pricing: { enabled: false, ...pageConfig.pricing },
-    timer: { enabled: false, ...pageConfig.timer },
-    community: { enabled: false, ...pageConfig.community },
-    contact: { enabled: false, ...pageConfig.contact }
   };
 
   const mappedConfig = {
     ...config,
+    sectionOrder: config.sectionOrder || ["videoGallery", "hero", "mainContent", "campaignTiers", "campaignHeader", "campaignDonors", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "landingSection", "contact"],
     timer: {
       ...config.timer,
-      targetDate: config.timer.endDate || config.timer.targetDate || config.timer.date
+      targetDate: config.timer?.endDate || config.timer?.targetDate || config.timer?.date
     },
     richContent: {
       ...config.richContent,
-      heading: config.richContent.heading || config.richContent.title,
-      body: config.richContent.body || config.richContent.content,
-      layout: config.richContent.layout || config.richContent.theme || "split"
+      heading: config.richContent?.heading || config.richContent?.title,
+      body: config.richContent?.body || config.richContent?.content,
+      layout: config.richContent?.layout || config.richContent?.theme || "split"
     },
     services: {
       ...config.services,
-      description: config.services.description || config.services.subtitle,
-      layout: config.services.layout || "grid",
-      columns: config.services.columns || 3,
-      effect: config.services.effect || "glow",
-      items: config.services.items || []
+      description: config.services?.description || config.services?.subtitle,
+      layout: config.services?.layout || "grid",
+      columns: config.services?.columns || 3,
+      effect: config.services?.effect || "glow",
+      items: config.services?.items || []
     },
     hero: {
       ...config.hero,
-      layout: config.hero.layout || "bento",
+      layout: config.hero?.layout || "progressive",
     },
     community: {
       ...config.community,
-      layout: config.community.layout || "split",
-      badgeVisible: config.community.badgeVisible !== false,
-      buttonVisible: config.community.buttonVisible !== false
+      layout: config.community?.layout || "split",
+      badgeVisible: config.community?.badgeVisible !== false,
+      buttonVisible: config.community?.buttonVisible !== false
     }
   };
   
@@ -133,5 +131,5 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   // If preview mode is on, force canEdit to false so the old editor doesn't wrap the page
   const canEdit = !isPreview && (session?.user?.role === "SUPERADMIN" || session?.user?.id === "1" || session?.user?.id === pageConfig?.ownerId);
 
-  return <HomeClient initialConfig={mappedConfig as any} initialGlobalSettings={globalSettings} pageId={id} collectionName="landing" canEdit={canEdit} />;
+  return <HomeClient initialConfig={mappedConfig as any} initialGlobalSettings={globalSettings} pageId={id} collectionName={detectedCollection} canEdit={canEdit} />;
 }

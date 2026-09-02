@@ -263,6 +263,11 @@ export interface HomePageConfig {
       thankYouSubtitle?: string;
       thankYouImage?: string;
       thankYouShareText?: string;
+      whatsapp_enabled?: boolean;
+      whatsapp_success_message?: string;
+      whatsapp_success_image_url?: string;
+      whatsapp_pending_message?: string;
+      whatsapp_pending_image_url?: string;
     };
   };
   campaignDonors?: any;
@@ -636,6 +641,11 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
       tierDisplayMode: "auto",
       tierImageShape: "rounded",
       fontSizeScale: 1,
+      whatsapp_enabled: true,
+      whatsapp_success_message: "שלום {שם מלא}, תודה רבה על תרומתך בסך ₪{סכום} עבור {שם קמפיין}! תזכו למצוות ולברכה.",
+      whatsapp_success_image_url: "",
+      whatsapp_pending_message: "שלום {שם מלא}, שמנו לב שהתחלת תרומה בסך ₪{סכום} עבור {שם קמפיין} אך התהליך טרם הושלם. לחץ כאן להשלמת התרומה: {קישור לתשלום}",
+      whatsapp_pending_image_url: "",
     }
   },
   mobileHiddenSections: [],

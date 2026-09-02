@@ -4,7 +4,7 @@ import React from "react";
 import { DonationTier } from "@/lib/types/campaign";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { IconPicker } from "@/components/ui/IconPicker";
-import { Plus, Trash2, Image as ImageIcon, Heart, CreditCard, CheckCircle2, FlaskConical } from "lucide-react";
+import { Plus, Trash2, Image as ImageIcon, Heart, CreditCard, CheckCircle2, FlaskConical, MessageSquare, Sparkles, Clock, Check } from "lucide-react";
 
 interface CampaignTiersEditorProps {
   config: any;
@@ -270,7 +270,7 @@ export const CampaignTiersEditor: React.FC<CampaignTiersEditorProps> = ({
                 type="button"
                 onClick={() => onChange({ ...config, drawerConfig: { ...config.drawerConfig, theme: "dark" } })}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
-                  (config.drawerConfig?.theme !== "light") ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"
+                  config.drawerConfig?.theme === "dark" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"
                 }`}
               >
                 🌙 לילה
@@ -279,7 +279,7 @@ export const CampaignTiersEditor: React.FC<CampaignTiersEditorProps> = ({
                 type="button"
                 onClick={() => onChange({ ...config, drawerConfig: { ...config.drawerConfig, theme: "light" } })}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
-                  config.drawerConfig?.theme === "light" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                  config.drawerConfig?.theme !== "dark" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
                 }`}
               >
                 ☀️ יום
@@ -504,9 +504,217 @@ export const CampaignTiersEditor: React.FC<CampaignTiersEditorProps> = ({
                 />
               </div>
             </div>
+
+            {/* WhatsApp Automated Messages Section (GREEN-API) */}
+            <div className="p-3.5 bg-gradient-to-r from-emerald-950/50 via-slate-900 to-green-950/40 rounded-xl border border-emerald-500/60 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                  <MessageSquare className="w-4.5 h-4.5 text-emerald-400" />
+                  <span>הודעות WhatsApp אוטומטיות (GREEN-API)</span>
+                </div>
+
+                {/* Enable/Disable WhatsApp Switch */}
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.drawerConfig?.whatsapp_enabled !== false}
+                    onChange={(e) => onChange({
+                      ...config,
+                      drawerConfig: { ...config.drawerConfig, whatsapp_enabled: e.target.checked }
+                    })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-8 h-4.5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+
+              {config.drawerConfig?.whatsapp_enabled !== false && (
+                <div className="space-y-4">
+                  {/* Explanatory Box with Interactive Clickable Placeholders */}
+                  <div className="bg-amber-950/30 border border-amber-500/40 p-3.5 rounded-xl text-xs space-y-2">
+                    <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      הסבר על מנגנון הוואטסאפ האוטומטי לתרומות
+                    </h4>
+                    <p className="text-amber-300/90 leading-relaxed text-[11px]">
+                      הודעות וואטסאפ יישלחו אוטומטית דרך <strong>GREEN-API</strong> למספר הטלפון שהתורם יזין בטופס.
+                      לחצו על כפתורי השדות למטה להוספת פלייסהולדרים, והמערכת תחלץ את הנתונים בזמן אמת:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { label: "שם מלא", tag: "{שם מלא}" },
+                        { label: "מספר טלפון", tag: "{טלפון}" },
+                        { label: "אימייל", tag: "{דוא\"ל}" },
+                        { label: "סכום תרומה", tag: "{סכום}" },
+                        { label: "שם מסלול", tag: "{מסלול}" },
+                        { label: "סוג תרומה", tag: "{סוג תרומה}" },
+                        { label: "מספר חודשים", tag: "{מספר חודשים}" },
+                        { label: "שם קמפיין", tag: "{שם קמפיין}" },
+                        { label: "שם שגריר", tag: "{שם שגריר}" },
+                        { label: "הקדשה / ברכה", tag: "{הקדשה}" },
+                        { label: "קישור לקבלה", tag: "{link_kabala}" },
+                        { label: "קישור לתשלום", tag: "{קישור לתשלום}" },
+                      ].map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              const curr = config.drawerConfig?.whatsapp_success_message || "";
+                              onChange({
+                                ...config,
+                                drawerConfig: {
+                                  ...config.drawerConfig,
+                                  whatsapp_success_message: curr ? `${curr} ${item.tag}` : item.tag,
+                                },
+                              });
+                            }}
+                            className="px-2 py-1 rounded bg-amber-900/60 hover:bg-amber-800 border border-amber-500/40 text-amber-200 text-[10px] font-bold transition-colors cursor-pointer"
+                            title={`הוסף ${item.tag} להודעת ההצלחה`}
+                          >
+                            {item.tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Success Message Card */}
+                    <div className="bg-slate-900/90 p-3.5 rounded-xl border border-emerald-500/40 space-y-3">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs border-b border-slate-700/80 pb-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>1. הודעה לאחר תרומה מוצלחת (סליקה מאושרת)</span>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">נוסח ההודעה</label>
+                        <textarea
+                          rows={3}
+                          value={config.drawerConfig?.whatsapp_success_message ?? "שלום {שם מלא}, תודה רבה על תרומתך בסך ₪{סכום} עבור {שם קמפיין}! תזכו למצוות ולברכה."}
+                          onChange={(e) => onChange({
+                            ...config,
+                            drawerConfig: { ...config.drawerConfig, whatsapp_success_message: e.target.value }
+                          })}
+                          placeholder="שלום {שם מלא}, תודה רבה על תרומתך..."
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs leading-relaxed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">תמונת תודה / באנר מצורף להודעה (אופציונלי)</label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 relative">
+                            <ImageIcon className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                              type="text"
+                              placeholder="כתובת תמונה (URL) או העלה תמונה"
+                              value={config.drawerConfig?.whatsapp_success_image_url || ""}
+                              onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_success_image_url: e.target.value } })}
+                              className="w-full pr-8 pl-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-white"
+                            />
+                          </div>
+                          <ImageUpload
+                            compact={true}
+                            currentImage={config.drawerConfig?.whatsapp_success_image_url}
+                            onSelect={(url) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_success_image_url: url } })}
+                            customTrigger={(open) => (
+                              <button
+                                type="button"
+                                onClick={open}
+                                className="px-2.5 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 transition-colors shadow cursor-pointer"
+                              >
+                                <ImageIcon className="w-3 h-3" />
+                                <span>העלאה / גלריה</span>
+                              </button>
+                            )}
+                          />
+                        </div>
+                        {config.drawerConfig?.whatsapp_success_image_url && (
+                          <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-emerald-500/50 mt-1.5">
+                            <img src={config.drawerConfig.whatsapp_success_image_url} alt="תמונת וואטסאפ" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_success_image_url: "" } })}
+                              className="absolute top-1 left-1 bg-black/70 hover:bg-rose-600 text-white p-0.5 rounded text-[10px] cursor-pointer"
+                              title="הסר תמונה"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Pending Message Card (Sent after 5 mins if unpaid) */}
+                    <div className="bg-slate-900/90 p-3.5 rounded-xl border border-amber-500/40 space-y-3">
+                      <div className="space-y-1 border-b border-slate-700/80 pb-2">
+                        <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs">
+                          <Clock className="w-4 h-4 text-amber-400" />
+                          <span>2. תזכורת לתרומה בהמתנה לתשלום (ממתין 5 דקות)</span>
+                        </div>
+                        <p className="text-[10px] text-amber-300/80">
+                          ⏰ נשלחת אוטומטית לתורם רק אם עברו 5 דקות משלב הפרטים והסליקה טרם הושלמה.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">נוסח הודעת התזכורת</label>
+                        <textarea
+                          rows={3}
+                          value={config.drawerConfig?.whatsapp_pending_message ?? "שלום {שם מלא}, שמנו לב שהתחלת תרומה בסך ₪{סכום} עבור {שם קמפיין} אך התהליך טרם הושלם. לחץ כאן להשלמת התרומה: {קישור לתשלום}"}
+                          onChange={(e) => onChange({
+                            ...config,
+                            drawerConfig: { ...config.drawerConfig, whatsapp_pending_message: e.target.value }
+                          })}
+                          placeholder="שלום {שם מלא}, שמנו לב שהתחלת תרומה..."
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs leading-relaxed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">תמונה מצורפת לתזכורת (אופציונלי)</label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 relative">
+                            <ImageIcon className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                              type="text"
+                              placeholder="כתובת תמונה (URL) או העלה תמונה"
+                              value={config.drawerConfig?.whatsapp_pending_image_url || ""}
+                              onChange={(e) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_pending_image_url: e.target.value } })}
+                              className="w-full pr-8 pl-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-white"
+                            />
+                          </div>
+                          <ImageUpload
+                            compact={true}
+                            currentImage={config.drawerConfig?.whatsapp_pending_image_url}
+                            onSelect={(url) => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_pending_image_url: url } })}
+                            customTrigger={(open) => (
+                              <button
+                                type="button"
+                                onClick={open}
+                                className="px-2.5 py-1.5 bg-amber-700/80 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0 transition-colors shadow cursor-pointer"
+                              >
+                                <ImageIcon className="w-3 h-3" />
+                                <span>העלאה / גלריה</span>
+                              </button>
+                            )}
+                          />
+                        </div>
+                        {config.drawerConfig?.whatsapp_pending_image_url && (
+                          <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-amber-500/50 mt-1.5">
+                            <img src={config.drawerConfig.whatsapp_pending_image_url} alt="תמונת תזכורת" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => onChange({ ...config, drawerConfig: { ...config.drawerConfig, whatsapp_pending_image_url: "" } })}
+                              className="absolute top-1 left-1 bg-black/70 hover:bg-rose-600 text-white p-0.5 rounded text-[10px] cursor-pointer"
+                              title="הסר תמונה"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
   );
 };

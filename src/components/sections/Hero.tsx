@@ -23,6 +23,13 @@ const isVideoUrl = (url: string) => {
 };
 
 const MediaBackground = ({ src, className, priority, sizes }: any) => {
+  if (!src || typeof src !== "string" || !src.trim() || src === "/" || src === "/placeholder.png") {
+    return (
+      <div className={cn("w-full h-full bg-slate-900/40 backdrop-blur-xs flex items-center justify-center", className)}>
+        <Sparkles className="w-12 h-12 text-white/20" />
+      </div>
+    );
+  }
   if (isVideoUrl(src)) {
     return (
       <video
@@ -239,7 +246,9 @@ export const Hero = ({
       return (
         <section className={`relative pt-24 pb-36 overflow-hidden ${activeTheme.bg} ${activeTheme.text} min-h-[65vh] flex items-center`}>
           <div className="absolute inset-0 z-0">
-            <Image src={bgImage} alt="Background" fill className="absolute inset-0 w-full h-full object-cover animate-fade-in" priority={priority} />
+            {Boolean(bgImage && typeof bgImage === "string" && bgImage.trim().length > 0 && bgImage !== "/" && bgImage !== "/placeholder.png") && (
+              <Image src={bgImage} alt="Background" fill className="absolute inset-0 w-full h-full object-cover animate-fade-in" priority={priority} />
+            )}
             <div className={`absolute inset-0 ${activeTheme.bg}/85 mix-blend-multiply`} />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/30" />
           </div>

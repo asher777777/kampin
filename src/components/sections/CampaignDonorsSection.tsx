@@ -79,40 +79,11 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
           liveDonations.push({ id: doc.id, ...data } as Donation);
         }
       });
-      setDonations((prev) => {
-        const merged = [...liveDonations];
-        prev.forEach(p => {
-          if (!merged.some(m => m.id === p.id)) merged.push(p);
-        });
-        return merged;
-      });
+      liveDonations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setDonations(liveDonations);
     }, (err) => {
       console.warn("Firestore live donations listener fallback to initial:", err);
     });
-
-    // If targetCampaignId is "home", ALSO listen to "default-campaign"
-    let unsubscribeFallback: (() => void) | null = null;
-    if (targetCampaignId === "home") {
-      const fallbackRef = collection(db, "campaigns", "default-campaign", "donations");
-      unsubscribeFallback = onSnapshot(fallbackRef, (snapshot) => {
-        const extraDonations: Donation[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data() as Donation;
-          if (data.paymentStatus === "completed") {
-            extraDonations.push({ id: doc.id, ...data } as Donation);
-          }
-        });
-        if (extraDonations.length > 0) {
-          setDonations((prev) => {
-            const merged = [...prev];
-            extraDonations.forEach(e => {
-              if (!merged.some(m => m.id === e.id)) merged.push(e);
-            });
-            return merged;
-          });
-        }
-      }, () => {});
-    }
 
     // Listen for ambassadors
     const ambassadorsRef = collection(db, "campaigns", targetCampaignId, "ambassadors");
@@ -128,7 +99,6 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
 
     return () => {
       unsubscribeDonations();
-      if (unsubscribeFallback) unsubscribeFallback();
       unsubscribeAmbassadors();
     };
   }, [targetCampaignId]);

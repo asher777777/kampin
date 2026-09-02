@@ -190,6 +190,59 @@ export async function createAmbassadorAction(data: {
   }
 }
 
+// Helper to retrieve drawerConfig for WhatsApp and custom branding
+async function getCampaignDrawerConfig(campaignId: string) {
+  try {
+    const targetId = (campaignId === "default-campaign" || campaignId === "home") ? "home" : campaignId;
+    const campDoc = await adminDb.collection("campaigns").doc(targetId).get();
+    const campData = campDoc.data() || {};
+    if (campData.drawerConfig) return campData.drawerConfig;
+
+    const pageDoc = await adminDb.collection("pages").doc(targetId).get();
+    const pageData = pageDoc.data();
+    if (pageData?.campaignTiers?.drawerConfig) return pageData.campaignTiers.drawerConfig;
+
+    const homeDoc = await adminDb.collection("pages").doc("home").get();
+    return homeDoc.data()?.campaignTiers?.drawerConfig || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+// Helper to resolve dynamic placeholders in WhatsApp templates
+function resolveDonationWhatsAppMessage(template: string, data: {
+  donorName?: string;
+  phone?: string;
+  email?: string;
+  amount: number | string;
+  monthlyAmount?: number | string;
+  recurringMonths?: number | string;
+  isRecurring?: boolean;
+  tier?: string;
+  campaignTitle?: string;
+  ambassadorName?: string;
+  dedication?: string;
+  receiptUrl?: string;
+  paymentUrl?: string;
+}): string {
+  if (!template) return "";
+  let msg = template;
+  msg = msg.replace(/\{שם מלא\}/g, data.donorName || "ידיד/ת הקמפיין");
+  msg = msg.replace(/\{טלפון\}|\{מספר טלפון נייד\}|\{מספר טלפון\}/g, data.phone || "");
+  msg = msg.replace(/\{דוא"ל\}|\{כתובת אימייל\}|\{אימייל\}/g, data.email || "");
+  msg = msg.replace(/\{סכום\}|\{סכום התרומה\}/g, String(data.amount || ""));
+  msg = msg.replace(/\{סכום חודשי\}/g, String(data.monthlyAmount || data.amount || ""));
+  msg = msg.replace(/\{מסלול\}|\{מסלול תרומה\}/g, data.tier || "");
+  msg = msg.replace(/\{סוג תרומה\}/g, data.isRecurring ? `הוראת קבע (${data.recurringMonths || 12} חודשים)` : "תרומה חד פעמית");
+  msg = msg.replace(/\{מספר חודשים\}/g, String(data.recurringMonths || (data.isRecurring ? 12 : 1)));
+  msg = msg.replace(/\{שם קמפיין\}|\{קמפיין\}|\{עמוד\}/g, data.campaignTitle || "הקמפיין");
+  msg = msg.replace(/\{שם שגריר\}|\{שגריר\}/g, data.ambassadorName || "");
+  msg = msg.replace(/\{הקדשה\}|\{הקדשה \/ ברכה\}|\{ברכה\}/g, data.dedication || "");
+  msg = msg.replace(/\{link_kabala\}|\{קישור לקבלה\}|\{קבלה\}/g, data.receiptUrl || "https://hakel.club/receipt");
+  msg = msg.replace(/\{קישור לתשלום\}|\{link_tashlum\}|\{קישור להשלמת תשלום\}/g, data.paymentUrl || "");
+  return msg;
+}
+
 /**
  * Record a pending donation when moving to payment step (status: "pending")
  * Registers the donor in CRM as "ממתין לתשלום" WITHOUT adding to totalRaised!
@@ -365,6 +418,73 @@ export async function recordPendingDonationAction(data: {
         });
         contactId = contactRef.id;
       }
+
+      // Schedule 5-minute delayed WhatsApp reminder check
+      if (phone) {
+        const scheduledDonationId = donationRef.id;
+        const scheduledContactId = contactId;
+        setTimeout(async () => {
+          try {
+            const snap = await adminDb
+              .collection("campaigns")
+              .doc(targetCampaignId)
+              .collection("donations")
+              .doc(scheduledDonationId)
+              .get();
+
+            if (!snap.exists) return;
+            const don = snap.data();
+            if (!don || don.paymentStatus !== "pending" || don.pendingWhatsAppSent) {
+              return; // Already paid or already sent
+            }
+
+            const drawerConfig = await getCampaignDrawerConfig(targetCampaignId);
+            if (drawerConfig.whatsapp_enabled === false) return;
+
+            const pendingTemplate = drawerConfig.whatsapp_pending_message || "שלום {שם מלא}, שמנו לב שהתחלת תרומה בסך ₪{סכום} עבור {שם קמפיין} אך התהליך טרם הושלם. לחץ כאן להשלמת התרומה: {קישור לתשלום}";
+            const paymentUrl = `${process.env.NEXTAUTH_URL || "https://kampin.web.app"}/c/${targetCampaignId}?openDonate=true`;
+
+            const resolvedMsg = resolveDonationWhatsAppMessage(pendingTemplate, {
+              donorName: isAnonymous ? "ידיד/ת הקמפיין" : (donorName || "ידיד/ת הקמפיין"),
+              phone,
+              email,
+              amount,
+              monthlyAmount,
+              recurringMonths,
+              isRecurring,
+              tier: tier || "",
+              campaignTitle,
+              ambassadorName: ambassadorName || "",
+              dedication,
+              paymentUrl,
+            });
+
+            const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
+            if (drawerConfig.whatsapp_pending_image_url) {
+              await sendWhatsAppFileByUrl(phone, drawerConfig.whatsapp_pending_image_url, "reminder.png", resolvedMsg);
+            } else {
+              await sendWhatsAppMessage(phone, resolvedMsg);
+            }
+
+            await snap.ref.update({
+              pendingWhatsAppSent: true,
+              pendingWhatsAppSentAt: new Date().toISOString(),
+            });
+
+            if (scheduledContactId) {
+              await adminDb.collection("contacts").doc(scheduledContactId).update({
+                events: adminDb.FieldValue.arrayUnion({
+                  time: new Date().toISOString(),
+                  title: "הודעת WhatsApp תזכורת (5 דק' בממתין)",
+                  text: `נשלחה תזכורת לנייד ${phone}: "${resolvedMsg}"`,
+                }),
+              });
+            }
+          } catch (delayedErr) {
+            console.warn("Delayed pending WhatsApp reminder error:", delayedErr);
+          }
+        }, 5 * 60 * 1000);
+      }
     } catch (crmErr) {
       console.warn("CRM pending donor sync warning:", crmErr);
     }
@@ -420,11 +540,22 @@ export async function completeDonationAction(data: {
       email,
     } = data;
 
-    if (!campaignId || !donationId || !amount) {
+    const targetCampaignId = (!campaignId || campaignId === "default-campaign") ? "home" : campaignId;
+
+    if (!donationId || !amount) {
       return { success: false, error: "חסרים נתונים להשלמת התרומה" };
     }
 
-    const campaignRef = adminDb.collection("campaigns").doc(campaignId);
+    console.log("===> [Campaign Server] completeDonationAction triggered:", {
+      targetCampaignId,
+      donationId,
+      amount,
+      phone,
+      donorName,
+      paymentMethod,
+    });
+
+    const campaignRef = adminDb.collection("campaigns").doc(targetCampaignId);
     const donationRef = campaignRef.collection("donations").doc(donationId);
 
     // Atomic transaction to update donation status and increment total raised
@@ -486,9 +617,10 @@ export async function completeDonationAction(data: {
     });
 
     // Update CRM Contact
+    let campaignTitle = campaignId;
     try {
       const campaignDoc = await campaignRef.get();
-      const campaignTitle = campaignDoc.data()?.title || campaignId;
+      campaignTitle = campaignDoc.data()?.title || campaignId;
 
       if (contactId) {
         const contactDocRef = adminDb.collection("contacts").doc(contactId);
@@ -556,7 +688,67 @@ export async function completeDonationAction(data: {
       console.warn("CRM complete donor sync warning:", crmErr);
     }
 
-    revalidatePath(`/c/${campaignId}`);
+    // Send automated WhatsApp success message via GREEN-API
+    const donorPhone = phone || (contactId ? (await adminDb.collection("contacts").doc(contactId).get()).data()?.conta_phone : "");
+    console.log("===> [WhatsApp Server] Processing WhatsApp notification for completed donation:", { donorPhone, targetCampaignId });
+
+    if (donorPhone) {
+      try {
+        const drawerConfig = await getCampaignDrawerConfig(targetCampaignId);
+        console.log("===> [WhatsApp Server] Fetched drawerConfig for WhatsApp:", {
+          whatsapp_enabled: drawerConfig.whatsapp_enabled,
+          has_success_message: !!drawerConfig.whatsapp_success_message,
+          has_success_image: !!drawerConfig.whatsapp_success_image_url,
+        });
+
+        if (drawerConfig.whatsapp_enabled !== false) {
+          const successTemplate = drawerConfig.whatsapp_success_message || "שלום {שם מלא}, תודה רבה על תרומתך בסך ₪{סכום} עבור {שם קמפיין}! תזכו למצוות ולברכה.";
+          const resolvedMsg = resolveDonationWhatsAppMessage(successTemplate, {
+            donorName: isAnonymous ? "תורם יקר" : (donorName || "תורם יקר"),
+            phone: donorPhone,
+            email,
+            amount,
+            monthlyAmount,
+            recurringMonths,
+            isRecurring,
+            tier: dedication || "",
+            campaignTitle,
+            ambassadorName: ambassadorName || "",
+            dedication,
+            receiptUrl: receiptUrl || "https://hakel.club/receipt",
+          });
+
+          console.log("===> [WhatsApp Server] Sending WhatsApp message via Green API to:", donorPhone, "Message:", resolvedMsg);
+
+          const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
+          if (drawerConfig.whatsapp_success_image_url) {
+            await sendWhatsAppFileByUrl(donorPhone, drawerConfig.whatsapp_success_image_url, "thank-you.png", resolvedMsg);
+          } else {
+            await sendWhatsAppMessage(donorPhone, resolvedMsg);
+          }
+
+          console.log("===> [WhatsApp Server] Successfully sent WhatsApp message to:", donorPhone);
+
+          if (contactId) {
+            await adminDb.collection("contacts").doc(contactId).update({
+              events: adminDb.FieldValue.arrayUnion({
+                time: new Date().toISOString(),
+                title: "הודעת WhatsApp תודה נשלחה (תרומה הושלמה)",
+                text: `נשלחה הודעת תודה לנייד ${donorPhone}: "${resolvedMsg}"`,
+              }),
+            });
+          }
+        } else {
+          console.log("===> [WhatsApp Server] WhatsApp notifications are disabled in drawerConfig.");
+        }
+      } catch (waErr) {
+        console.error("===> [WhatsApp Server] WhatsApp success notification error:", waErr);
+      }
+    } else {
+      console.warn("===> [WhatsApp Server] No donor phone found for WhatsApp notification!");
+    }
+
+    revalidatePath(`/c/${targetCampaignId}`);
     return { success: true };
   } catch (error: any) {
     console.error("Error completing donation:", error);
@@ -662,15 +854,17 @@ export async function recordDonationAction(data: {
       email,
     } = data;
     
-    if (!campaignId || !amount || amount <= 0) {
+    const targetCampaignId = (!campaignId || campaignId === "default-campaign") ? "home" : campaignId;
+
+    if (!amount || amount <= 0) {
       return { success: false, error: "סכום תרומה לא תקין" };
     }
 
-    const campaignRef = adminDb.collection("campaigns").doc(campaignId);
+    const campaignRef = adminDb.collection("campaigns").doc(targetCampaignId);
     const donationRef = campaignRef.collection("donations").doc();
 
     const donationData = {
-      campaignId,
+      campaignId: targetCampaignId,
       donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
       realDonorName: donorName || "",
       amount: Number(amount),
@@ -724,9 +918,10 @@ export async function recordDonationAction(data: {
     });
 
     // Sync Donor to CRM contacts
+    let campaignTitle = campaignId;
     try {
       const campaignDoc = await campaignRef.get();
-      const campaignTitle = campaignDoc.data()?.title || campaignId;
+      campaignTitle = campaignDoc.data()?.title || campaignId;
       const crmOwnerId = campaignDoc.data()?.ownerId || "1";
 
       const existing = await findExistingContact(crmOwnerId, phone, email);
@@ -837,7 +1032,44 @@ export async function recordDonationAction(data: {
       console.warn("CRM complete donor sync warning:", crmErr);
     }
 
-    revalidatePath(`/c/${campaignId}`);
+    // Send automated WhatsApp success message via GREEN-API
+    if (phone) {
+      try {
+        const drawerConfig = await getCampaignDrawerConfig(targetCampaignId);
+        if (drawerConfig.whatsapp_enabled !== false) {
+          const successTemplate = drawerConfig.whatsapp_success_message || "שלום {שם מלא}, תודה רבה על תרומתך בסך ₪{סכום} עבור {שם קמפיין}! תזכו למצוות ולברכה.";
+          const resolvedMsg = resolveDonationWhatsAppMessage(successTemplate, {
+            donorName: isAnonymous ? "תורם יקר" : (donorName || "תורם יקר"),
+            phone,
+            email,
+            amount,
+            monthlyAmount,
+            recurringMonths,
+            isRecurring,
+            tier: tier || "",
+            campaignTitle,
+            ambassadorName: ambassadorName || "",
+            dedication,
+            receiptUrl: receiptUrl || "https://hakel.club/receipt",
+          });
+
+          console.log("===> [WhatsApp Server] recordDonationAction sending WhatsApp to:", phone, "Msg:", resolvedMsg);
+
+          const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
+          if (drawerConfig.whatsapp_success_image_url) {
+            await sendWhatsAppFileByUrl(phone, drawerConfig.whatsapp_success_image_url, "thank-you.png", resolvedMsg);
+          } else {
+            await sendWhatsAppMessage(phone, resolvedMsg);
+          }
+
+          console.log("===> [WhatsApp Server] recordDonationAction successfully sent WhatsApp to:", phone);
+        }
+      } catch (waErr) {
+        console.error("===> [WhatsApp Server] recordDonationAction WhatsApp notification error:", waErr);
+      }
+    }
+
+    revalidatePath(`/c/${targetCampaignId}`);
     return { success: true, donationId: donationRef.id };
   } catch (error: any) {
     console.error("Error recording donation:", error);
@@ -1001,6 +1233,21 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     const allDonations: Donation[] = [];
     const allAmbassadors: Ambassador[] = [];
 
+    // Fetch contacts map to detect orphaned or trashed donations
+    const activeContactsMap = new Map<string, boolean>();
+    try {
+      const contactsSnap = await adminDb.collection("contacts").get();
+      contactsSnap.docs.forEach((cDoc) => {
+        const cData = cDoc.data();
+        const isLive = cData.status !== "trashed";
+        activeContactsMap.set(cDoc.id, isLive);
+        if (cData.phone) activeContactsMap.set(cData.phone, isLive);
+        if (cData.email) activeContactsMap.set(cData.email, isLive);
+      });
+    } catch (cErr) {
+      console.warn("Could not prefetch contacts map:", cErr);
+    }
+
     for (const cid of idsToSearch) {
       try {
         const [donationsSnap, ambSnap] = await Promise.all([
@@ -1008,12 +1255,26 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
           adminDb.collection("campaigns").doc(cid).collection("ambassadors").get(),
         ]);
 
-        donationsSnap.docs.forEach((doc) => {
-          const data = doc.data() as Donation;
-          if (data.paymentStatus === "completed" && !allDonations.some(d => d.id === doc.id)) {
-            allDonations.push({ id: doc.id, ...data });
+        for (const doc of donationsSnap.docs) {
+          const data = doc.data() as any;
+          if (data.paymentStatus === "completed") {
+            let shouldRemove = false;
+            if (data.contactId && activeContactsMap.has(data.contactId) && !activeContactsMap.get(data.contactId)) {
+              shouldRemove = true;
+            } else if (data.phone && activeContactsMap.has(data.phone) && !activeContactsMap.get(data.phone)) {
+              shouldRemove = true;
+            }
+
+            if (shouldRemove) {
+              await doc.ref.delete().catch(() => {});
+              continue;
+            }
+
+            if (!allDonations.some(d => d.id === doc.id)) {
+              allDonations.push({ id: doc.id, ...data });
+            }
           }
-        });
+        }
 
         ambSnap.docs.forEach((doc) => {
           if (!allAmbassadors.some(a => a.id === doc.id)) {

@@ -35,8 +35,17 @@ import {
   CheckSquare,
   RotateCcw,
   DollarSign,
-  Tag as TagIcon
+  Tag as TagIcon,
+  ChevronDown,
+  Search,
+  Globe,
+  Bookmark,
+  Save,
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -72,8 +81,16 @@ export default function AnalyticsDashboardPage() {
   const [filterForm, setFilterForm] = useState("");
   const [activeMetricFilter, setActiveMetricFilter] = useState<string | null>(null);
   const [activeTabFilter, setActiveTabFilter] = useState<string | null>(null);
+  const [showTabSelector, setShowTabSelector] = useState(false);
+  const [filterCommunity, setFilterCommunity] = useState("");
+  const [showCommunitySelector, setShowCommunitySelector] = useState(false);
+  const [showSourceSelector, setShowSourceSelector] = useState(false);
   const [selectedQuickTags, setSelectedQuickTags] = useState<string[]>([]);
   const [showTagSelector, setShowTagSelector] = useState(false);
+  const [tagFilterSearch, setTagFilterSearch] = useState("");
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [columnDataFilters, setColumnDataFilters] = useState<Record<string, 'all' | 'has_data' | 'no_data'>>({});
   const [showRowNumbering, setShowRowNumbering] = useState(true);
   const [showRowCheckboxes, setShowRowCheckboxes] = useState(true);
@@ -83,6 +100,27 @@ export default function AnalyticsDashboardPage() {
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'} | null>(null);
   const [editingCell, setEditingCell] = useState<{ id: string, field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+
+  // Saved Table Views (Presets) State
+  const [savedViews, setSavedViews] = useState<Array<{
+    id: string;
+    name: string;
+    selectedColumns: string[];
+    activeTabFilter: string | null;
+    filterCommunity: string;
+    filterSource: string;
+    selectedQuickTags: string[];
+    columnDataFilters: Record<string, 'all' | 'has_data' | 'no_data'>;
+    showSummaries: boolean;
+    showRowNumbering: boolean;
+    showRowCheckboxes: boolean;
+    sortConfig: { key: string; direction: 'asc' | 'desc' } | null;
+    createdAt: string;
+  }>>([]);
+  const [activeSavedViewId, setActiveSavedViewId] = useState<string | null>(null);
+  const [showSavedViewsMenu, setShowSavedViewsMenu] = useState(false);
+  const [showSaveViewModal, setShowSaveViewModal] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
 
   // New Tag Modal / Inline Input state
   const [showNewTagModal, setShowNewTagModal] = useState(false);
@@ -420,6 +458,75 @@ export default function AnalyticsDashboardPage() {
     }
   };
 
+  // Load Saved Views from LocalStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("crm_saved_table_views");
+      if (raw) {
+        setSavedViews(JSON.parse(raw));
+      }
+    } catch (e) {
+      console.error("Failed to load saved views:", e);
+    }
+  }, []);
+
+  const handleSaveCurrentView = (name: string) => {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    const newView = {
+      id: "view_" + Date.now(),
+      name: cleanName,
+      selectedColumns,
+      activeTabFilter,
+      filterCommunity,
+      filterSource,
+      selectedQuickTags,
+      columnDataFilters,
+      showSummaries,
+      showRowNumbering,
+      showRowCheckboxes,
+      sortConfig,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [...savedViews.filter(v => v.name !== cleanName), newView];
+    setSavedViews(updated);
+    setActiveSavedViewId(newView.id);
+    try {
+      localStorage.setItem("crm_saved_table_views", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save view:", e);
+    }
+    setShowSaveViewModal(false);
+    setNewViewName("");
+  };
+
+  const handleApplyView = (view: any) => {
+    if (view.selectedColumns) setSelectedColumns(view.selectedColumns);
+    setActiveTabFilter(view.activeTabFilter || null);
+    setFilterCommunity(view.filterCommunity || "");
+    setFilterSource(view.filterSource || "");
+    setSelectedQuickTags(view.selectedQuickTags || []);
+    setColumnDataFilters(view.columnDataFilters || {});
+    if (view.showSummaries !== undefined) setShowSummaries(view.showSummaries);
+    if (view.showRowNumbering !== undefined) setShowRowNumbering(view.showRowNumbering);
+    if (view.showRowCheckboxes !== undefined) setShowRowCheckboxes(view.showRowCheckboxes);
+    if (view.sortConfig !== undefined) setSortConfig(view.sortConfig);
+    setActiveSavedViewId(view.id);
+    setShowSavedViewsMenu(false);
+  };
+
+  const handleDeleteSavedView = (viewId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedViews.filter(v => v.id !== viewId);
+    setSavedViews(updated);
+    if (activeSavedViewId === viewId) setActiveSavedViewId(null);
+    try {
+      localStorage.setItem("crm_saved_table_views", JSON.stringify(updated));
+    } catch (err) {
+      console.error("Failed to update saved views:", err);
+    }
+  };
+
   const handleAddContact = () => {
     setSelectedContact(null);
     setModalOpen(true);
@@ -543,13 +650,54 @@ export default function AnalyticsDashboardPage() {
   };
 
   const filteredContacts = data ? data.contacts.filter((c: any) => {
-    if (filterSource && c.lead_source !== filterSource && c.mh_crm_city !== filterSource) return false;
-    if (filterTag && c.tg1 !== filterTag && c.tg2 !== filterTag && c.tg3 !== filterTag) return false;
+    // 0. Global Deep Search (Scans all parameters in client card)
+    if (globalSearchTerm.trim()) {
+      const q = globalSearchTerm.trim().toLowerCase();
+      const matchesSearch = Object.entries(c).some(([key, val]) => {
+        if (val === null || val === undefined) return false;
+        if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+          return String(val).toLowerCase().includes(q);
+        }
+        if (Array.isArray(val)) {
+          return val.some((item) => {
+            if (typeof item === "string" || typeof item === "number") {
+              return String(item).toLowerCase().includes(q);
+            }
+            if (typeof item === "object" && item !== null) {
+              return Object.values(item).some((sub) => String(sub || "").toLowerCase().includes(q));
+            }
+            return false;
+          });
+        }
+        if (typeof val === "object" && val !== null) {
+          return Object.values(val).some((sub) => String(sub || "").toLowerCase().includes(q));
+        }
+        return false;
+      });
+      if (!matchesSearch) return false;
+    }
+
+    // 1. Community filter
+    if (filterCommunity) {
+      const comm = (c.community || c.mh_crm_community || "").trim();
+      if (comm !== filterCommunity) return false;
+    }
+
+    // 2. Lead Source filter
+    if (filterSource) {
+      const isSource = c.lead_source === filterSource;
+      const isCity = `עיר: ${c.mh_crm_city || ""}`.trim() === filterSource;
+      if (!isSource && !isCity) return false;
+    }
+
     if (filterForm && c.last_form_name !== filterForm && !(c.form_submissions || []).some((fs: any) => fs.name === filterForm)) return false;
     
-    // Quick Tag filter pills
+    // 3. Real Tags filter
     if (selectedQuickTags.length > 0) {
-      const matchesAnyTag = selectedQuickTags.some(tag => c.tg1 === tag || c.tg2 === tag || c.tg3 === tag);
+      const cTags: string[] = Array.isArray(c.tags) ? [...c.tags] : [];
+      if (c.tg2) cTags.push(c.tg2);
+      if (c.tg3) cTags.push(c.tg3);
+      const matchesAnyTag = selectedQuickTags.some(tag => cTags.includes(tag));
       if (!matchesAnyTag) return false;
     }
 
@@ -705,36 +853,46 @@ export default function AnalyticsDashboardPage() {
     return String(val);
   };
 
-  const exportToCsv = () => {
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(processedContacts.length / Number(pageSize)));
+  
+  const paginatedContacts = useMemo(() => {
+    if (pageSize === "all") return processedContacts;
+    const start = (currentPage - 1) * Number(pageSize);
+    return processedContacts.slice(start, start + Number(pageSize));
+  }, [processedContacts, pageSize, currentPage]);
+
+  const exportToExcel = () => {
     if (!processedContacts || processedContacts.length === 0) return;
     
-    // Create headers
+    // Create header row
     const headers = selectedColumns.map(col => getColumnLabel(col));
     
-    // Create rows
-    const rows = processedContacts.map((contact: any) => {
+    // Create data rows
+    const dataRows = processedContacts.map((contact: any) => {
       return selectedColumns.map(col => {
-        let val = getContactValue(contact, col);
-        const formattedVal = formatCellValue(val);
-        
-        // Escape quotes and wrap in quotes for CSV
-        const stringVal = String(formattedVal).replace(/"/g, '""');
-        return `"${stringVal}"`;
+        const val = getContactValue(contact, col);
+        const formatted = formatCellValue(val);
+        return formatted === "-" ? "" : formatted;
       });
     });
+
+    const worksheetData = [headers, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     
-    // Add BOM for Hebrew Excel support
-    const BOM = "\uFEFF";
-    const csvContent = BOM + [headers.join(","), ...rows.map(row => row.join(","))].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `דוח_אנשי_קשר_${new Date().toLocaleDateString('he-IL').replaceAll('/', '-')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Set column widths
+    ws['!cols'] = selectedColumns.map((col) => {
+      const headerLen = getColumnLabel(col).length;
+      return { wch: Math.max(headerLen + 4, 16) };
+    });
+
+    // Right-to-left view for Hebrew
+    ws['!views'] = [{ rightToLeft: true }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "אנשי קשר");
+
+    const fileName = `דוח_אנשי_קשר_${new Date().toLocaleDateString('he-IL').replaceAll('/', '_')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   const allAvailableColumns = useMemo(() => {
@@ -794,10 +952,12 @@ export default function AnalyticsDashboardPage() {
     );
   }
 
-  const availableTags = Object.keys(data.tagsCount).sort();
-  const tagsData = formatForChart(data.tagsCount);
-  const formsData = formatForChart(data.formsCount);
-  const sourcesData = formatForChart(data.leadSourcesCount);
+  const availableTags = Object.keys(data.tagsCount || {}).sort();
+  const availableCommunities = Object.keys((data as any).communitiesCount || {}).sort();
+  const availableLeadSources = Object.keys(data.leadSourcesCount || {}).sort();
+  const tagsData = formatForChart(data.tagsCount || {});
+  const formsData = formatForChart(data.formsCount || {});
+  const sourcesData = formatForChart(data.leadSourcesCount || {});
 
   return (
     <div className="flex flex-col w-full max-w-[1600px] mx-auto h-full overflow-y-auto p-4 md:p-6 pb-36 space-y-8 text-right" dir="rtl">
@@ -1027,169 +1187,413 @@ export default function AnalyticsDashboardPage() {
         </div>
       )}
 
-      {/* Quick Filters (Tabs + Dynamic Tag Pills) */}
-      <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm shrink-0 space-y-4 print:hidden">
-        <div>
-          <p className="text-xs font-bold text-slate-500 mb-3">סינון מהיר לפי לשוניות כרטיס לקוח:</p>
-          <div className="flex flex-wrap gap-2 items-center">
-            {tabFilters.map((tab) => {
-              const isActive = activeTabFilter === tab.id;
-              const Icon = tab.icon;
-              const count = data.contacts.filter((c) => tab.filterFn(c, data.customFields || [])).length;
-              
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTabFilter(isActive ? null : tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all cursor-pointer ${
-                    isActive 
-                      ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10" 
-                      : "bg-slate-50 border-slate-200/60 text-slate-600 hover:bg-slate-100 hover:text-slate-700"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
-                  <span>{tab.label}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-md font-mono ${isActive ? "bg-indigo-700 text-indigo-100" : "bg-slate-200/60 text-slate-500"}`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-            {activeTabFilter && (
-              <button
-                type="button"
-                onClick={() => setActiveTabFilter(null)}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold px-3 py-2 hover:underline cursor-pointer"
-              >
-                נקה סינון לשוניות
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Modern High-End Filter Omnibar (Zero Horizontal Scroll) */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs shrink-0 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        
+        {/* Left Side: Segment, Communities, Lead Sources & Tag Dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
+          
+          {/* 1. Client Card Category Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowTabSelector(!showTabSelector);
+                setShowCommunitySelector(false);
+                setShowSourceSelector(false);
+                setShowTagSelector(false);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                activeTabFilter
+                  ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-600/10"
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+              }`}
+            >
+              {activeTabFilter ? (
+                <>
+                  {React.createElement(tabFilters.find(t => t.id === activeTabFilter)?.icon || Users, { className: "w-3.5 h-3.5" })}
+                  <span>{tabFilters.find(t => t.id === activeTabFilter)?.label}</span>
+                </>
+              ) : (
+                <>
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
+                  <span>כל הלשוניות</span>
+                </>
+              )}
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTabSelector ? "rotate-180" : ""} ${activeTabFilter ? "text-indigo-200" : "text-slate-400"}`} />
+            </button>
 
-        {/* Dynamic Tags Quick Filter & Tag Management Section */}
-        <div className="pt-3 border-t border-slate-100">
-          <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-amber-500" />
-                סינון וניהול תגיות:
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowNewTagModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                title="הוסף תווית חדשה למערכת"
-              >
-                <Plus className="w-3.5 h-3.5 text-amber-600" />
-                <span>הוסף תווית</span>
-              </button>
-            </div>
-
-            {selectedQuickTags.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedQuickTags([])}
-                className="text-xs text-rose-500 hover:text-rose-700 font-bold hover:underline cursor-pointer"
-              >
-                נקה תגיות נבחרות ({selectedQuickTags.length})
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2 items-center">
-            {availableTags.length === 0 ? (
-              <div className="text-xs text-slate-400 py-1">
-                אין תגיות עדיין. לחץ על <strong className="text-amber-600">"הוסף תווית"</strong> כדי ליצור תווית ראשונה.
-              </div>
-            ) : (
-              availableTags.slice(0, 20).map(tag => {
-                const isSelected = selectedQuickTags.includes(tag);
-                const count = data.tagsCount[tag] || 0;
-                return (
-                  <div
-                    key={tag}
-                    className={`group relative flex items-center rounded-xl border text-xs font-bold transition-all ${
-                      isSelected 
-                        ? "bg-amber-500 border-amber-500 text-white shadow-sm" 
-                        : "bg-amber-50/50 border-amber-200 text-amber-900 hover:bg-amber-100"
+            {/* Dropdown Menu */}
+            {showTabSelector && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTabSelector(false)} />
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 space-y-0.5 text-right">
+                  <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                    סינון לפי לשונית כרטיס לקוח
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTabFilter(null);
+                      setShowTabSelector(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      activeTabFilter === null ? "bg-indigo-50 text-indigo-700 font-bold" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleQuickTag(tag)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer"
-                    >
-                      <Tag className="w-3 h-3" />
-                      <span>{tag}</span>
-                      <span className={`text-[10px] px-1 py-0.2 rounded-md ${isSelected ? "bg-amber-600 text-white" : "bg-amber-200/60 text-amber-800"}`}>
-                        {count}
-                      </span>
-                      {isSelected && <X className="w-3 h-3 mr-0.5" />}
-                    </button>
-                    
-                    {/* Delete Tag Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteTag(tag, e)}
-                      className={`p-1 pl-2 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer opacity-40 group-hover:opacity-100 ${isSelected ? 'text-amber-200 hover:text-white' : ''}`}
-                      title={`מחק את התווית "${tag}" מכל המערכת`}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-
-            {/* Add Tag Dropdown button for remaining tags */}
-            {availableTags.length > 20 && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowTagSelector(!showTagSelector)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-dashed border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-100 cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  עוד תגיות ({availableTags.length - 20})
-                </button>
-                {showTagSelector && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowTagSelector(false)}></div>
-                    <div className="absolute top-full right-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-slate-200 shadow-xl rounded-2xl p-2 z-50 space-y-1">
-                      {availableTags.slice(20).map(tag => {
-                        const isSelected = selectedQuickTags.includes(tag);
-                        return (
-                          <div
-                            key={tag}
-                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-right ${isSelected ? 'bg-amber-100 text-amber-900' : 'hover:bg-slate-50 text-slate-700'}`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => toggleQuickTag(tag)}
-                              className="flex-grow flex items-center justify-between text-right cursor-pointer"
-                            >
-                              <span>{tag}</span>
-                              <span className="text-[10px] bg-slate-100 px-1 rounded">{data.tagsCount[tag] || 0}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteTag(tag, e)}
-                              className="text-slate-400 hover:text-rose-600 p-1 mr-1 cursor-pointer"
-                              title={`מחק תווית "${tag}"`}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      <span>הצג את כל הלקוחות</span>
                     </div>
-                  </>
-                )}
-              </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {data.contacts.length}
+                    </span>
+                  </button>
+
+                  {tabFilters.map((tab) => {
+                    const isSelected = activeTabFilter === tab.id;
+                    const Icon = tab.icon;
+                    const count = data.contacts.filter((c) => tab.filterFn(c, data.customFields || [])).length;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTabFilter(tab.id);
+                          setShowTabSelector(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                          isSelected ? "bg-indigo-50 text-indigo-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-indigo-600" : "text-slate-400"}`} />
+                          <span>{tab.label}</span>
+                        </div>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? "bg-indigo-100 text-indigo-700 font-bold" : "bg-slate-100 text-slate-600"}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
+
+          {/* 2. Communities Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCommunitySelector(!showCommunitySelector);
+                setShowTabSelector(false);
+                setShowSourceSelector(false);
+                setShowTagSelector(false);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                filterCommunity
+                  ? "bg-purple-600 border-purple-600 text-white shadow-purple-600/10"
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+              }`}
+            >
+              <Building className={`w-3.5 h-3.5 ${filterCommunity ? "text-white" : "text-purple-500"}`} />
+              <span>{filterCommunity ? filterCommunity : `קהילות (${availableCommunities.length})`}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCommunitySelector ? "rotate-180" : ""} ${filterCommunity ? "text-purple-100" : "text-slate-400"}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showCommunitySelector && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowCommunitySelector(false)} />
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 space-y-0.5 text-right">
+                  <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                    סינון לפי קהילה
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterCommunity("");
+                      setShowCommunitySelector(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      !filterCommunity ? "bg-purple-50 text-purple-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <span>כל הקהילות</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {data.contacts.length}
+                    </span>
+                  </button>
+
+                  {availableCommunities.map((comm) => {
+                    const isSelected = filterCommunity === comm;
+                    const count = (data as any).communitiesCount?.[comm] || 0;
+                    return (
+                      <button
+                        key={comm}
+                        type="button"
+                        onClick={() => {
+                          setFilterCommunity(comm);
+                          setShowCommunitySelector(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                          isSelected ? "bg-purple-50 text-purple-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <span className="truncate">{comm}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? "bg-purple-100 text-purple-700 font-bold" : "bg-slate-100 text-slate-600"}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {availableCommunities.length === 0 && (
+                    <div className="p-3 text-center text-slate-400 text-xs">
+                      אין קהילות מוגדרות
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 3. Lead Sources Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSourceSelector(!showSourceSelector);
+                setShowTabSelector(false);
+                setShowCommunitySelector(false);
+                setShowTagSelector(false);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                filterSource
+                  ? "bg-teal-600 border-teal-600 text-white shadow-teal-600/10"
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+              }`}
+            >
+              <Globe className={`w-3.5 h-3.5 ${filterSource ? "text-white" : "text-teal-500"}`} />
+              <span>{filterSource ? filterSource : `מקורות הגעה (${availableLeadSources.length})`}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSourceSelector ? "rotate-180" : ""} ${filterSource ? "text-teal-100" : "text-slate-400"}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showSourceSelector && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSourceSelector(false)} />
+                <div className="absolute top-full right-0 mt-1.5 w-68 max-h-64 overflow-y-auto bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 space-y-0.5 text-right">
+                  <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                    סינון לפי מקור הגעה / עיר
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterSource("");
+                      setShowSourceSelector(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      !filterSource ? "bg-teal-50 text-teal-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <span>הכל</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {data.contacts.length}
+                    </span>
+                  </button>
+
+                  {availableLeadSources.map((src) => {
+                    const isSelected = filterSource === src;
+                    const count = data.leadSourcesCount[src] || 0;
+                    return (
+                      <button
+                        key={src}
+                        type="button"
+                        onClick={() => {
+                          setFilterSource(src);
+                          setShowSourceSelector(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                          isSelected ? "bg-teal-50 text-teal-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <span className="truncate">{src}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? "bg-teal-100 text-teal-700 font-bold" : "bg-slate-100 text-slate-600"}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 4. Real Tags Filter Dropdown (Zero ID numbers!) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowTagSelector(!showTagSelector);
+                setShowTabSelector(false);
+                setShowCommunitySelector(false);
+                setShowSourceSelector(false);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                selectedQuickTags.length > 0
+                  ? "bg-amber-500 border-amber-500 text-white shadow-amber-500/10"
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+              }`}
+            >
+              <Tag className={`w-3.5 h-3.5 ${selectedQuickTags.length > 0 ? "text-white" : "text-amber-500"}`} />
+              <span>
+                {selectedQuickTags.length === 0
+                  ? `תוויות (${availableTags.length})`
+                  : selectedQuickTags.length === 1
+                  ? selectedQuickTags[0]
+                  : `${selectedQuickTags.length} תוויות נבחרו`}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTagSelector ? "rotate-180" : ""} ${selectedQuickTags.length > 0 ? "text-amber-100" : "text-slate-400"}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showTagSelector && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTagSelector(false)} />
+                <div className="absolute top-full right-0 mt-1.5 w-68 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2.5 z-50 space-y-2 text-right">
+                  
+                  {/* Search inside tags */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="חפש תווית..."
+                      value={tagFilterSearch}
+                      onChange={e => setTagFilterSearch(e.target.value)}
+                      className="w-full pr-8 pl-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-amber-500 text-slate-800"
+                      onClick={e => e.stopPropagation()}
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Tags list */}
+                  <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                    {availableTags.length === 0 ? (
+                      <div className="p-4 text-center text-slate-400 text-xs">
+                        אין תוויות מוגדרות עדיין
+                      </div>
+                    ) : (
+                      availableTags
+                        .filter(t => t.toLowerCase().includes(tagFilterSearch.toLowerCase().trim()))
+                        .map(tag => {
+                          const isSelected = selectedQuickTags.includes(tag);
+                          const count = data.tagsCount[tag] || 0;
+                          return (
+                            <div
+                              key={tag}
+                              className={`flex items-center justify-between p-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                isSelected ? "bg-amber-100/80 text-amber-950 font-bold" : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleQuickTag(tag)}
+                                className="flex-1 flex items-center justify-between text-right cursor-pointer"
+                              >
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] ${
+                                    isSelected ? "bg-amber-600 border-amber-600 text-white" : "border-slate-300 bg-white"
+                                  }`}>
+                                    {isSelected && "✓"}
+                                  </span>
+                                  <span className="truncate">{tag}</span>
+                                </div>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-slate-500 shadow-2xs">
+                                  {count}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteTag(tag, e)}
+                                className="text-slate-300 hover:text-rose-600 p-1 mr-1 transition-colors cursor-pointer"
+                                title="מחק תווית זו לצמיתות"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+
+                  {/* Actions inside tag dropdown */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTagSelector(false);
+                        setShowNewTagModal(true);
+                      }}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>תווית חדשה</span>
+                    </button>
+
+                    {selectedQuickTags.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuickTags([])}
+                        className="text-xs font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                      >
+                        נקה בחירה
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Active Filter Clear Button */}
+          {(activeTabFilter || filterCommunity || filterSource || selectedQuickTags.length > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTabFilter(null);
+                setFilterCommunity("");
+                setFilterSource("");
+                setSelectedQuickTags([]);
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer"
+              title="נקה את כל הסינונים"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>נקה סינונים</span>
+            </button>
+          )}
+        </div>
+
+        {/* Right Side: Quick Add Tag & Summary Counter */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500 font-medium font-mono">
+            {processedContacts.length} מתוך {data.contacts.length} לקוחות
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setShowNewTagModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-amber-400 text-amber-800 bg-amber-50/50 hover:bg-amber-100 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            title="הוסף תווית חדשה למערכת"
+          >
+            <Plus className="w-3.5 h-3.5 text-amber-600" />
+            <span>תווית חדשה</span>
+          </button>
         </div>
       </div>
 
@@ -1268,6 +1672,63 @@ export default function AnalyticsDashboardPage() {
                 disabled={!newTagName.trim() || loading}
               >
                 {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "שמור תווית"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Table View Modal */}
+      {showSaveViewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <Save className="w-5 h-5 text-indigo-600" />
+                שמירת תצוגת טבלה מותאמת
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setShowSaveViewModal(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              שמירה זו תזכור את {selectedColumns.length} העמודות שנבחרו, הסינונים הפעילים, מיון הנתונים והגדרות התצוגה הנוכחיות.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">שם התצוגה:</label>
+              <Input
+                autoFocus
+                placeholder="לדוגמה: תורמי קמפיין ירושלים, דוח טלפונים..."
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveCurrentView(newViewName);
+                  if (e.key === "Escape") setShowSaveViewModal(false);
+                }}
+                className="rounded-xl h-11"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                onClick={() => setShowSaveViewModal(false)}
+                className="rounded-xl"
+              >
+                ביטול
+              </Button>
+              <Button
+                onClick={() => handleSaveCurrentView(newViewName)}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6"
+                disabled={!newViewName.trim()}
+              >
+                שמור תצוגה
               </Button>
             </div>
           </div>
@@ -1358,34 +1819,184 @@ export default function AnalyticsDashboardPage() {
 
       {/* Dynamic Contacts Table */}
       <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm shrink-0">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-500" />
-            טבלת נתונים מותאמת אישית ({processedContacts.length} רשומות)
-          </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 print:hidden">
           
-          <div className="flex items-center gap-3 flex-wrap print:hidden">
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+          {/* Left Side: Saved Views Dropdown & Save Button */}
+          <div className="flex items-center gap-2">
+            
+            {/* Saved Views Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowSavedViewsMenu(!showSavedViewsMenu)}
+                className={`flex items-center gap-2 px-3.5 h-10 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                  activeSavedViewId
+                    ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-600/10"
+                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <Bookmark className={`w-3.5 h-3.5 ${activeSavedViewId ? "text-white" : "text-indigo-600"}`} />
+                <span>
+                  {activeSavedViewId
+                    ? `תצוגה: ${savedViews.find(v => v.id === activeSavedViewId)?.name || "מותאמת"}`
+                    : `תצוגות שמורות (${savedViews.length})`}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSavedViewsMenu ? "rotate-180" : ""}`} />
+              </button>
+
+              {showSavedViewsMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowSavedViewsMenu(false)} />
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2.5 z-50 space-y-1 text-right">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 flex items-center justify-between">
+                      <span>תצוגות טבלה שמורות</span>
+                      <span className="text-[10px] font-mono">{savedViews.length} תצוגות</span>
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                      {savedViews.length === 0 ? (
+                        <div className="p-4 text-center text-slate-400 text-xs">
+                          אין תצוגות שמורות עדיין. שמור את התצוגה הנוכחית (עמודות + סינונים) בלחיצה על "שמור תצוגה".
+                        </div>
+                      ) : (
+                        savedViews.map(view => {
+                          const isSelected = activeSavedViewId === view.id;
+                          return (
+                            <div
+                              key={view.id}
+                              className={`flex items-center justify-between p-2 rounded-xl text-xs font-semibold transition-colors ${
+                                isSelected ? "bg-indigo-50 text-indigo-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleApplyView(view)}
+                                className="flex-1 text-right flex items-center gap-2 cursor-pointer truncate"
+                              >
+                                <Bookmark className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-indigo-600" : "text-slate-400"}`} />
+                                <span className="truncate">{view.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">({view.selectedColumns.length} עמ')</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSavedView(view.id, e)}
+                                className="text-slate-300 hover:text-rose-600 p-1 mr-1 transition-colors cursor-pointer"
+                                title="מחק תצוגה שמורה"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSavedViewsMenu(false);
+                          setShowSaveViewModal(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>שמור מצב נוכחי כתצוגה</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Save Current View Button */}
+            <button
+              type="button"
+              onClick={() => setShowSaveViewModal(true)}
+              className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              title="שמור את העמודות, הסינונים והסדר הנוכחיים כתבנית תצוגה"
+            >
+              <Save className="w-3.5 h-3.5 text-indigo-600" />
+              <span>שמור תצוגה</span>
+            </button>
+          </div>
+
+          {/* Center / Right: Global Instant Deep Search & Rows Selector */}
+          <div className="flex items-center gap-2.5 flex-1 max-w-xl">
+            {/* Global Deep Search Input */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="חיפוש מהיר בכל כרטיס הלקוח (שם, טלפון, הערות, תשלום...)..."
+                value={globalSearchTerm}
+                onChange={(e) => {
+                  setGlobalSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pr-8.5 pl-8 h-10 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all"
+              />
+              {globalSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalSearchTerm("");
+                    setCurrentPage(1);
+                  }}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                  title="נקה חיפוש"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Rows Per Page Selector */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl shrink-0">
+              <span className="font-semibold text-slate-500">שורות:</span>
+              <select
+                value={String(pageSize)}
+                onChange={(e) => {
+                  const val = e.target.value === "all" ? "all" : Number(e.target.value);
+                  setPageSize(val);
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+                <option value="all">הכל ({processedContacts.length})</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Right Side: Options & Actions */}
+          <div className="flex items-center gap-2.5 flex-wrap print:hidden">
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
               <input 
                 type="checkbox"
                 checked={showSummaries}
                 onChange={() => setShowSummaries(!showSummaries)}
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              הצג שורת סיכומים
+              סיכומים
             </label>
 
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
               <input 
                 type="checkbox"
                 checked={showRowNumbering}
                 onChange={() => setShowRowNumbering(!showRowNumbering)}
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              הצג מיספור שורות
+              מיספור
             </label>
 
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
               <input 
                 type="checkbox"
                 checked={showRowCheckboxes}
@@ -1395,16 +2006,17 @@ export default function AnalyticsDashboardPage() {
                 }}
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              הצג תיבות בחירה
+              בחירה
             </label>
 
             <Button 
-              onClick={exportToCsv}
+              onClick={exportToExcel}
               variant="outline" 
               className="rounded-xl h-10 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 flex items-center gap-2 transition-colors cursor-pointer"
+              title="ייצא את הנתונים המסוננים לקובץ Excel (.xlsx)"
             >
-              <Download className="w-4 h-4" />
-              ייצא לאקסל
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>ייצא לאקסל</span>
             </Button>
 
             <Button 
@@ -1606,7 +2218,7 @@ export default function AnalyticsDashboardPage() {
                         if (!isNaN(Number(val)) && typeof val !== "boolean") {
                           const strVal = String(val).replace(/[^0-9.-]/g, '');
                           if (strVal.length > 6 && col !== 'total_spent' && col !== 'campaign_amount') {
-                            // Too long, treat as text (like phone or ID) so we just count it
+                            // Too long, treat as text
                           } else {
                             sum += Number(val);
                             isNumeric = true;
@@ -1636,97 +2248,171 @@ export default function AnalyticsDashboardPage() {
               )}
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {processedContacts.slice(0, 100).map((contact: any, idx: number) => {
-                const isSelected = selectedRowIds.includes(contact.id || "");
-                return (
-                  <tr key={contact.id || idx} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50/20' : ''}`}>
-                    {showRowCheckboxes && (
-                      <td className="px-4 py-3 text-center w-10 whitespace-nowrap">
-                        <input 
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRowIds(prev => [...prev, contact.id || ""]);
-                            } else {
-                              setSelectedRowIds(prev => prev.filter(id => id !== (contact.id || "")));
-                            }
-                          }}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                      </td>
-                    )}
-                    {showRowNumbering && (
-                      <td className="px-4 py-3 text-right text-slate-400 font-mono text-xs w-12">
-                        {idx + 1}
-                      </td>
-                    )}
-                    {selectedColumns.map(col => {
-                      const val = getContactValue(contact, col);
-                      const isEditing = editingCell?.id === contact.id && editingCell?.field === col;
-                      
-                      return (
-                        <td 
-                          key={col} 
-                          className="px-4 py-3 text-slate-700 max-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors group" 
-                          title={String(val || "")}
-                          onDoubleClick={() => {
-                            setEditingCell({ id: contact.id || "", field: col });
-                            setEditValue(String(val || ""));
-                          }}
-                        >
-                          {isEditing ? (
-                            <input
-                              autoFocus
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={handleSaveEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit();
-                                if (e.key === 'Escape') setEditingCell(null);
-                              }}
-                              className="w-full border border-indigo-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between">
-                              <span className="truncate">{formatCellValue(val)}</span>
-                              <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="px-4 py-3 flex items-center justify-center gap-2 print:hidden">
-                      <button 
-                        type="button"
-                        onClick={(e) => handleEditClick(contact.id, e)}
-                        className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 transition-colors cursor-pointer"
-                        title="ערוך"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => handleDeleteClick(contact.id, e)}
-                        className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors cursor-pointer"
-                        title="מחק"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {processedContacts.length > 100 && (
+              {paginatedContacts.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedColumns.length + 1 + (showRowCheckboxes ? 1 : 0) + (showRowNumbering ? 1 : 0)} className="px-4 py-4 text-center text-slate-500 bg-slate-50 font-medium">
-                    מוצגות 100 הרשומות הראשונות (מתוך {processedContacts.length}). סנן נתונים כדי למצוא רשומות ספציפיות.
+                  <td
+                    colSpan={selectedColumns.length + 1 + (showRowCheckboxes ? 1 : 0) + (showRowNumbering ? 1 : 0)}
+                    className="px-4 py-12 text-center text-slate-400 bg-slate-50/50"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search className="w-8 h-8 text-slate-300" />
+                      <p className="text-sm font-bold text-slate-600">לא נמצאו רשומות התואמות את החיפוש והסינונים</p>
+                      <p className="text-xs text-slate-400">נסה לנקות את שדה החיפוש או לשנות את הסינונים</p>
+                      {globalSearchTerm && (
+                        <button
+                          type="button"
+                          onClick={() => setGlobalSearchTerm("")}
+                          className="mt-2 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          נקה חיפוש מהיר
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
+              ) : (
+                paginatedContacts.map((contact: any, idx: number) => {
+                  const isSelected = selectedRowIds.includes(contact.id || "");
+                  const rowNumber = pageSize === "all" ? idx + 1 : (currentPage - 1) * Number(pageSize) + idx + 1;
+                  return (
+                    <tr key={contact.id || idx} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50/20' : ''}`}>
+                      {showRowCheckboxes && (
+                        <td className="px-4 py-3 text-center w-10 whitespace-nowrap">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRowIds(prev => [...prev, contact.id || ""]);
+                              } else {
+                                setSelectedRowIds(prev => prev.filter(id => id !== (contact.id || "")));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                          />
+                        </td>
+                      )}
+                      {showRowNumbering && (
+                        <td className="px-4 py-3 text-right text-slate-400 font-mono text-xs w-12">
+                          {rowNumber}
+                        </td>
+                      )}
+                      {selectedColumns.map(col => {
+                        const val = getContactValue(contact, col);
+                        const isEditing = editingCell?.id === contact.id && editingCell?.field === col;
+                        
+                        return (
+                          <td 
+                            key={col} 
+                            className="px-4 py-3 text-slate-700 max-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors group" 
+                            title={String(val || "")}
+                            onDoubleClick={() => {
+                              setEditingCell({ id: contact.id || "", field: col });
+                              setEditValue(String(val || ""));
+                            }}
+                          >
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={handleSaveEdit}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEdit();
+                                  if (e.key === 'Escape') setEditingCell(null);
+                                }}
+                                className="w-full border border-indigo-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{formatCellValue(val)}</span>
+                                <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-3 flex items-center justify-center gap-2 print:hidden">
+                        <button 
+                          type="button"
+                          onClick={(e) => handleEditClick(contact.id, e)}
+                          className="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 transition-colors cursor-pointer"
+                          title="ערוך"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={(e) => handleDeleteClick(contact.id, e)}
+                          className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors cursor-pointer"
+                          title="מחק"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {pageSize !== "all" && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100 print:hidden text-right">
+            <span className="text-xs text-slate-500 font-medium">
+              מציג {(currentPage - 1) * Number(pageSize) + 1} - {Math.min(currentPage * Number(pageSize), processedContacts.length)} מתוך {processedContacts.length} אנשי קשר
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+                <span>הקודם</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                  .map((pageNum, idx, arr) => {
+                    const prevNum = arr[idx - 1];
+                    const hasGap = prevNum && pageNum - prevNum > 1;
+                    return (
+                      <React.Fragment key={pageNum}>
+                        {hasGap && <span className="px-1 text-slate-400 text-xs">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === pageNum
+                              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                              : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
+              >
+                <span>הבא</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ContactModal 

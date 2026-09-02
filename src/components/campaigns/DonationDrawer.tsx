@@ -74,7 +74,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
   drawerConfig,
 }) => {
   const tiers = configTiers && configTiers.length > 0 ? configTiers : defaultTiers;
-  const isDark = drawerConfig?.theme !== 'light';
+  const isDark = drawerConfig?.theme === 'dark';
 
   const [step, setStep] = useState<"amount" | "details" | "payment" | "success">("amount");
 
@@ -389,6 +389,8 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
     e.preventDefault();
     setError("");
 
+    const targetCampId = (campaignId === "default-campaign" || campaignId === "home") ? "home" : (campaignId || "home");
+
     if (isTestMode) {
       // SIMULATION IN TEST MODE (NO CREDIT CARD API CALL)
       setLoading(true);
@@ -400,7 +402,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
 
         if (pendingDonationId) {
           await completeDonationAction({
-            campaignId,
+            campaignId: targetCampId,
             donationId: pendingDonationId,
             contactId: pendingContactId,
             amount: calculatedTotal,
@@ -420,7 +422,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
           });
         } else {
           await recordDonationAction({
-            campaignId,
+            campaignId: targetCampId,
             donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
             amount: calculatedTotal,
             monthlyAmount: isRecurring ? currentMonthly : undefined,
@@ -514,7 +516,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         // Complete donation in Firestore & CRM (Atomically adds to campaign totalRaised & donorCount!)
         if (pendingDonationId) {
           await completeDonationAction({
-            campaignId,
+            campaignId: targetCampId,
             donationId: pendingDonationId,
             contactId: pendingContactId,
             amount: calculatedTotal,
@@ -535,7 +537,7 @@ export const DonationDrawer: React.FC<DonationDrawerProps> = ({
         } else {
           // Fallback direct record if pending ID not present
           await recordDonationAction({
-            campaignId,
+            campaignId: targetCampId,
             donorName: isAnonymous ? "אנונימי" : (donorName || "אנונימי"),
             amount: calculatedTotal,
             monthlyAmount: isRecurring ? currentMonthly : undefined,

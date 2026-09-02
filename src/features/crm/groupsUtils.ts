@@ -1,6 +1,6 @@
 export interface GroupRule {
-  field: "total_spent" | "campaign_amount" | "order_count" | "mh_crm_city" | "company_name" | "last_form_name" | "has_phone" | "has_email";
-  operator: "gte" | "lte" | "eq" | "contains" | "exists";
+  field: "total_spent" | "order_count" | "lead_source" | "gender" | "mh_crm_city" | "company_name" | "last_form_name" | "has_phone";
+  operator: "gte" | "lte" | "eq" | "contains" | "exists" | "not_exists";
   value: string | number;
 }
 
@@ -14,6 +14,16 @@ export interface SmartGroup {
   matchType?: "all" | "any"; // AND / OR
   count?: number;
   ownerId?: string;
+
+  // Community enhanced parameters
+  gallery?: string[]; // א. גלריית תמונות
+  vision?: string; // ב. חזון הקהילה
+  purpose?: string; // ג. מטרת הקהילה
+  pageId?: string; // ד. מזהה עמוד הקהילה
+  pageSlug?: string; // ד. נתיב עמוד הקהילה
+  pageUrl?: string; // ד. קישור לעמוד
+  mainCampaignId?: string; // ה. קמפיין ראשי הקשור לעמוד הקהילה
+  campaignTitle?: string;
 }
 
 export interface GroupsDataResponse {
@@ -33,14 +43,10 @@ export function evaluateRule(contact: any, rule: GroupRule): boolean {
     const has = Boolean(contact.conta_phone && String(contact.conta_phone).trim().length > 0);
     return operator === "exists" ? has : !has;
   }
-  if (field === "has_email") {
-    const has = Boolean(contact.email && String(contact.email).trim().length > 0);
-    return operator === "exists" ? has : !has;
-  }
 
   const contactVal = contact[field];
 
-  if (field === "total_spent" || field === "campaign_amount" || field === "order_count") {
+  if (field === "total_spent" || field === "order_count") {
     const num = Number(contactVal || 0);
     const target = Number(value || 0);
     if (operator === "gte") return num >= target;
@@ -55,6 +61,7 @@ export function evaluateRule(contact: any, rule: GroupRule): boolean {
   if (operator === "eq") return str === targetStr;
   if (operator === "contains") return str.includes(targetStr);
   if (operator === "exists") return Boolean(str);
+  if (operator === "not_exists") return !str;
   return false;
 }
 

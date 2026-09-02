@@ -366,6 +366,95 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
 }
 
 
+/**
+ * Cascade-delete or remove campaign donations associated with a contact
+ */
+export async function cleanupContactCampaignDonations(contactId: string, contactData?: any) {
+  try {
+    const data = contactData || (await adminDb.collection("contacts").doc(contactId).get()).data() || {};
+    const donationHistory = data.campaign_donations_history || [];
+    const donorPhone = data.phone || data.mobile;
+    const donorEmail = data.email;
+    const donorName = data.name || data.firstName || data.fullName;
+
+    // 1. Delete by donation IDs listed in campaign_donations_history
+    for (const item of donationHistory) {
+      if (item?.id) {
+        const campId = item.campaignId || "home";
+        try {
+          const campDocRef = adminDb.collection("campaigns").doc(campId);
+          const donDocRef = campDocRef.collection("donations").doc(item.id);
+          const donSnap = await donDocRef.get();
+          if (donSnap.exists) {
+            const donData = donSnap.data() || {};
+            await donDocRef.delete();
+
+            // Decrement campaign totalRaised and donorCount
+            if (donData.paymentStatus === "completed" && donData.amount) {
+              const amountToDeduct = Number(donData.amount) || 0;
+              const campSnap = await campDocRef.get();
+              if (campSnap.exists) {
+                const cData = campSnap.data() || {};
+                await campDocRef.update({
+                  totalRaised: Math.max(0, (cData.totalRaised || 0) - amountToDeduct),
+                  donorCount: Math.max(0, (cData.donorCount || 0) - 1),
+                });
+              }
+
+              // Decrement ambassador stats if applicable
+              if (donData.ambassadorId) {
+                const ambRef = campDocRef.collection("ambassadors").doc(donData.ambassadorId);
+                const ambSnap = await ambRef.get();
+                if (ambSnap.exists) {
+                  const aData = ambSnap.data() || {};
+                  await ambRef.update({
+                    totalRaised: Math.max(0, (aData.totalRaised || 0) - amountToDeduct),
+                    donorCount: Math.max(0, (aData.donorCount || 0) - 1),
+                  });
+                }
+              }
+            }
+          }
+        } catch (itemErr) {
+          console.warn(`Error deleting donation ${item.id} for campaign ${campId}:`, itemErr);
+        }
+      }
+    }
+
+    // 2. Also search all campaigns for any orphan donations matching this contactId, phone, or email
+    const campaignsSnap = await adminDb.collection("campaigns").get();
+    for (const cDoc of campaignsSnap.docs) {
+      try {
+        const donationsRef = cDoc.ref.collection("donations");
+        const donationsSnap = await donationsRef.get();
+        for (const donDoc of donationsSnap.docs) {
+          const d = donDoc.data() || {};
+          const isMatch = (d.contactId && d.contactId === contactId) ||
+            (donorPhone && d.phone && d.phone === donorPhone) ||
+            (donorEmail && d.email && d.email === donorEmail) ||
+            (donorName && d.donorName && d.donorName === donorName);
+
+          if (isMatch) {
+            await donDoc.ref.delete();
+            if (d.paymentStatus === "completed" && d.amount) {
+              const amountToDeduct = Number(d.amount) || 0;
+              const cData = cDoc.data() || {};
+              await cDoc.ref.update({
+                totalRaised: Math.max(0, (cData.totalRaised || 0) - amountToDeduct),
+                donorCount: Math.max(0, (cData.donorCount || 0) - 1),
+              });
+            }
+          }
+        }
+      } catch (cErr) {
+        console.warn(`Error scanning campaign ${cDoc.id} for donations:`, cErr);
+      }
+    }
+  } catch (err) {
+    console.error("Error in cleanupContactCampaignDonations:", err);
+  }
+}
+
 // 5. Delete contact
 export async function deleteContact(id: string) {
   try {
@@ -381,8 +470,14 @@ export async function deleteContact(id: string) {
       throw new Error("אין הרשאה למחוק איש קשר זה");
     }
 
+    const contactData = docSnap.data();
+
+    // Cascade delete any linked campaign donations
+    await cleanupContactCampaignDonations(id, contactData);
+
     await docRef.delete();
     revalidatePath("/dashboard/crm");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
     console.error("Error in deleteContact:", error);
@@ -411,10 +506,12 @@ export async function handleBulkAction(
         const data = docSnap.data() || {};
         if (action === "trash") {
           batch.update(docRef, { status: "trashed", updatedAt: new Date().toISOString() });
+          await cleanupContactCampaignDonations(id, data);
         } else if (action === "restore") {
           batch.update(docRef, { status: "active", updatedAt: new Date().toISOString() });
         } else if (action === "delete_permanent") {
           batch.delete(docRef);
+          await cleanupContactCampaignDonations(id, data);
         } else if (action === "add_tag" && options?.tag?.trim()) {
           const newTag = options.tag.trim();
           if (data.tg1 !== newTag && data.tg2 !== newTag && data.tg3 !== newTag) {

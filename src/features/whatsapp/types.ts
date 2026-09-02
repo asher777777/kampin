@@ -15,6 +15,7 @@ export interface WhatsAppConnectionState {
 }
 
 export interface WhatsAppRecipient {
+  contactId?: string;
   name: string;
   phone: string;
   status: string;
@@ -26,7 +27,11 @@ export interface WhatsAppRecipient {
 export interface WhatsAppCampaign {
   id?: string;
   userId: string;
+  name?: string;
   messageContent: string;
+  mediaUrl?: string;
+  communityId?: string;
+  communityName?: string;
   totalRecipients: number;
   successCount: number;
   failureCount: number;

@@ -375,9 +375,62 @@ export async function sendWhatsAppFile(formData: FormData) {
   }
 }
 
-// 8. Save Campaign Message History in Firestore
+// 7.1 Send Single WhatsApp File by URL (for automated receipts, thank-you banners)
+export async function sendWhatsAppFileByUrl(phone: string, urlFile: string, fileName = "image.png", caption = "") {
+  try {
+    const settings = await getWhatsAppSettings();
+    if (!settings.idInstance || !settings.apiToken) {
+      throw new Error("חיבור וואטסאפ לא מוגדר");
+    }
+
+    // Clean phone number
+    let cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.startsWith("0")) {
+      cleanPhone = "972" + cleanPhone.slice(1);
+    }
+    const chatId = `${cleanPhone}@c.us`;
+
+    const url = getGreenApiUrl(settings, "sendFileByUrl");
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chatId,
+        urlFile,
+        fileName,
+        caption: caption ? caption.replace(/\n/g, "\r\n") : undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn("Green API sendFileByUrl warning:", errText);
+      // Fallback to text message if file fails
+      if (caption) {
+        return await sendWhatsAppMessage(phone, caption);
+      }
+      throw new Error(`שגיאת שליחת קובץ ב-URL: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error in sendWhatsAppFileByUrl server action:", error);
+    if (caption) {
+      try {
+        return await sendWhatsAppMessage(phone, caption);
+      } catch (e) {}
+    }
+    throw error;
+  }
+}
+
+// 8. Save Campaign Message History in Firestore & Log Events on Contacts
 export async function saveWhatsAppCampaign(params: {
+  name?: string;
   messageContent: string;
+  mediaUrl?: string;
+  communityId?: string;
+  communityName?: string;
   totalRecipients: number;
   successCount: number;
   failureCount: number;
@@ -385,14 +438,20 @@ export async function saveWhatsAppCampaign(params: {
 }) {
   try {
     const userId = await getUserId();
-    const campaignData = {
+    const nowIso = new Date().toISOString();
+    const campaignData: any = {
       userId,
+      name: params.name || `שליחה קבוצתית - ${new Date().toLocaleDateString("he-IL")}`,
       messageContent: params.messageContent,
       totalRecipients: params.totalRecipients,
       successCount: params.successCount,
       failureCount: params.failureCount,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
     };
+
+    if (params.mediaUrl) campaignData.mediaUrl = params.mediaUrl;
+    if (params.communityId) campaignData.communityId = params.communityId;
+    if (params.communityName) campaignData.communityName = params.communityName;
 
     const docRef = await adminDb.collection("whatsapp_campaigns").add(campaignData);
     const campaignId = docRef.id;
@@ -403,9 +462,66 @@ export async function saveWhatsAppCampaign(params: {
       const recipientRef = docRef.collection("recipients").doc();
       batch.set(recipientRef, recipient);
     });
-
     await batch.commit();
+
+    // Log Event on each contact card
+    const eventPromises = params.recipients.map(async (recipient) => {
+      try {
+        let contactDocId = recipient.contactId;
+
+        // If contactId is missing, look up by phone
+        if (!contactDocId && recipient.phone) {
+          const cleanPhone = recipient.phone.replace(/\D/g, "");
+          const searchSnap = await adminDb
+            .collection("contacts")
+            .where("ownerId", "==", userId)
+            .where("conta_phone", "==", recipient.phone)
+            .limit(1)
+            .get();
+
+          if (!searchSnap.empty) {
+            contactDocId = searchSnap.docs[0].id;
+          }
+        }
+
+        if (contactDocId) {
+          const contactRef = adminDb.collection("contacts").doc(contactDocId);
+          const contactSnap = await contactRef.get();
+          if (contactSnap.exists) {
+            const currentData = contactSnap.data() || {};
+            const existingEvents = Array.isArray(currentData.events) ? currentData.events : [];
+            
+            const newEvent = {
+              time: nowIso,
+              title: "הודעה יוצאת מוואטסאפ",
+              text: recipient.personalizedContent || params.messageContent,
+              mediaUrl: params.mediaUrl || undefined,
+              status: recipient.status || "בוצע",
+              communityName: params.communityName || undefined,
+              createdAt: nowIso,
+            };
+
+            // Update contact doc with new event in array and update timestamp
+            await contactRef.update({
+              events: [newEvent, ...existingEvents].slice(0, 100),
+              last_contact_date: nowIso,
+              updatedAt: nowIso,
+            });
+
+            // Also add to events subcollection
+            await contactRef.collection("events").add(newEvent);
+          }
+        }
+      } catch (err) {
+        console.warn(`Could not log WhatsApp event for recipient ${recipient.phone}:`, err);
+      }
+    });
+
+    await Promise.all(eventPromises);
+
     revalidatePath("/dashboard/whatsapp");
+    revalidatePath("/dashboard/crm");
+    revalidatePath("/dashboard/crm/groups");
     return { success: true, campaignId };
   } catch (error) {
     console.error("Error in saveWhatsAppCampaign server action:", error);

@@ -35,7 +35,11 @@ export interface Donation {
   campaignId: string;
   ambassadorId?: string | null;
   ambassadorName?: string | null;
+  contactId?: string;
   donorName: string;
+  realDonorName?: string;
+  phone?: string;
+  email?: string;
   amount: number;
   monthlyAmount?: number;
   recurringMonths?: number;

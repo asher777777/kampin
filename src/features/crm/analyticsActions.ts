@@ -124,6 +124,7 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
     let totalCampaignAmount = 0;
     const tagsCount: Record<string, number> = {};
     const leadSourcesCount: Record<string, number> = {};
+    const communitiesCount: Record<string, number> = {};
     const formsCount: Record<string, number> = {};
     const numericFieldsAgg: Record<string, { 
       sum: number; 
@@ -153,13 +154,27 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
         totalCampaignAmount += campAmount;
       }
 
-      // Tags
-      [c.tg1, c.tg2, c.tg3].forEach((t) => {
+      // Real Tags (filter out pure numeric IDs like TZ)
+      const rawTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+      if (c.tg2) rawTags.push(c.tg2);
+      if (c.tg3) rawTags.push(c.tg3);
+
+      rawTags.forEach((t) => {
         if (t && typeof t === "string" && t.trim()) {
           const trimmed = t.trim();
-          tagsCount[trimmed] = (tagsCount[trimmed] || 0) + 1;
+          // Filter out pure numbers with 5+ digits (like Israeli IDs)
+          if (!/^\d{5,}$/.test(trimmed)) {
+            tagsCount[trimmed] = (tagsCount[trimmed] || 0) + 1;
+          }
         }
       });
+
+      // Communities
+      const comm = c.community || c.mh_crm_community || "";
+      if (comm && typeof comm === "string" && comm.trim()) {
+        const cleanComm = comm.trim();
+        communitiesCount[cleanComm] = (communitiesCount[cleanComm] || 0) + 1;
+      }
 
       // Lead source & City
       if (c.lead_source && typeof c.lead_source === "string" && c.lead_source.trim()) {
@@ -222,6 +237,7 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
       totalCampaignAmount,
       tagsCount,
       leadSourcesCount,
+      communitiesCount,
       formsCount,
       numericFieldsAgg,
       textFieldsAgg,

@@ -61,6 +61,69 @@ export async function GET(request: Request) {
       }
     }
 
+    // 3. Sweep pending donations older than 5 minutes for automated WhatsApp reminder
+    try {
+      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+      const pendingSnap = await adminDb.collectionGroup("donations")
+        .where("paymentStatus", "==", "pending")
+        .where("pendingWhatsAppSent", "==", false)
+        .where("createdAt", "<=", fiveMinsAgo)
+        .where("createdAt", ">=", twoHoursAgo)
+        .limit(20)
+        .get();
+
+      for (const donDoc of pendingSnap.docs) {
+        const donData = donDoc.data();
+        const targetCampId = donData.campaignId || "home";
+        const phone = donData.phone;
+        if (!phone) {
+          await donDoc.ref.update({ pendingWhatsAppSent: true });
+          continue;
+        }
+
+        // Fetch drawerConfig
+        const pageDoc = await adminDb.collection("pages").doc(targetCampId === "default-campaign" || targetCampId === "home" ? "home" : targetCampId).get();
+        const drawerConfig = pageDoc.data()?.campaignTiers?.drawerConfig || {};
+
+        if (drawerConfig.whatsapp_enabled === false) {
+          await donDoc.ref.update({ pendingWhatsAppSent: true });
+          continue;
+        }
+
+        const pendingTemplate = drawerConfig.whatsapp_pending_message || "שלום {שם מלא}, שמנו לב שהתחלת תרומה בסך ₪{סכום} עבור {שם קמפיין} אך התהליך טרם הושלם. לחץ כאן להשלמת התרומה: {קישור לתשלום}";
+        const paymentUrl = `${process.env.NEXTAUTH_URL || "https://kampin.web.app"}/c/${targetCampId}?openDonate=true`;
+
+        let resolvedMsg = pendingTemplate;
+        resolvedMsg = resolvedMsg.replace(/\{שם מלא\}/g, donData.donorName || "ידיד/ת הקמפיין");
+        resolvedMsg = resolvedMsg.replace(/\{טלפון\}|\{מספר טלפון נייד\}|\{מספר טלפון\}/g, phone);
+        resolvedMsg = resolvedMsg.replace(/\{דוא"ל\}|\{כתובת אימייל\}|\{אימייל\}/g, donData.email || "");
+        resolvedMsg = resolvedMsg.replace(/\{סכום\}|\{סכום התרומה\}/g, String(donData.amount || ""));
+        resolvedMsg = resolvedMsg.replace(/\{מסלול\}|\{מסלול תרומה\}/g, donData.tier || "");
+        resolvedMsg = resolvedMsg.replace(/\{סוג תרומה\}/g, donData.isRecurring ? "הוראת קבע" : "תרומה חד פעמית");
+        resolvedMsg = resolvedMsg.replace(/\{מספר חודשים\}/g, String(donData.recurringMonths || 1));
+        resolvedMsg = resolvedMsg.replace(/\{שם קמפיין\}|\{קמפיין\}|\{עמוד\}/g, donData.campaignTitle || "הקמפיין");
+        resolvedMsg = resolvedMsg.replace(/\{שם שגריר\}|\{שגריר\}/g, donData.ambassadorName || "");
+        resolvedMsg = resolvedMsg.replace(/\{הקדשה\}|\{ברכה\}/g, donData.dedication || "");
+        resolvedMsg = resolvedMsg.replace(/\{קישור לתשלום\}|\{link_tashlum\}/g, paymentUrl);
+
+        const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
+        if (drawerConfig.whatsapp_pending_image_url) {
+          await sendWhatsAppFileByUrl(phone, drawerConfig.whatsapp_pending_image_url, "reminder.png", resolvedMsg);
+        } else {
+          await sendWhatsAppMessage(phone, resolvedMsg);
+        }
+
+        await donDoc.ref.update({
+          pendingWhatsAppSent: true,
+          pendingWhatsAppSentAt: new Date().toISOString(),
+        });
+      }
+    } catch (cronDonErr) {
+      console.warn("Cron pending donations sweep notice:", cronDonErr);
+    }
+
     return NextResponse.json({ success: true, executedCount, message: "Cron executed successfully" });
   } catch (error: any) {
     console.error("Cron Error:", error);

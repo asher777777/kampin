@@ -113,7 +113,7 @@ export function CourseBanner({
           {/* On mobile, this will be below. On desktop, this spans full height. */}
           <div className="absolute inset-0 pb-16 md:pb-0 pl-0 md:pl-0 pr-0 md:pr-4 pt-0 md:pt-10 z-10">
             <div className="w-full h-full relative overflow-hidden rounded-t-[50px] md:rounded-tr-[250px] rounded-br-[0] md:rounded-bl-none shadow-2xl border-t-8 border-r-8 md:border-b-0 border-white">
-              {imageSrc ? (
+              {Boolean(imageSrc && typeof imageSrc === "string" && imageSrc.trim().length > 0 && imageSrc !== "/" && imageSrc !== "/placeholder.png") ? (
                 <Image 
                   src={imageSrc} 
                   alt={title || "Image"} 

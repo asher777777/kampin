@@ -12,7 +12,14 @@ export interface Community {
   name: string;
   color: string;
   icon: string;
-  purpose?: string;
+  vision?: string; // חזון
+  purpose?: string; // מטרה
+  gallery?: string[]; // גלריית תמונות
+  pageId?: string; // מזהה עמוד
+  pageSlug?: string; // נתיב עמוד
+  pageUrl?: string; // קישור לעמוד
+  mainCampaignId?: string; // קמפיין ראשי
+  campaignTitle?: string;
   isDraft?: boolean;
   files?: CommunityFile[];
   memberCount?: number;
