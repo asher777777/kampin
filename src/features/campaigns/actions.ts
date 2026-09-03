@@ -1568,9 +1568,30 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
               matchedContact = contactByNameMap.get(String(data.donorName).trim().toLowerCase());
             }
 
+            const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+            const isInvalidComm = (val?: string | null) => {
+              if (!val) return true;
+              const s = String(val).trim();
+              if (!s || /^\d+$/.test(s) || INVALID_COMMUNITIES_FILTER.has(s)) return true;
+              return false;
+            };
+
+            if (data.ambassadorName && isInvalidComm(data.ambassadorName)) {
+              data.ambassadorName = "";
+            }
+
             if (matchedContact) {
               const cTags = Array.isArray(matchedContact.tags) ? matchedContact.tags : [];
-              const commName = matchedContact.community || matchedContact.mh_crm_community || cTags[0] || "";
+              let commName = "";
+              if (matchedContact.community && !isInvalidComm(matchedContact.community)) {
+                commName = matchedContact.community.trim();
+              } else if (matchedContact.mh_crm_community && !isInvalidComm(matchedContact.mh_crm_community)) {
+                commName = matchedContact.mh_crm_community.trim();
+              } else {
+                const validTag = cTags.find((t: any) => typeof t === "string" && !isInvalidComm(t));
+                if (validTag) commName = validTag.trim();
+              }
+
               if (commName && !data.ambassadorName) {
                 data.ambassadorName = commName;
               }
@@ -1583,8 +1604,11 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         }
 
         ambSnap.docs.forEach((doc) => {
-          if (!allAmbassadors.some(a => a.id === doc.id)) {
-            allAmbassadors.push({ id: doc.id, ...doc.data() } as Ambassador);
+          const ambData = doc.data() as Ambassador;
+          const aName = (ambData.name || "").trim();
+          const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+          if (aName && !/^\d+$/.test(aName) && !INVALID_COMMUNITIES_FILTER.has(aName) && !allAmbassadors.some(a => a.id === doc.id)) {
+            allAmbassadors.push({ id: doc.id, ...ambData });
           }
         });
       } catch (err) {
@@ -1593,9 +1617,27 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     }
 
     // 3. For contacts with community tags who have donations/payments in CRM, ensure their donations are included
+    const INVALID_COMMUNITIES_CRM = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+    const isInvalidCrmComm = (val?: string | null) => {
+      if (!val) return true;
+      const s = String(val).trim();
+      if (!s || /^\d+$/.test(s) || INVALID_COMMUNITIES_CRM.has(s)) return true;
+      return false;
+    };
+
     allLiveContacts.forEach((c) => {
       const cTags = Array.isArray(c.tags) ? c.tags : [];
-      const commName = c.community || c.mh_crm_community || cTags[0] || "";
+      let commName = "";
+
+      if (c.community && !isInvalidCrmComm(c.community)) {
+        commName = c.community.trim();
+      } else if (c.mh_crm_community && !isInvalidCrmComm(c.mh_crm_community)) {
+        commName = c.mh_crm_community.trim();
+      } else {
+        const validTag = cTags.find((t: any) => typeof t === "string" && !isInvalidCrmComm(t));
+        if (validTag) commName = validTag.trim();
+      }
+
       const spent = Number(c.total_spent || c.campaign_amount || 0);
 
       if (commName && spent > 0) {

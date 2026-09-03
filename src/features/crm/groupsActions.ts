@@ -1104,4 +1104,162 @@ export async function importGroupsFromExcelAction(
   }
 }
 
+const INVALID_COMMUNITIES_SET = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+
+const isInvalidCommunityName = (val?: string | null) => {
+  if (!val) return true;
+  const s = String(val).trim();
+  if (!s || /^\d+$/.test(s)) return true;
+  if (INVALID_COMMUNITIES_SET.has(s)) return true;
+  return false;
+};
+
+export async function cleanupAllNumericTagsAndCommunitiesAction(): Promise<{
+  cleanedContactsCount: number;
+  cleanedDonationsCount: number;
+  cleanedGroupsCount: number;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const ownerId = session.user.id;
+
+    let cleanedContactsCount = 0;
+    let cleanedDonationsCount = 0;
+    let cleanedGroupsCount = 0;
+
+    // 1. Clean contacts (remove numeric community / 'באולם' / 'בחוץ', remove numeric tags)
+    const contactsSnap = await adminDb.collection("contacts").where("ownerId", "==", ownerId).get();
+    let batch = adminDb.batch();
+    let batchOps = 0;
+
+    for (const cDoc of contactsSnap.docs) {
+      const c = cDoc.data();
+      let needsUpdate = false;
+      const updateData: any = {};
+
+      // Check community
+      if (c.community && isInvalidCommunityName(c.community)) {
+        updateData.community = "";
+        needsUpdate = true;
+      }
+      if (c.mh_crm_community && isInvalidCommunityName(c.mh_crm_community)) {
+        updateData.mh_crm_community = "";
+        needsUpdate = true;
+      }
+
+      // Check tags
+      if (Array.isArray(c.tags)) {
+        const filteredTags = c.tags.filter((t: any) => typeof t === "string" && t.trim() && !isInvalidCommunityName(t));
+        if (filteredTags.length !== c.tags.length) {
+          updateData.tags = filteredTags;
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        batch.update(cDoc.ref, updateData);
+        batchOps++;
+        cleanedContactsCount++;
+      }
+
+      if (batchOps >= 450) {
+        await batch.commit();
+        batch = adminDb.batch();
+        batchOps = 0;
+      }
+    }
+
+    // 2. Clean donations across campaigns
+    const campaignsSnap = await adminDb.collection("campaigns").get();
+    for (const campDoc of campaignsSnap.docs) {
+      const donationsSnap = await campDoc.ref.collection("donations").get();
+      for (const dDoc of donationsSnap.docs) {
+        const d = dDoc.data();
+        let needsUpdate = false;
+        const updateData: any = {};
+
+        if (d.ambassadorName && isInvalidCommunityName(d.ambassadorName)) {
+          updateData.ambassadorName = "";
+          needsUpdate = true;
+        }
+        if (d.ambassadorId && isInvalidCommunityName(d.ambassadorId)) {
+          updateData.ambassadorId = "";
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          batch.update(dDoc.ref, updateData);
+          batchOps++;
+          cleanedDonationsCount++;
+        }
+
+        if (batchOps >= 450) {
+          await batch.commit();
+          batch = adminDb.batch();
+          batchOps = 0;
+        }
+      }
+
+      // Also clean ambassadors subcollection
+      const ambSnap = await campDoc.ref.collection("ambassadors").get();
+      for (const aDoc of ambSnap.docs) {
+        const a = aDoc.data();
+        if (isInvalidCommunityName(a.name) || isInvalidCommunityName(a.slug)) {
+          batch.delete(aDoc.ref);
+          batchOps++;
+          cleanedGroupsCount++;
+        }
+        if (batchOps >= 450) {
+          await batch.commit();
+          batch = adminDb.batch();
+          batchOps = 0;
+        }
+      }
+    }
+
+    // 3. Clean crm_groups
+    const groupsSnap = await adminDb.collection("users").doc(ownerId).collection("crm_groups").get();
+    for (const gDoc of groupsSnap.docs) {
+      const g = gDoc.data();
+      if (!g.name || isInvalidCommunityName(g.name)) {
+        batch.delete(gDoc.ref);
+        batchOps++;
+        cleanedGroupsCount++;
+      }
+      if (batchOps >= 450) {
+        await batch.commit();
+        batch = adminDb.batch();
+        batchOps = 0;
+      }
+    }
+
+    // 4. Clean invalid pages
+    try {
+      const pagesSnap = await adminDb.collection("pages").where("ownerId", "==", ownerId).get();
+      for (const pDoc of pagesSnap.docs) {
+        const p = pDoc.data();
+        if (isInvalidCommunityName(p.title) || isInvalidCommunityName(p.slug)) {
+          batch.delete(pDoc.ref);
+          batchOps++;
+        }
+      }
+    } catch (pErr) {}
+
+    if (batchOps > 0) {
+      await batch.commit();
+    }
+
+    revalidatePath("/dashboard/crm/groups");
+    revalidatePath("/dashboard/crm/analytics");
+    revalidatePath("/dashboard/crm");
+    revalidatePath("/");
+
+    return { cleanedContactsCount, cleanedDonationsCount, cleanedGroupsCount };
+  } catch (error: any) {
+    console.error("Error in cleanupAllNumericTagsAndCommunitiesAction:", error);
+    return { cleanedContactsCount: 0, cleanedDonationsCount: 0, cleanedGroupsCount: 0 };
+  }
+}
+
 

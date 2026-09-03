@@ -333,8 +333,10 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                         </p>
                       )}
 
-                      {/* Ambassador Attribution */}
-                      {item.ambassadorName && (
+                      {/* Ambassador / Community Leader Attribution */}
+                      {item.ambassadorName && 
+                       !/^\d+$/.test(item.ambassadorName.trim()) && 
+                       !["באולם", "בחוץ", "באולם ", "בחוץ "].includes(item.ambassadorName.trim()) && (
                         <div className="text-xs text-amber-700 font-semibold flex items-center gap-1 self-end bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
                           <Sparkles className="w-3 h-3 text-amber-500" />
                           <span>ע"י {item.ambassadorName}</span>
