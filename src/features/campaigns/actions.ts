@@ -1495,7 +1495,68 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     const allDonations: Donation[] = [];
     const allAmbassadors: Ambassador[] = [];
 
-    // 1. Fetch contacts map with tags/communities to detect active donors and their community affiliation
+    // 1. Fetch CRM communities strictly linked to THIS campaign first
+    const linkedGroupNames = new Set<string>();
+    const allCrmGroupsMap = new Map<string, any>();
+    const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+
+    try {
+      const crmGroupsSnap = await adminDb.collectionGroup("crm_groups").get();
+      crmGroupsSnap.docs.forEach((doc) => {
+        const gData = doc.data();
+        if (!gData.name || !gData.name.trim()) return;
+        const gName = gData.name.trim();
+        if (INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName)) return;
+
+        allCrmGroupsMap.set(gName, gData);
+        if (gData.id) allCrmGroupsMap.set(gData.id, gData);
+
+        const gMainCamp = (gData.mainCampaignId || "").trim();
+
+        // Strict campaign linkage: ONLY if explicitly assigned to this campaign
+        const isLinked =
+          (rawId === "home" || rawId === "default-campaign" || rawId === "/")
+            ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
+            : (gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}` || gMainCamp.includes(rawId));
+
+        if (isLinked) {
+          linkedGroupNames.add(gName);
+          const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
+          const ambObj: Ambassador = {
+            id: doc.id,
+            name: gName,
+            leaderName: gData.leaderName || gName,
+            slug: ambSlug,
+            targetGoal: Number(gData.targetGoal || 5000),
+            totalRaised: 0,
+            donorCount: 0,
+            message: gData.vision || gData.description || "",
+            gallery: gData.gallery || [],
+            campaignId: rawId,
+            pageUrl: gData.pageUrl || `/${ambSlug}`,
+            createdAt: gData.createdAt || new Date().toISOString()
+          };
+
+          const existingIdx = allAmbassadors.findIndex(
+            a => a.id === doc.id || a.slug === ambSlug || a.name === gName
+          );
+
+          if (existingIdx === -1) {
+            allAmbassadors.push(ambObj);
+          } else {
+            allAmbassadors[existingIdx] = {
+              ...ambObj,
+              ...allAmbassadors[existingIdx],
+              pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
+            };
+          }
+        }
+      });
+    } catch (crmErr) {
+      console.warn("Error fetching collectionGroup crm_groups in getCampaignDonationsAction:", crmErr);
+    }
+
+    // 2. Fetch contacts map to detect active donors and their community affiliation
     const activeContactsMap = new Map<string, boolean>();
     const contactByPhoneMap = new Map<string, any>();
     const contactByEmailMap = new Map<string, any>();
@@ -1532,7 +1593,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       console.warn("Could not prefetch contacts map:", cErr);
     }
 
-    // 2. Fetch donations from campaign subcollections
+    // 3. Fetch donations from campaign subcollections
     for (const cid of idsToSearch) {
       try {
         const [donationsSnap, ambSnap] = await Promise.all([
@@ -1555,6 +1616,11 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
               continue;
             }
 
+            // If ambassadorName is not a strictly linked community to this campaign, clear it
+            if (data.ambassadorName && !linkedGroupNames.has(String(data.ambassadorName).trim())) {
+              data.ambassadorName = "";
+            }
+
             // Find matching contact for community attribution
             let matchedContact = null;
             if (data.contactId && contactByIdMap.has(data.contactId)) {
@@ -1568,27 +1634,15 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
               matchedContact = contactByNameMap.get(String(data.donorName).trim().toLowerCase());
             }
 
-            const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
-            const isInvalidComm = (val?: string | null) => {
-              if (!val) return true;
-              const s = String(val).trim();
-              if (!s || /^\d+$/.test(s) || INVALID_COMMUNITIES_FILTER.has(s)) return true;
-              return false;
-            };
-
-            if (data.ambassadorName && isInvalidComm(data.ambassadorName)) {
-              data.ambassadorName = "";
-            }
-
             if (matchedContact) {
               const cTags = Array.isArray(matchedContact.tags) ? matchedContact.tags : [];
               let commName = "";
-              if (matchedContact.community && !isInvalidComm(matchedContact.community)) {
+              if (matchedContact.community && linkedGroupNames.has(matchedContact.community.trim())) {
                 commName = matchedContact.community.trim();
-              } else if (matchedContact.mh_crm_community && !isInvalidComm(matchedContact.mh_crm_community)) {
+              } else if (matchedContact.mh_crm_community && linkedGroupNames.has(matchedContact.mh_crm_community.trim())) {
                 commName = matchedContact.mh_crm_community.trim();
               } else {
-                const validTag = cTags.find((t: any) => typeof t === "string" && !isInvalidComm(t));
+                const validTag = cTags.find((t: any) => typeof t === "string" && linkedGroupNames.has(t.trim()));
                 if (validTag) commName = validTag.trim();
               }
 
@@ -1606,8 +1660,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         ambSnap.docs.forEach((doc) => {
           const ambData = doc.data() as Ambassador;
           const aName = (ambData.name || "").trim();
-          const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
-          if (aName && !/^\d+$/.test(aName) && !INVALID_COMMUNITIES_FILTER.has(aName) && !allAmbassadors.some(a => a.id === doc.id)) {
+          if (aName && linkedGroupNames.has(aName) && !allAmbassadors.some(a => a.id === doc.id)) {
             allAmbassadors.push({ id: doc.id, ...ambData });
           }
         });
@@ -1616,25 +1669,17 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     }
 
-    // 3. For contacts with community tags who have donations/payments in CRM, ensure their donations are included
-    const INVALID_COMMUNITIES_CRM = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
-    const isInvalidCrmComm = (val?: string | null) => {
-      if (!val) return true;
-      const s = String(val).trim();
-      if (!s || /^\d+$/.test(s) || INVALID_COMMUNITIES_CRM.has(s)) return true;
-      return false;
-    };
-
+    // 4. For contacts with community tags who have donations/payments in CRM, ensure their donations are included ONLY IF community is linked
     allLiveContacts.forEach((c) => {
       const cTags = Array.isArray(c.tags) ? c.tags : [];
       let commName = "";
 
-      if (c.community && !isInvalidCrmComm(c.community)) {
+      if (c.community && linkedGroupNames.has(c.community.trim())) {
         commName = c.community.trim();
-      } else if (c.mh_crm_community && !isInvalidCrmComm(c.mh_crm_community)) {
+      } else if (c.mh_crm_community && linkedGroupNames.has(c.mh_crm_community.trim())) {
         commName = c.mh_crm_community.trim();
       } else {
-        const validTag = cTags.find((t: any) => typeof t === "string" && !isInvalidCrmComm(t));
+        const validTag = cTags.find((t: any) => typeof t === "string" && linkedGroupNames.has(t.trim()));
         if (validTag) commName = validTag.trim();
       }
 
@@ -1669,80 +1714,17 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     });
 
-    // 4. Fetch CRM communities strictly linked to this campaign
-    const linkedGroupNames = new Set<string>();
-    const allCrmGroupsMap = new Map<string, any>();
-
-    try {
-      const crmGroupsSnap = await adminDb.collectionGroup("crm_groups").get();
-      crmGroupsSnap.docs.forEach((doc) => {
-        const gData = doc.data();
-        if (!gData.name || !gData.name.trim()) return;
-        const gName = gData.name.trim();
-        allCrmGroupsMap.set(gName, gData);
-        if (gData.id) allCrmGroupsMap.set(gData.id, gData);
-
-        const gMainCamp = (gData.mainCampaignId || "").trim();
-
-        // Strict campaign linkage: ONLY if explicitly assigned to this campaign
-        const isLinked =
-          (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-            ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
-            : (gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}`);
-
-        if (isLinked) {
-          linkedGroupNames.add(gName);
-          const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
-          const existingIdx = allAmbassadors.findIndex(
-            a => a.id === doc.id || a.slug === ambSlug || a.name === gName
-          );
-
-          const ambObj: Ambassador = {
-            id: doc.id,
-            name: gName,
-            leaderName: gData.leaderName || gName,
-            slug: ambSlug,
-            targetGoal: Number(gData.targetGoal || 5000),
-            totalRaised: 0,
-            donorCount: 0,
-            message: gData.vision || gData.description || "",
-            gallery: gData.gallery || [],
-            campaignId: rawId,
-            pageUrl: gData.pageUrl || `/${ambSlug}`,
-            createdAt: gData.createdAt || new Date().toISOString()
-          };
-
-          if (existingIdx === -1) {
-            allAmbassadors.push(ambObj);
-          } else {
-            allAmbassadors[existingIdx] = {
-              ...ambObj,
-              ...allAmbassadors[existingIdx],
-              pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
-            };
-          }
-        }
-      });
-    } catch (crmErr) {
-      console.warn("Error fetching collectionGroup crm_groups in getCampaignDonationsAction:", crmErr);
-    }
-
-    // 5. Strictly filter allAmbassadors so ONLY active CRM communities linked to THIS campaign remain
-    const filteredAmbassadors = allAmbassadors.filter(amb => {
-      if (linkedGroupNames.has(amb.name)) return true;
-      if (allCrmGroupsMap.has(amb.name)) {
-        const crmGrp = allCrmGroupsMap.get(amb.name);
-        const gMainCamp = (crmGrp.mainCampaignId || "").trim();
-        if (rawId === "home" || rawId === "default-campaign" || rawId === "/") {
-          return gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign";
-        }
-        return gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}`;
+    // 5. Strictly ensure allDonations only have ambassadorName if it is in linkedGroupNames
+    allDonations.forEach(d => {
+      if (d.ambassadorName && !linkedGroupNames.has(String(d.ambassadorName).trim())) {
+        d.ambassadorName = "";
       }
-      // Do not allow obsolete / unlinked ambassadors
-      return false;
     });
 
-    // 6. Calculate totalRaised and donorCount for each linked community from allDonations
+    // 6. Strictly filter allAmbassadors so ONLY active CRM communities linked to THIS campaign remain
+    const filteredAmbassadors = allAmbassadors.filter(amb => linkedGroupNames.has(amb.name));
+
+    // 7. Calculate totalRaised and donorCount for each linked community from allDonations
     filteredAmbassadors.forEach(amb => {
       const ambDonations = allDonations.filter(d => {
         const matchName = d.ambassadorName && d.ambassadorName.trim().toLowerCase() === amb.name.trim().toLowerCase();
