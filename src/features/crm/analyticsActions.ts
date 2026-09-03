@@ -126,6 +126,20 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
     const leadSourcesCount: Record<string, number> = {};
     const communitiesCount: Record<string, number> = {};
     const formsCount: Record<string, number> = {};
+
+    // Pre-populate defined CRM groups so all communities appear in the filter
+    try {
+      const groupsSnap = await adminDb.collection("users").doc(ownerId).collection("crm_groups").get();
+      groupsSnap.docs.forEach((gDoc) => {
+        const gData = gDoc.data();
+        if (gData.name && typeof gData.name === "string" && gData.name.trim()) {
+          const gName = gData.name.trim();
+          communitiesCount[gName] = 0;
+        }
+      });
+    } catch (gErr) {
+      console.warn("Could not fetch crm_groups for communitiesCount:", gErr);
+    }
     const numericFieldsAgg: Record<string, { 
       sum: number; 
       count: number; 
@@ -169,12 +183,25 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
         }
       });
 
-      // Communities
-      const comm = c.community || c.mh_crm_community || "";
-      if (comm && typeof comm === "string" && comm.trim()) {
-        const cleanComm = comm.trim();
-        communitiesCount[cleanComm] = (communitiesCount[cleanComm] || 0) + 1;
+      // Communities (from c.tags array AND c.community / c.mh_crm_community)
+      const contactCommunities = new Set<string>();
+      if (Array.isArray(c.tags)) {
+        c.tags.forEach((t: any) => {
+          if (t && typeof t === "string" && t.trim()) {
+            contactCommunities.add(t.trim());
+          }
+        });
       }
+      if (c.community && typeof c.community === "string" && c.community.trim()) {
+        contactCommunities.add(c.community.trim());
+      }
+      if (c.mh_crm_community && typeof c.mh_crm_community === "string" && c.mh_crm_community.trim()) {
+        contactCommunities.add(c.mh_crm_community.trim());
+      }
+
+      contactCommunities.forEach((comm) => {
+        communitiesCount[comm] = (communitiesCount[comm] || 0) + 1;
+      });
 
       // Lead source & City
       if (c.lead_source && typeof c.lead_source === "string" && c.lead_source.trim()) {

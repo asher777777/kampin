@@ -3,6 +3,8 @@ import { getHomePageConfig } from "@/features/home/actions";
 import { getGlobalSettings } from "@/features/settings/actions";
 import { CampaignClientView } from "../CampaignClientView";
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function generateMetadata({
   params,
@@ -18,7 +20,7 @@ export async function generateMetadata({
 
   return {
     title: `${campaign?.title || "קמפיין גיוס"}${ambName}`,
-    description: ambassador?.message || campaign?.subtitle || "עמוד שגריר אישי לתרומה",
+    description: ambassador?.message || campaign?.subtitle || "עמוד קהילה אישי",
   };
 }
 
@@ -29,8 +31,25 @@ export default async function AmbassadorCampaignPage({
 }) {
   const { campaignId, ambassadorSlug } = await params;
   const decodedSlug = decodeURIComponent(ambassadorSlug || "");
-  const campaign = await getCampaignData(campaignId);
-  const ambassador = await getAmbassadorBySlug(campaignId, decodedSlug);
+
+  // If a full community page exists in pages collection, redirect directly to the community page
+  try {
+    const pageSnap = await adminDb.collection("pages").doc(decodedSlug).get();
+    if (pageSnap.exists) {
+      redirect(`/${decodedSlug}`);
+    }
+  } catch (e: any) {
+    if (e.message?.includes("NEXT_REDIRECT")) throw e;
+  }
+
+  let campaign: any = null;
+  let ambassador: any = null;
+  try {
+    campaign = await getCampaignData(campaignId);
+    ambassador = await getAmbassadorBySlug(campaignId, decodedSlug);
+  } catch (e) {
+    console.warn("Failed to get campaign/ambassador data:", e);
+  }
 
   let homeConfig: any = null;
   try {

@@ -5,11 +5,19 @@ import { Sun, Moon } from "lucide-react";
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Read the current class on mount
-    const hasDark = document.documentElement.classList.contains("dark");
-    setTheme(hasDark ? "dark" : "light");
+    setMounted(true);
+    // Read the current class or local storage on mount
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "light") {
+      document.documentElement.classList.remove("dark");
+      setTheme("light");
+    } else {
+      document.documentElement.classList.add("dark");
+      setTheme("dark");
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -25,23 +33,37 @@ export function ThemeToggle() {
     }
   };
 
+  if (!mounted) {
+    return (
+      <div className="h-11 w-full rounded-xl bg-slate-800/40 animate-pulse" />
+    );
+  }
+
   return (
     <button
       onClick={toggleTheme}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-colors w-full text-right cursor-pointer"
+      className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border border-slate-700/60 dark:border-slate-800 bg-slate-800/40 dark:bg-slate-900/80 hover:bg-slate-800 dark:hover:bg-slate-800 text-slate-200 dark:text-slate-300 hover:text-white transition-all w-full cursor-pointer group"
       type="button"
+      title={theme === "dark" ? "מעבר למצב יום" : "מעבר למצב לילה"}
     >
-      {theme === "dark" ? (
-        <>
-          <Sun className="w-5 h-5 text-amber-500" />
-          <span>מצב בהיר (Light Mode)</span>
-        </>
-      ) : (
-        <>
-          <Moon className="w-5 h-5 text-amber-500" />
-          <span>מצב כהה (Dark Mode)</span>
-        </>
-      )}
+      <div className="flex items-center gap-2.5">
+        {theme === "dark" ? (
+          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+            <Sun className="w-4 h-4" />
+          </div>
+        ) : (
+          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+            <Moon className="w-4 h-4" />
+          </div>
+        )}
+        <span className="text-xs font-bold whitespace-nowrap">
+          {theme === "dark" ? "מצב יום" : "מצב לילה"}
+        </span>
+      </div>
+
+      <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
+        {theme === "dark" ? "כהה פעיל" : "בהיר פעיל"}
+      </span>
     </button>
   );
 }

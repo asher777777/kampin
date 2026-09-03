@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Sweep pending donations older than 5 minutes for automated WhatsApp reminder
+    // 3. Sweep pending donations older than 5 minutes for automated WhatsApp reminder (Strict single-send guard)
     try {
       const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -74,21 +74,45 @@ export async function GET(request: Request) {
         .limit(20)
         .get();
 
+      const processedPhones = new Set<string>();
+
       for (const donDoc of pendingSnap.docs) {
         const donData = donDoc.data();
         const targetCampId = donData.campaignId || "home";
         const phone = donData.phone;
-        if (!phone) {
-          await donDoc.ref.update({ pendingWhatsAppSent: true });
+        
+        // Immediately mark as sent to avoid any other cron worker sending it
+        await donDoc.ref.update({
+          pendingWhatsAppSent: true,
+          pendingWhatsAppSentAt: new Date().toISOString(),
+        });
+
+        if (!phone || processedPhones.has(phone)) {
           continue;
         }
+
+        // Check if contact already received a reminder in the last 24h
+        const contactsSnap = await adminDb.collection("contacts").where("conta_phone", "==", phone).limit(1).get();
+        if (!contactsSnap.empty) {
+          const cData = contactsSnap.docs[0].data();
+          if (cData.lastPendingWhatsAppSentAt) {
+            const diffMs = Date.now() - new Date(cData.lastPendingWhatsAppSentAt).getTime();
+            if (diffMs < 24 * 60 * 60 * 1000) {
+              continue;
+            }
+          }
+          await contactsSnap.docs[0].ref.update({
+            lastPendingWhatsAppSentAt: new Date().toISOString(),
+          });
+        }
+
+        processedPhones.add(phone);
 
         // Fetch drawerConfig
         const pageDoc = await adminDb.collection("pages").doc(targetCampId === "default-campaign" || targetCampId === "home" ? "home" : targetCampId).get();
         const drawerConfig = pageDoc.data()?.campaignTiers?.drawerConfig || {};
 
         if (drawerConfig.whatsapp_enabled === false) {
-          await donDoc.ref.update({ pendingWhatsAppSent: true });
           continue;
         }
 
@@ -114,11 +138,6 @@ export async function GET(request: Request) {
         } else {
           await sendWhatsAppMessage(phone, resolvedMsg);
         }
-
-        await donDoc.ref.update({
-          pendingWhatsAppSent: true,
-          pendingWhatsAppSentAt: new Date().toISOString(),
-        });
       }
     } catch (cronDonErr) {
       console.warn("Cron pending donations sweep notice:", cronDonErr);

@@ -16,6 +16,7 @@ interface CampaignDonorsSectionProps {
   initialDonations?: Donation[];
   initialAmbassadors?: Ambassador[];
   onOpenAmbassadorModal?: () => void;
+  ambassadorSlug?: string;
   ambassadorSlugFilter?: string;
   ambassadorId?: string;
   ambassadorName?: string;
@@ -29,13 +30,19 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   initialDonations = [],
   initialAmbassadors = [],
   onOpenAmbassadorModal,
+  ambassadorSlug,
   ambassadorSlugFilter,
   ambassadorId,
   ambassadorName,
   ambassadorMessage,
   campaignDescription,
 }) => {
-  const isAmbassadorView = Boolean(ambassadorName || ambassadorId || ambassadorSlugFilter);
+  const activeSlug = ambassadorSlug || ambassadorSlugFilter;
+  const isAmbassadorView = Boolean(
+    ambassadorId?.trim() ||
+    activeSlug?.trim() ||
+    (ambassadorName && ambassadorName.trim() !== "")
+  );
   const [activeTab, setActiveTab] = useState<"donors" | "teams" | "about">(config?.defaultTab || "donors");
   const [donorFilterMode, setDonorFilterMode] = useState<"ambassador_only" | "all">(
     isAmbassadorView ? "ambassador_only" : "all"
@@ -113,14 +120,14 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     if (!isAmbassadorView) return allCompletedDonations;
     return allCompletedDonations.filter(d => {
       const matchId = ambassadorId && d.ambassadorId === ambassadorId;
-      const matchSlug = ambassadorSlugFilter && (d.ambassadorId === ambassadorSlugFilter || (d as any).ambassadorSlug === ambassadorSlugFilter);
+      const matchSlug = activeSlug && (d.ambassadorId === activeSlug || (d as any).ambassadorSlug === activeSlug);
       const matchName = ambassadorName && d.ambassadorName && d.ambassadorName.trim().toLowerCase() === ambassadorName.trim().toLowerCase();
       return Boolean(matchId || matchSlug || matchName);
     });
-  }, [allCompletedDonations, isAmbassadorView, ambassadorId, ambassadorSlugFilter, ambassadorName]);
+  }, [allCompletedDonations, isAmbassadorView, ambassadorId, activeSlug, ambassadorName]);
 
   const displayDonations = useMemo(() => {
-    let list: Donation[] = (isAmbassadorView && donorFilterMode === "ambassador_only")
+    let list: Donation[] = isAmbassadorView
       ? ambassadorDonations
       : allCompletedDonations;
 
@@ -138,7 +145,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     }
 
     return list as Donation[];
-  }, [allCompletedDonations, ambassadorDonations, isAmbassadorView, donorFilterMode, searchQuery, sortBy]);
+  }, [allCompletedDonations, ambassadorDonations, isAmbassadorView, searchQuery, sortBy]);
 
   const displayAmbassadors = useMemo(() => {
     return ambassadors;
@@ -200,7 +207,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               activeTab === "donors" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <span>{isAmbassadorView ? (donorFilterMode === "ambassador_only" ? ambassadorDonations.length : allCompletedDonations.length) : allCompletedDonations.length} תורמים</span>
+            <span>{displayDonations.length} תורמים</span>
             {activeTab === "donors" && (
               <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
             )}
@@ -212,7 +219,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               activeTab === "teams" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <span>{displayAmbassadors.length} קבוצות / שגרירים</span>
+            <span>{displayAmbassadors.length} קהילות</span>
             {activeTab === "teams" && (
               <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
             )}
@@ -234,34 +241,6 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
         {/* Donors Tab Content */}
         {activeTab === "donors" && (
           <div className="flex flex-col gap-5">
-            
-            {/* Filter Toggle for Ambassador Page (Ambassador Donors vs All Donors) */}
-            {isAmbassadorView && (
-              <div className="flex items-center justify-center gap-2 p-1.5 bg-slate-200/70 rounded-full max-w-md mx-auto w-full">
-                <button
-                  type="button"
-                  onClick={() => setDonorFilterMode("ambassador_only")}
-                  className={`flex-1 py-1.5 px-4 rounded-full text-xs md:text-sm font-bold transition-all ${
-                    donorFilterMode === "ambassador_only"
-                      ? "bg-white text-emerald-900 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  תרומות דרך {ambassadorName || "השגריר"} ({ambassadorDonations.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDonorFilterMode("all")}
-                  className={`flex-1 py-1.5 px-4 rounded-full text-xs md:text-sm font-bold transition-all ${
-                    donorFilterMode === "all"
-                      ? "bg-white text-emerald-900 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  כלל תורמי הקמפיין ({allCompletedDonations.length})
-                </button>
-              </div>
-            )}
 
             {/* Search & Sort Toolbar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -302,7 +281,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                 </div>
                 <h4 className="text-lg font-bold text-slate-800">
                   {isAmbassadorView && donorFilterMode === "ambassador_only"
-                    ? `היו הראשונים לתרום דרך ${ambassadorName || "השגריר"}!`
+                    ? `היו הראשונים לתרום דרך ${ambassadorName || "מוביל הקהילה"}!`
                     : "היו הראשונים לתרום לקמפיין!"}
                 </h4>
                 <p className="text-sm text-slate-500 max-w-sm">
@@ -369,30 +348,30 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
           </div>
         )}
 
-        {/* Teams / Ambassadors Tab Content */}
+        {/* Teams / Community Leaders Tab Content */}
         {activeTab === "teams" && (
           <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
-              <div>
-                <h3 className="font-bold text-emerald-950 text-lg">רוצים לעזור לנו להגיע ליעד?</h3>
-                <p className="text-sm text-emerald-800">צרו יעד אישי והפכו לשגרירים של הקמפיין!</p>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-emerald-50 border border-emerald-200 p-4 sm:p-5 rounded-2xl shadow-xs">
+              <div className="text-right space-y-0.5">
+                <h3 className="font-extrabold text-emerald-950 text-base sm:text-lg">אמרו לך שאת המובילה של הפעילות</h3>
+                <p className="text-xs sm:text-sm text-emerald-800 font-medium">פתחי עמוד מיוחד להגדיל את המשתתפים</p>
               </div>
               
               <button
                 onClick={onOpenAmbassadorModal}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all shadow-md flex items-center gap-2"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-full text-sm transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
-                <span>צור יעד אישי</span>
+                <span>צרי קהילה</span>
               </button>
             </div>
 
             {displayAmbassadors.length === 0 ? (
               <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
                 <Users className="w-12 h-12 text-slate-300" />
-                <h4 className="text-base font-bold text-slate-700">עדיין לא הצטרפו שגרירים לקמפיין</h4>
+                <h4 className="text-base font-bold text-slate-700">עדיין לא נפתחו קהילות בקמפיין</h4>
                 <p className="text-xs text-slate-500 max-w-sm">
-                  רוצים לפתוח יעד אישי ולהפוך לשגרירים? לחצו על "צור יעד אישי" והצטרפו!
+                  רוצה לפתוח עמוד מיוחד ולהגדיל את המשתתפים? לחצי על "צרי קהילה" והצטרפי!
                 </p>
               </div>
             ) : (
@@ -418,7 +397,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                         {isCurrentAmbassador && (
                           <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-2">
                             <Sparkles className="w-3 h-3 text-amber-600" />
-                            <span>זה עמוד השגריר הנוכחי</span>
+                            <span>זה עמוד מוביל הקהילה הנוכחי</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between mb-2">
@@ -442,14 +421,14 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                       </div>
 
                       <a
-                        href={`/c/${targetCampaignId}/${amb.slug}`}
+                        href={amb.pageUrl || `/c/${targetCampaignId}/${amb.slug}`}
                         className={`w-full py-2 text-xs font-bold rounded-lg transition-colors text-center border ${
                           isCurrentAmbassador
                             ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600"
                             : "bg-slate-100 hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 border-slate-200"
                         }`}
                       >
-                        {isCurrentAmbassador ? "אתה נמצא כאן" : "צפה בעמוד השגריר"}
+                        {isCurrentAmbassador ? "אתה נמצא כאן" : "צפה בעמוד הקהילה"}
                       </a>
                     </div>
                   );
@@ -468,7 +447,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 text-slate-800 space-y-2">
                 <div className="flex items-center gap-2 text-amber-900 font-bold text-base">
                   <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>מסר אישי מ{ambassadorName || "השגריר"}:</span>
+                  <span>מסר אישי מ{ambassadorName || "מוביל הקהילה"}:</span>
                 </div>
                 <p className="text-slate-800 italic leading-relaxed pr-2">
                   "{ambassadorMessage}"

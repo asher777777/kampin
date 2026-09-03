@@ -97,30 +97,44 @@ export async function getAmbassadorBySlug(campaignId: string, slug: string): Pro
  */
 export async function createAmbassadorAction(data: {
   campaignId: string;
-  name: string;
+  name: string; // שם הקהילה
+  leaderName?: string; // שם מוביל הקהילה
   targetGoal: number;
-  message?: string;
+  message?: string; // חזון הקהילה
+  gallery?: string[];
+  customSlug?: string;
   phone?: string;
   email?: string;
   ownerId?: string;
 }): Promise<{ success: boolean; ambassador?: Ambassador; error?: string }> {
   try {
-    const { campaignId, name, targetGoal, message, phone, email, ownerId } = data;
+    const { campaignId, name, leaderName, targetGoal, message, gallery, customSlug, phone, email, ownerId } = data;
     if (!campaignId || !name || !targetGoal) {
       return { success: false, error: "חסרים שדות חובה" };
     }
 
-    // Generate unique slug
-    const baseSlug = name
-      .trim()
-      .toLowerCase()
-      .replace(/[\s\W]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "ambassador";
+    // 1. Generate unique English-only slug
+    let baseSlug = "";
+    if (customSlug && customSlug.trim()) {
+      baseSlug = customSlug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+    
+    if (!baseSlug) {
+      baseSlug = name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/^-+|-+$/g, "") || `leader-${Date.now().toString().slice(-4)}`;
+    }
     
     let slug = baseSlug;
     let counter = 1;
 
-    // Check slug uniqueness
+    // Check slug uniqueness across campaign ambassadors
     while (true) {
       const existing = await adminDb
         .collection("campaigns")
@@ -141,12 +155,15 @@ export async function createAmbassadorAction(data: {
 
     const ambassadorData = {
       campaignId,
-      name,
+      name: name.trim(),
+      leaderName: (leaderName && leaderName.trim()) || name.trim(),
       slug,
       targetGoal: Number(targetGoal),
       totalRaised: 0,
       donorCount: 0,
       message: message || "",
+      vision: message || "",
+      gallery: gallery || [],
       phone: phone || "",
       email: email || "",
       createdAt: new Date().toISOString(),
@@ -154,31 +171,215 @@ export async function createAmbassadorAction(data: {
 
     await docRef.set(ambassadorData);
 
-    // Sync to CRM contacts collection for campaign creator
-    try {
-      const campaignDoc = await adminDb.collection("campaigns").doc(campaignId).get();
-      const campaignTitle = campaignDoc.data()?.title || campaignId;
-      const crmOwnerId = ownerId || campaignDoc.data()?.ownerId || "1";
+    // 2. Fetch campaign data and owner ID
+    const campaignDoc = await adminDb.collection("campaigns").doc(campaignId).get();
+    const campaignData = campaignDoc.exists ? campaignDoc.data() : {};
+    const campaignTitle = campaignData?.title || campaignId;
+    const crmOwnerId = ownerId || campaignData?.ownerId || "1";
 
+    // 3. Create Community in crm_groups for the community leader
+    try {
+      const communityId = `leader-${docRef.id}`;
+      const groupData = {
+        id: communityId,
+        name: name.trim(),
+        leaderName: (leaderName && leaderName.trim()) || name.trim(),
+        color: "#4f46e5",
+        description: message || `קהילת ${name.trim()} - קמפיין ${campaignTitle}`,
+        type: "manual",
+        ownerId: crmOwnerId,
+        gallery: gallery || [],
+        vision: message || "",
+        purpose: "",
+        pageId: slug,
+        pageSlug: slug,
+        pageUrl: `/${slug}`,
+        mainCampaignId: campaignId,
+        campaignTitle: campaignTitle,
+        rules: [],
+        matchType: "all",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adminDb
+        .collection("users")
+        .doc(crmOwnerId)
+        .collection("crm_groups")
+        .doc(communityId)
+        .set(groupData, { merge: true });
+    } catch (grpErr) {
+      console.warn("Could not create crm_group for community leader:", grpErr);
+    }
+
+    // 4. Create Community Page in 'pages' collection
+    try {
+      let inheritedVideoGallery: any = campaignData?.videoGallery || null;
+      let inheritedTiers: any = campaignData?.campaignTiers || null;
+
+      if (!inheritedVideoGallery) {
+        try {
+          const homeDoc = await adminDb.collection("pages").doc("home").get();
+          if (homeDoc.exists) {
+            inheritedVideoGallery = homeDoc.data()?.videoGallery || null;
+            if (!inheritedTiers) inheritedTiers = homeDoc.data()?.campaignTiers || null;
+          }
+        } catch (homeErr) {
+          console.warn("Home config fetch error:", homeErr);
+        }
+      }
+
+      const leaderHeroImage = gallery && gallery.length > 0 ? gallery[0] : (inheritedVideoGallery?.images?.[0] || "");
+      const leaderSecondaryImage = gallery && gallery.length > 1 ? gallery[1] : leaderHeroImage;
+
+      const pageDocData = {
+        id: slug,
+        ownerId: crmOwnerId,
+        title: name.trim(),
+        leaderName: (leaderName && leaderName.trim()) || name.trim(),
+        slug: slug,
+        collectionName: "pages",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        seo: {
+          title: `${name.trim()} | קמפיין ${campaignTitle}`,
+          description: message || `עמוד קהילת ${name.trim()} בקמפיין ${campaignTitle}`,
+        },
+        sectionOrder: [
+          "videoGallery",
+          "richContent",
+          "campaignTiers",
+          "campaignHeader",
+          "campaignDonors",
+          "hero",
+          "mainContent",
+          "services",
+          "community",
+          "pricing",
+          "livePosts",
+          "faq",
+          "timer",
+          "landingSection",
+          "contact"
+        ],
+        // 1. Video & Media Gallery
+        videoGallery: {
+          visible: true,
+          anchorId: "videoGallery",
+          images: (inheritedVideoGallery?.images && inheritedVideoGallery.images.length > 0)
+            ? inheritedVideoGallery.images
+            : (gallery || []),
+          videoUrl: inheritedVideoGallery?.videoUrl || "",
+          videoType: inheritedVideoGallery?.videoType || "youtube",
+          effect: inheritedVideoGallery?.effect || "fade",
+          objectFit: inheritedVideoGallery?.objectFit || "cover",
+          desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
+        },
+        // 2. Rich Content / About Section: כותרת הקהילה והחזון
+        richContent: {
+          visible: true,
+          anchorId: "richContent",
+          heading: name.trim(),
+          title: name.trim(),
+          body: message || `ברוכים הבאים לעמוד קהילת ${name.trim()} בקמפיין ${campaignTitle}`,
+          layout: "classic"
+        },
+        // 3. Campaign Tiers
+        campaignTiers: {
+          visible: true,
+          anchorId: "campaignTiers",
+          campaignId: campaignId,
+          donationType: inheritedTiers?.donationType || "both",
+          tiers: inheritedTiers?.tiers || [
+            { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות הקהילה" },
+            { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית בפעילות" },
+            { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
+            { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
+          ]
+        },
+        // 4. Campaign Header
+        campaignHeader: {
+          visible: true,
+          anchorId: "campaignHeader",
+          campaignId: campaignId,
+          ambassadorSlug: slug,
+          ambassadorName: name.trim()
+        },
+        // 5. Campaign Donors
+        campaignDonors: {
+          visible: true,
+          anchorId: "campaignDonors",
+          campaignId: campaignId,
+          ambassadorSlug: slug,
+          ambassadorName: name.trim(),
+          campaignDescription: message || ""
+        },
+        // 6. Hero Section (מוסתר כברירת מחדל)
+        hero: {
+          visible: false,
+          anchorId: "hero",
+          title: name.trim(),
+          subtitle: message || `קהילת ${name.trim()} - קמפיין ${campaignTitle}`,
+          description: `הצטרפו לתמיכה ביעד של ₪${Number(targetGoal).toLocaleString()}`,
+          imageSrc: leaderHeroImage,
+          layout: "progressive",
+          buttonsVisible: false,
+          heroStyle: "hero",
+          flexDirection: "col"
+        },
+        // 7. Main Content Section (מוסתר כברירת מחדל)
+        mainContent: {
+          visible: false,
+          anchorId: "mainContent",
+          title: name.trim(),
+          subtitle: message ? "חזון מוביל הקהילה" : "אודות היעד האישי",
+          description: message || `הצטרפו לתמיכה בקמפיין ${campaignTitle}`,
+          imageSrc: leaderSecondaryImage,
+          layout: "course-banner"
+        },
+        // 8-15. Other Sections (מוסתרים)
+        services: { visible: false, items: [] },
+        community: { visible: false, title: name.trim(), description: "", gallery: gallery || [] },
+        pricing: { visible: false, packages: [] },
+        livePosts: { visible: false },
+        faq: { visible: false, items: [] },
+        timer: { visible: false },
+        landingSection: { visible: false },
+        contact: { visible: false }
+      };
+
+      await adminDb.collection("pages").doc(slug).set(pageDocData, { merge: true });
+    } catch (pageErr) {
+      console.warn("Could not auto-create community page for leader:", pageErr);
+    }
+
+    // 5. Sync to CRM contacts collection for the community leader
+    try {
+      const contactPersonName = (leaderName && leaderName.trim()) || name.trim();
       await adminDb.collection("contacts").add({
         ownerId: crmOwnerId,
         status: "active",
-        conta_name: name,
+        conta_name: contactPersonName,
         conta_phone: phone || "",
         email: email || "",
-        lead_source: `שגריר בקמפיין: ${campaignTitle}`,
+        lead_source: `מוביל קהילת ${name.trim()} בקמפיין: ${campaignTitle}`,
         campaign_role: "ambassador",
         campaign_id: campaignId,
         campaign_title: campaignTitle,
         campaign_ambassador_slug: slug,
         campaign_target_goal: Number(targetGoal),
         campaign_total_raised: 0,
+        tags: [name.trim(), contactPersonName].filter(Boolean),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
     } catch (crmErr) {
-      console.warn("CRM ambassador sync warning:", crmErr);
+      console.warn("CRM leader sync warning:", crmErr);
     }
+
+    revalidatePath(`/c/${campaignId}`);
+    revalidatePath(`/dashboard/crm/groups`);
+    revalidatePath(`/dashboard/crm`);
 
     return {
       success: true,
@@ -186,7 +387,7 @@ export async function createAmbassadorAction(data: {
     };
   } catch (error: any) {
     console.error("Error creating ambassador:", error);
-    return { success: false, error: error.message || "שגיאה ביצירת שגריר" };
+    return { success: false, error: error.message || "שגיאה ביצירת מוביל קהילה" };
   }
 }
 
@@ -371,6 +572,11 @@ export async function recordPendingDonationAction(data: {
         const currentHist = existing.data.campaign_donations_history || [];
         const currentPayments = existing.data.payments || [];
         const currentEvents = existing.data.events || [];
+        const ambassadorTag = ambassadorName ? ambassadorName.trim() : "";
+        let currentTags: string[] = Array.isArray(existing.data.tags) ? existing.data.tags : [];
+        if (ambassadorTag && !currentTags.includes(ambassadorTag)) {
+          currentTags = [...currentTags, ambassadorTag];
+        }
 
         await adminDb.collection("contacts").doc(existing.id).update({
           conta_name: existing.data.conta_name && existing.data.conta_name !== "אנונימי" && existing.data.conta_name !== "תורם קמפיין" 
@@ -378,6 +584,7 @@ export async function recordPendingDonationAction(data: {
             : (donorName || existing.data.conta_name || "תורם קמפיין"),
           email: existing.data.email || email || "",
           conta_phone: existing.data.conta_phone || phone || "",
+          tags: currentTags,
           campaign_amount: (Number(existing.data.campaign_amount || 0) + Number(amount)),
           campaign_donations_history: [donationHistoryItem, ...currentHist],
           payments: [paymentItem, ...currentPayments],
@@ -385,12 +592,14 @@ export async function recordPendingDonationAction(data: {
           updatedAt: new Date().toISOString(),
         });
       } else {
+        const ambassadorTag = ambassadorName ? ambassadorName.trim() : "";
         const contactRef = await adminDb.collection("contacts").add({
           ownerId: crmOwnerId,
           status: "active",
           conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
           conta_phone: phone || "",
           email: email || "",
+          tags: ambassadorTag ? [ambassadorTag] : [],
           lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""} - ממתין לתשלום`,
           campaign_role: "donor",
           campaign_id: targetCampaignId,
@@ -419,7 +628,26 @@ export async function recordPendingDonationAction(data: {
         contactId = contactRef.id;
       }
 
-      // Schedule 5-minute delayed WhatsApp reminder check
+      // Invalidate previous pending donations for this phone in this campaign so they never trigger duplicate reminders
+      if (phone) {
+        try {
+          const oldPendingSnap = await campaignRef.collection("donations")
+            .where("phone", "==", phone)
+            .where("paymentStatus", "==", "pending")
+            .get();
+          
+          for (const oldDoc of oldPendingSnap.docs) {
+            if (oldDoc.id !== donationRef.id) {
+              await oldDoc.ref.update({
+                pendingWhatsAppSent: true,
+                superseded: true,
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Schedule 5-minute delayed WhatsApp reminder check (Single send guaranteed)
       if (phone) {
         const scheduledDonationId = donationRef.id;
         const scheduledContactId = contactId;
@@ -435,11 +663,40 @@ export async function recordPendingDonationAction(data: {
             if (!snap.exists) return;
             const don = snap.data();
             if (!don || don.paymentStatus !== "pending" || don.pendingWhatsAppSent) {
-              return; // Already paid or already sent
+              return; // Already paid, cancelled or already sent
+            }
+
+            // Check contact 24h cooldown to guarantee only 1 reminder ever sent
+            if (scheduledContactId) {
+              const cSnap = await adminDb.collection("contacts").doc(scheduledContactId).get();
+              const cData = cSnap.data();
+              if (cData?.lastPendingWhatsAppSentAt) {
+                const diffMs = Date.now() - new Date(cData.lastPendingWhatsAppSentAt).getTime();
+                if (diffMs < 24 * 60 * 60 * 1000) {
+                  console.log("===> [WhatsApp Server] Cooldown: pending reminder already sent in last 24h to:", phone);
+                  await snap.ref.update({ pendingWhatsAppSent: true });
+                  return;
+                }
+              }
             }
 
             const drawerConfig = await getCampaignDrawerConfig(targetCampaignId);
-            if (drawerConfig.whatsapp_enabled === false) return;
+            if (drawerConfig.whatsapp_enabled === false) {
+              await snap.ref.update({ pendingWhatsAppSent: true });
+              return;
+            }
+
+            // Mark as sent BEFORE sending (atomic guard to prevent duplicate concurrent triggers)
+            await snap.ref.update({
+              pendingWhatsAppSent: true,
+              pendingWhatsAppSentAt: new Date().toISOString(),
+            });
+
+            if (scheduledContactId) {
+              await adminDb.collection("contacts").doc(scheduledContactId).update({
+                lastPendingWhatsAppSentAt: new Date().toISOString(),
+              });
+            }
 
             const pendingTemplate = drawerConfig.whatsapp_pending_message || "שלום {שם מלא}, שמנו לב שהתחלת תרומה בסך ₪{סכום} עבור {שם קמפיין} אך התהליך טרם הושלם. לחץ כאן להשלמת התרומה: {קישור לתשלום}";
             const paymentUrl = `${process.env.NEXTAUTH_URL || "https://kampin.web.app"}/c/${targetCampaignId}?openDonate=true`;
@@ -459,6 +716,8 @@ export async function recordPendingDonationAction(data: {
               paymentUrl,
             });
 
+            console.log("===> [WhatsApp Server] Sending single pending reminder to:", phone);
+
             const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
             if (drawerConfig.whatsapp_pending_image_url) {
               await sendWhatsAppFileByUrl(phone, drawerConfig.whatsapp_pending_image_url, "reminder.png", resolvedMsg);
@@ -466,17 +725,12 @@ export async function recordPendingDonationAction(data: {
               await sendWhatsAppMessage(phone, resolvedMsg);
             }
 
-            await snap.ref.update({
-              pendingWhatsAppSent: true,
-              pendingWhatsAppSentAt: new Date().toISOString(),
-            });
-
             if (scheduledContactId) {
               await adminDb.collection("contacts").doc(scheduledContactId).update({
                 events: adminDb.FieldValue.arrayUnion({
                   time: new Date().toISOString(),
-                  title: "הודעת WhatsApp תזכורת (5 דק' בממתין)",
-                  text: `נשלחה תזכורת לנייד ${phone}: "${resolvedMsg}"`,
+                  title: "הודעת WhatsApp תזכורת (נשלחה פעם אחת)",
+                  text: `נשלחה תזכורת יחידה לנייד ${phone}: "${resolvedMsg}"`,
                 }),
               });
             }
@@ -968,6 +1222,11 @@ export async function recordDonationAction(data: {
         const currentHist = existing.data.campaign_donations_history || [];
         const currentPayments = existing.data.payments || [];
         const currentEvents = existing.data.events || [];
+        const ambassadorTag = ambassadorName ? ambassadorName.trim() : "";
+        let currentTags: string[] = Array.isArray(existing.data.tags) ? existing.data.tags : [];
+        if (ambassadorTag && !currentTags.includes(ambassadorTag)) {
+          currentTags = [...currentTags, ambassadorTag];
+        }
 
         await adminDb.collection("contacts").doc(existing.id).update({
           conta_name: existing.data.conta_name && existing.data.conta_name !== "אנונימי" && existing.data.conta_name !== "תורם קמפיין"
@@ -975,6 +1234,7 @@ export async function recordDonationAction(data: {
             : (donorName || existing.data.conta_name || "תורם קמפיין"),
           email: existing.data.email || email || "",
           conta_phone: existing.data.conta_phone || phone || "",
+          tags: currentTags,
           lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
           campaign_role: "donor",
           campaign_id: campaignId,
@@ -991,12 +1251,14 @@ export async function recordDonationAction(data: {
           updatedAt: new Date().toISOString(),
         });
       } else {
+        const ambassadorTag = ambassadorName ? ambassadorName.trim() : "";
         await adminDb.collection("contacts").add({
           ownerId: crmOwnerId,
           status: "active",
           conta_name: donorName || (isAnonymous ? "אנונימי" : "תורם קמפיין"),
           conta_phone: phone || "",
           email: email || "",
+          tags: ambassadorTag ? [ambassadorTag] : [],
           lead_source: `תורם בקמפיין: ${campaignTitle}${isRecurring ? " (הוראת קבע)" : ""}`,
           campaign_role: "donor",
           campaign_id: campaignId,
@@ -1233,21 +1495,44 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     const allDonations: Donation[] = [];
     const allAmbassadors: Ambassador[] = [];
 
-    // Fetch contacts map to detect orphaned or trashed donations
+    // 1. Fetch contacts map with tags/communities to detect active donors and their community affiliation
     const activeContactsMap = new Map<string, boolean>();
+    const contactByPhoneMap = new Map<string, any>();
+    const contactByEmailMap = new Map<string, any>();
+    const contactByIdMap = new Map<string, any>();
+    const contactByNameMap = new Map<string, any>();
+    const allLiveContacts: any[] = [];
+
     try {
       const contactsSnap = await adminDb.collection("contacts").get();
       contactsSnap.docs.forEach((cDoc) => {
         const cData = cDoc.data();
         const isLive = cData.status !== "trashed";
         activeContactsMap.set(cDoc.id, isLive);
-        if (cData.phone) activeContactsMap.set(cData.phone, isLive);
-        if (cData.email) activeContactsMap.set(cData.email, isLive);
+        if (isLive) {
+          allLiveContacts.push({ id: cDoc.id, ...cData });
+          contactByIdMap.set(cDoc.id, cData);
+          if (cData.phone) {
+            activeContactsMap.set(cData.phone, isLive);
+            contactByPhoneMap.set(String(cData.phone).replace(/\D/g, ""), cData);
+          }
+          if (cData.conta_phone) {
+            contactByPhoneMap.set(String(cData.conta_phone).replace(/\D/g, ""), cData);
+          }
+          if (cData.email) {
+            activeContactsMap.set(cData.email, isLive);
+            contactByEmailMap.set(String(cData.email).trim().toLowerCase(), cData);
+          }
+          if (cData.conta_name) {
+            contactByNameMap.set(String(cData.conta_name).trim().toLowerCase(), cData);
+          }
+        }
       });
     } catch (cErr) {
       console.warn("Could not prefetch contacts map:", cErr);
     }
 
+    // 2. Fetch donations from campaign subcollections
     for (const cid of idsToSearch) {
       try {
         const [donationsSnap, ambSnap] = await Promise.all([
@@ -1270,6 +1555,27 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
               continue;
             }
 
+            // Find matching contact for community attribution
+            let matchedContact = null;
+            if (data.contactId && contactByIdMap.has(data.contactId)) {
+              matchedContact = contactByIdMap.get(data.contactId);
+            } else if (data.phone) {
+              const cleanP = String(data.phone).replace(/\D/g, "");
+              matchedContact = contactByPhoneMap.get(cleanP);
+            } else if (data.email) {
+              matchedContact = contactByEmailMap.get(String(data.email).trim().toLowerCase());
+            } else if (data.donorName) {
+              matchedContact = contactByNameMap.get(String(data.donorName).trim().toLowerCase());
+            }
+
+            if (matchedContact) {
+              const cTags = Array.isArray(matchedContact.tags) ? matchedContact.tags : [];
+              const commName = matchedContact.community || matchedContact.mh_crm_community || cTags[0] || "";
+              if (commName && !data.ambassadorName) {
+                data.ambassadorName = commName;
+              }
+            }
+
             if (!allDonations.some(d => d.id === doc.id)) {
               allDonations.push({ id: doc.id, ...data });
             }
@@ -1286,10 +1592,132 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     }
 
+    // 3. For contacts with community tags who have donations/payments in CRM, ensure their donations are included
+    allLiveContacts.forEach((c) => {
+      const cTags = Array.isArray(c.tags) ? c.tags : [];
+      const commName = c.community || c.mh_crm_community || cTags[0] || "";
+      const spent = Number(c.total_spent || c.campaign_amount || 0);
+
+      if (commName && spent > 0) {
+        const cleanP = c.conta_phone ? String(c.conta_phone).replace(/\D/g, "") : "";
+        const cleanE = c.email ? String(c.email).trim().toLowerCase() : "";
+        
+        const alreadyHasDonation = allDonations.some(d => 
+          (d.contactId && d.contactId === c.id) ||
+          (cleanP && d.phone && String(d.phone).replace(/\D/g, "") === cleanP) ||
+          (cleanE && d.email && String(d.email).trim().toLowerCase() === cleanE)
+        );
+
+        if (!alreadyHasDonation) {
+          allDonations.push({
+            id: `crm-${c.id}`,
+            campaignId: rawId,
+            contactId: c.id,
+            donorName: c.conta_name || "תורם",
+            phone: c.conta_phone || "",
+            email: c.email || "",
+            amount: spent,
+            ambassadorName: commName,
+            ambassadorId: commName,
+            paymentStatus: "completed",
+            isAnonymous: false,
+            createdAt: c.createdAt || c.last_order_date || new Date().toISOString()
+          });
+        }
+      }
+    });
+
+    // 4. Fetch CRM communities strictly linked to this campaign
+    const linkedGroupNames = new Set<string>();
+    const allCrmGroupsMap = new Map<string, any>();
+
+    try {
+      const crmGroupsSnap = await adminDb.collectionGroup("crm_groups").get();
+      crmGroupsSnap.docs.forEach((doc) => {
+        const gData = doc.data();
+        if (!gData.name || !gData.name.trim()) return;
+        const gName = gData.name.trim();
+        allCrmGroupsMap.set(gName, gData);
+        if (gData.id) allCrmGroupsMap.set(gData.id, gData);
+
+        const gMainCamp = (gData.mainCampaignId || "").trim();
+
+        // Strict campaign linkage: ONLY if explicitly assigned to this campaign
+        const isLinked =
+          (rawId === "home" || rawId === "default-campaign" || rawId === "/")
+            ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
+            : (gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}`);
+
+        if (isLinked) {
+          linkedGroupNames.add(gName);
+          const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
+          const existingIdx = allAmbassadors.findIndex(
+            a => a.id === doc.id || a.slug === ambSlug || a.name === gName
+          );
+
+          const ambObj: Ambassador = {
+            id: doc.id,
+            name: gName,
+            leaderName: gData.leaderName || gName,
+            slug: ambSlug,
+            targetGoal: Number(gData.targetGoal || 5000),
+            totalRaised: 0,
+            donorCount: 0,
+            message: gData.vision || gData.description || "",
+            gallery: gData.gallery || [],
+            campaignId: rawId,
+            pageUrl: gData.pageUrl || `/${ambSlug}`,
+            createdAt: gData.createdAt || new Date().toISOString()
+          };
+
+          if (existingIdx === -1) {
+            allAmbassadors.push(ambObj);
+          } else {
+            allAmbassadors[existingIdx] = {
+              ...ambObj,
+              ...allAmbassadors[existingIdx],
+              pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
+            };
+          }
+        }
+      });
+    } catch (crmErr) {
+      console.warn("Error fetching collectionGroup crm_groups in getCampaignDonationsAction:", crmErr);
+    }
+
+    // 5. Strictly filter allAmbassadors so ONLY active CRM communities linked to THIS campaign remain
+    const filteredAmbassadors = allAmbassadors.filter(amb => {
+      if (linkedGroupNames.has(amb.name)) return true;
+      if (allCrmGroupsMap.has(amb.name)) {
+        const crmGrp = allCrmGroupsMap.get(amb.name);
+        const gMainCamp = (crmGrp.mainCampaignId || "").trim();
+        if (rawId === "home" || rawId === "default-campaign" || rawId === "/") {
+          return gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign";
+        }
+        return gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}`;
+      }
+      // Do not allow obsolete / unlinked ambassadors
+      return false;
+    });
+
+    // 6. Calculate totalRaised and donorCount for each linked community from allDonations
+    filteredAmbassadors.forEach(amb => {
+      const ambDonations = allDonations.filter(d => {
+        const matchName = d.ambassadorName && d.ambassadorName.trim().toLowerCase() === amb.name.trim().toLowerCase();
+        const matchSlug = (d as any).ambassadorSlug && ((d as any).ambassadorSlug === amb.slug || d.ambassadorId === amb.slug);
+        const matchId = d.ambassadorId && d.ambassadorId === amb.id;
+        return Boolean(matchName || matchSlug || matchId);
+      });
+
+      const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      amb.totalRaised = total;
+      amb.donorCount = ambDonations.length;
+    });
+
     // Sort newest first
     allDonations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return { donations: allDonations, ambassadors: allAmbassadors };
+    return { donations: allDonations, ambassadors: filteredAmbassadors };
   } catch (error) {
     console.error("Error in getCampaignDonationsAction:", error);
     return { donations: [], ambassadors: [] };

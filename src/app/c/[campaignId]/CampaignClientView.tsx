@@ -171,11 +171,11 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
                   </div>
                 </div>
 
-                {/* Ambassador Info & Campaign Link */}
+                {/* Community Leader Info & Campaign Link */}
                 <div className="space-y-1.5 text-right flex-1">
                   <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300/80 text-xs font-extrabold tracking-wide">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-700 animate-pulse" />
-                    <span>עמוד שגריר אישי</span>
+                    <span>עמוד מוביל קהילה</span>
                     <span className="text-emerald-400">•</span>
                     <span className="text-emerald-800 font-semibold">קמפיין {campaignTitle}</span>
                   </div>
@@ -189,7 +189,7 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
               {/* Personal Target Goal Badge */}
               <div className="flex items-center gap-3 bg-white border border-emerald-200/90 px-6 py-3.5 rounded-2xl shadow-sm shrink-0 w-full md:w-auto justify-between md:justify-start">
                 <div className="text-right">
-                  <div className="text-xs text-slate-500 font-bold">יעד הגיוס של השגריר</div>
+                  <div className="text-xs text-slate-500 font-bold">יעד הגיוס של מוביל הקהילה</div>
                   <div className="text-2xl md:text-3xl font-black text-emerald-800 dir-rtl tracking-tight">
                     ₪{currentAmbassador.targetGoal.toLocaleString()}
                   </div>
@@ -198,13 +198,13 @@ export const CampaignClientView: React.FC<CampaignClientViewProps> = ({
 
             </div>
 
-            {/* Ambassador Personal Message / Quote */}
+            {/* Leader Personal Message / Quote */}
             {currentAmbassador.message && (
               <div className="mt-6 pt-5 border-t border-emerald-200/70 relative z-10">
                 <div className="flex items-start gap-3.5 bg-white/90 rounded-2xl p-4 md:p-5 border border-emerald-200/80 shadow-sm">
                   <MessageSquareQuote className="w-7 h-7 text-emerald-700 shrink-0 mt-0.5" />
                   <div className="text-right space-y-1">
-                    <div className="text-xs font-bold text-emerald-900">מסר אישי מהשגריר:</div>
+                    <div className="text-xs font-bold text-emerald-900">חזון ומסר ממוביל הקהילה:</div>
                     <p className="text-sm md:text-base text-slate-800 italic leading-relaxed">
                       "{currentAmbassador.message}"
                     </p>

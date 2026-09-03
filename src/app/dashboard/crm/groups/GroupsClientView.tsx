@@ -16,6 +16,7 @@ import {
   type SelectablePageOrCampaign
 } from "@/features/crm/groupsActions";
 import { ContactModal } from "../ContactModal";
+import { CrmFloatingNav } from "@/components/navigation/CrmFloatingNav";
 import type { 
   SmartGroup, 
   GroupRule 
@@ -60,13 +61,31 @@ import {
   Calendar,
   Paperclip,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Columns
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { MessageModal } from "@/app/dashboard/crm/MessageModal";
 import WhatsAppGroupImportView from "./WhatsAppGroupImportView";
+
+const ALL_GROUP_COLUMNS = [
+  { id: "conta_name", label: "שם איש קשר" },
+  { id: "tags", label: "קהילות משויכות" },
+  { id: "conta_phone", label: "טלפון" },
+  { id: "email", label: "אימייל" },
+  { id: "mh_crm_city", label: "עיר" },
+  { id: "total_spent", label: "סך תשלומים (₪)" },
+  { id: "campaign_amount", label: "סכום קמפיין (₪)" },
+  { id: "lead_source", label: "מקור הגעה / ליד" },
+  { id: "gender", label: "מגדר" },
+  { id: "company_name", label: "שם חברה" },
+  { id: "job_title", label: "תפקיד" },
+  { id: "status", label: "סטטוס" },
+  { id: "createdAt", label: "תאריך הצטרפות" },
+  { id: "actions", label: "פעולות מהירות" },
+];
 
 const PRESET_COLORS = [
   "#4f46e5", // Indigo
@@ -98,6 +117,7 @@ export default function GroupsClientView() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
+  const [formLeaderName, setFormLeaderName] = useState("");
   const [formColor, setFormColor] = useState("#4f46e5");
   const [formDesc, setFormDesc] = useState("");
   const [formVision, setFormVision] = useState("");
@@ -105,6 +125,7 @@ export default function GroupsClientView() {
   const [formGallery, setFormGallery] = useState<string[]>([]);
   const [formMainCampaignId, setFormMainCampaignId] = useState("");
   const [formPageUrl, setFormPageUrl] = useState("");
+  const [formPageSlug, setFormPageSlug] = useState("");
   const [formType, setFormType] = useState<"manual" | "smart">("manual");
   const [formMatchType, setFormMatchType] = useState<"all" | "any">("all");
   const [formRules, setFormRules] = useState<GroupRule[]>([]);
@@ -134,6 +155,46 @@ export default function GroupsClientView() {
 
   // Inline Quick Tag dropdown
   const [tagDropdownContactId, setTagDropdownContactId] = useState<string | null>(null);
+
+  // Column Selector State (Default: only contact name and associated communities)
+  const [selectedGroupColumns, setSelectedGroupColumns] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("crm_groups_selected_columns");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return ["conta_name", "tags"];
+  });
+  const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+
+  const toggleGroupColumn = (colId: string) => {
+    setSelectedGroupColumns(prev => {
+      let next: string[];
+      if (prev.includes(colId)) {
+        if (prev.length <= 1) return prev; // Keep at least 1 column
+        next = prev.filter(c => c !== colId);
+      } else {
+        next = [...prev, colId];
+      }
+      try {
+        localStorage.setItem("crm_groups_selected_columns", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const resetGroupColumns = () => {
+    const defaults = ["conta_name", "tags"];
+    setSelectedGroupColumns(defaults);
+    try {
+      localStorage.setItem("crm_groups_selected_columns", JSON.stringify(defaults));
+    } catch (e) {}
+  };
 
   // Load Data
   const loadData = useCallback(async () => {
@@ -267,6 +328,7 @@ export default function GroupsClientView() {
   const handleOpenCreateGroup = (type: "manual" | "smart" = "manual") => {
     setEditingGroupId(null);
     setFormName("");
+    setFormLeaderName("");
     setFormColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
     setFormDesc("");
     setFormVision("");
@@ -274,6 +336,7 @@ export default function GroupsClientView() {
     setFormGallery([]);
     setFormMainCampaignId("");
     setFormPageUrl("");
+    setFormPageSlug("");
     setFormType(type);
     setFormMatchType("all");
     setFormRules(type === "smart" ? [{ field: "total_spent", operator: "gte", value: 500 }] : []);
@@ -284,6 +347,7 @@ export default function GroupsClientView() {
   const handleOpenEditGroup = (group: SmartGroup) => {
     setEditingGroupId(group.id);
     setFormName(group.name);
+    setFormLeaderName((group as any).leaderName || "");
     setFormColor(group.color || "#4f46e5");
     setFormDesc(group.description || "");
     setFormVision(group.vision || "");
@@ -291,6 +355,7 @@ export default function GroupsClientView() {
     setFormGallery(group.gallery || []);
     setFormMainCampaignId(group.mainCampaignId || "");
     setFormPageUrl(group.pageUrl || "");
+    setFormPageSlug(group.pageSlug || group.pageId || "");
     setFormType(group.type || "manual");
     setFormMatchType(group.matchType || "all");
     setFormRules(group.rules || []);
@@ -310,6 +375,7 @@ export default function GroupsClientView() {
       const res = await saveSmartGroup({
         id: editingGroupId || undefined,
         name: formName.trim(),
+        leaderName: formLeaderName.trim() || undefined,
         color: formColor,
         description: formDesc.trim(),
         vision: formVision.trim(),
@@ -317,11 +383,12 @@ export default function GroupsClientView() {
         gallery: formGallery,
         mainCampaignId: formMainCampaignId,
         campaignTitle: chosenCampaign?.title || "",
+        pageSlug: formPageSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || undefined,
         pageUrl: formPageUrl || undefined,
         type: formType,
         matchType: formMatchType,
         rules: formType === "smart" ? formRules : []
-      });
+      } as any);
 
       if (res.success) {
         setIsGroupModalOpen(false);
@@ -466,387 +533,426 @@ export default function GroupsClientView() {
   return (
     <div className="h-full w-full overflow-y-auto bg-slate-50 text-slate-800 p-4 md:p-8 pb-40 space-y-6 text-right select-none font-sans" dir="rtl">
       
-      {/* 0. Top View Mode Selector */}
-      <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
-        <button
-          type="button"
-          onClick={() => setMainViewMode("manage")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
-            mainViewMode === "manage"
-              ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>ניהול קהילות וקבוצות</span>
-          <span className={`px-2 py-0.5 rounded-md text-[11px] font-mono ${
-            mainViewMode === "manage" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-          }`}>
-            {groups.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMainViewMode("whatsapp_import")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
-            mainViewMode === "whatsapp_import"
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-              : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50/50"
-          }`}
-        >
-          <MessageCircle className="w-4 h-4" />
-          <span>ייבוא מוואטסאפ (Green API)</span>
-          <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-md ${
-            mainViewMode === "whatsapp_import" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
-          }`}>
-            חדש
-          </span>
-        </button>
-      </div>
-
+      {/* 0. Top View Mode Switcher (Manage vs WhatsApp Import) */}
       {mainViewMode === "whatsapp_import" ? (
-        <WhatsAppGroupImportView
-          existingGroups={groups}
-          onImportComplete={(targetGroupName) => {
-            setMainViewMode("manage");
-            setActiveGroupId(targetGroupName);
-            loadData();
-          }}
-        />
+        <div>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+            <button
+              type="button"
+              onClick={() => setMainViewMode("manage")}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Users className="w-4 h-4 text-indigo-600" />
+              <span>חזור לניהול קהילות וקבוצות</span>
+            </button>
+          </div>
+          <WhatsAppGroupImportView
+            existingGroups={groups}
+            onImportComplete={(targetGroupName) => {
+              setMainViewMode("manage");
+              setActiveGroupId(targetGroupName);
+              loadData();
+            }}
+          />
+        </div>
       ) : (
         <>
-          {/* 1. Clean Desktop Top Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                  <Folder className="w-5 h-5" />
+          {/* 1. Ultra-Compact Unified Top Bar */}
+          <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            {/* Right side: Active Community Title & Pill Sub-tabs Switcher */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-white shadow-2xs"
+                  style={{ backgroundColor: activeGroup.color || "#4f46e5" }}
+                />
+                <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>{activeGroup.name}</span>
+                  {activeGroup.type === "smart" && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-semibold flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-amber-500" />
+                      חכמה
+                    </span>
+                  )}
+                </h1>
+              </div>
+
+              <div className="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block" />
+
+              {/* Sub-tabs: Contacts vs Interactions */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceTab("contacts")}
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    workspaceTab === "contacts"
+                      ? "bg-white text-indigo-700 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>אנשי קשר</span>
+                  <span className="text-[10px] font-mono px-1 rounded bg-slate-200/70 text-slate-700">
+                    {filteredContacts.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceTab("interactions");
+                    loadCommunityInteractions();
+                  }}
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    workspaceTab === "interactions"
+                      ? "bg-white text-emerald-700 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>אינטראקציות</span>
+                  <span className="text-[10px] font-mono px-1 rounded bg-slate-200/70 text-slate-700">
+                    {communityInteractions.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Live Community Page Link if custom community */}
+              {!activeGroupId.startsWith("__") && (activeGroup.pageUrl || activeGroup.campaignTitle) && (
+                <div className="flex items-center gap-1.5 hidden md:flex">
+                  {activeGroup.pageUrl && (
+                    <a
+                      href={activeGroup.pageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-xs border border-indigo-200 transition-colors"
+                    >
+                      <Globe className="w-3 h-3 text-indigo-600" />
+                      <span>עמוד קהילה</span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                    </a>
+                  )}
+                  {activeGroup.campaignTitle && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 font-semibold rounded-lg text-xs border border-rose-200">
+                      <HeartHandshake className="w-3 h-3 text-rose-500" />
+                      <span>קמפיין: {activeGroup.campaignTitle}</span>
+                    </span>
+                  )}
                 </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                ניהול וחלוקת קהילות
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-normal">
-                  {groups.length} קהילות מוגדרות
-                </span>
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                איש קשר אחד יכול להשתייך למספר קהילות במקביל. ניתן ליצור קהילות רגילות או חכמות לפי תנאים לוגיים.
-              </p>
+              )}
             </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            onClick={loadData}
-            variant="outline"
-            className="h-10 px-3.5 rounded-xl border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-indigo-600" : ""}`} />
-            <span>רענן נתונים</span>
-          </Button>
-
-          <Button
-            onClick={() => handleOpenCreateGroup("smart")}
-            className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm"
-          >
-            <Zap className="w-4 h-4 text-slate-950" />
-            <span>⚡ קהילה חכמה (לפי תנאים)</span>
-          </Button>
-
-          <Button
-            onClick={() => handleOpenCreateGroup("manual")}
-            className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>קהילה רגילה</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* 2. Visual Community Tabs Bar (Desktop Optimized) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-200">
-          
-          {/* All Contacts Tab */}
-          <button
-            type="button"
-            onClick={() => setActiveGroupId("__all__")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
-              activeGroupId === "__all__"
-                ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-            }`}
-          >
-            <Users className="w-4 h-4 opacity-80" />
-            <span>כל אנשי הקשר</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] font-mono ${
-              activeGroupId === "__all__" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
-            }`}>
-              {totalContacts}
-            </span>
-          </button>
-
-          {/* Untagged Contacts Tab */}
-          <button
-            type="button"
-            onClick={() => setActiveGroupId("__untagged__")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
-              activeGroupId === "__untagged__"
-                ? "bg-rose-600 text-white border-rose-600 shadow-sm"
-                : "bg-rose-50/60 text-rose-700 border-rose-200 hover:bg-rose-100"
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-rose-500" />
-            <span>ללא קהילה</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] font-mono ${
-              activeGroupId === "__untagged__" ? "bg-white/20 text-white" : "bg-rose-200 text-rose-900"
-            }`}>
-              {untaggedCount}
-            </span>
-          </button>
-
-          <div className="h-6 w-px bg-slate-200 mx-1 shrink-0" />
-
-          {/* Custom Communities Tabs */}
-          {groups.map((g) => {
-            const isActive = activeGroupId === g.id || activeGroupId === g.name;
-            const isSmart = g.type === "smart";
-
-            return (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setActiveGroupId(g.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
-                  isActive
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <span 
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: g.color || "#4f46e5" }}
-                />
-                {isSmart && (
-                  <Zap className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-300" : "text-amber-600"}`} />
-                )}
-                <span>{g.name}</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[11px] font-mono ${
-                  isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}>
-                  {g.count || 0}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. Main Desktop Workspace */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        
-        {/* Workspace Action Header */}
-        <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                {activeGroup.name}
-                {activeGroup.type === "smart" && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-amber-500" />
-                    קהילה חכמה (לפי תנאים)
-                  </span>
-                )}
-              </h2>
-              <span className="text-xs text-slate-500 font-mono">
-                {filteredContacts.length} אנשי קשר בקהילה
-              </span>
-            </div>
-            {activeGroup.description && (
-              <p className="text-xs text-slate-500 mt-1">{activeGroup.description}</p>
-            )}
-
-            {/* Community Enhanced Overview Strip (Vision, Purpose, Gallery, Campaign, Live Page) */}
-            {!activeGroupId.startsWith("__") && (activeGroup.vision || activeGroup.purpose || activeGroup.pageUrl || activeGroup.campaignTitle || (activeGroup.gallery && activeGroup.gallery.length > 0)) && (
-              <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center gap-2.5 flex-wrap text-xs">
-                {activeGroup.pageUrl && (
-                  <a
-                    href={activeGroup.pageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl border border-indigo-200/80 transition-colors shadow-2xs cursor-pointer"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>עמוד הקהילה</span>
-                    <ExternalLink className="w-3 h-3 opacity-60" />
-                  </a>
-                )}
-
-                {activeGroup.campaignTitle && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 font-bold rounded-xl border border-rose-200/80">
-                    <HeartHandshake className="w-3.5 h-3.5 text-rose-500" />
-                    <span>קמפיין: {activeGroup.campaignTitle}</span>
-                  </span>
-                )}
-
-                {activeGroup.vision && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-800 rounded-xl border border-blue-200/70 max-w-xs truncate" title={activeGroup.vision}>
-                    <Compass className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="font-semibold truncate">חזון: {activeGroup.vision}</span>
-                  </span>
-                )}
-
-                {activeGroup.purpose && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200/70 max-w-xs truncate" title={activeGroup.purpose}>
-                    <Target className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="font-semibold truncate">מטרה: {activeGroup.purpose}</span>
-                  </span>
-                )}
-
-                {activeGroup.gallery && activeGroup.gallery.length > 0 && (
-                  <div className="flex items-center -space-x-2 space-x-reverse mr-auto">
-                    {activeGroup.gallery.slice(0, 4).map((img, i) => (
-                      <div key={i} className="w-6 h-6 rounded-full border-2 border-white overflow-hidden shadow-2xs">
-                        <img src={img} alt="גלריה" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    {activeGroup.gallery.length > 4 && (
-                      <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 border-2 border-white flex items-center justify-center text-[10px] font-bold">
-                        +{activeGroup.gallery.length - 4}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Quick Action: Send WhatsApp to ALL filtered contacts in this community */}
-            <Button
-              onClick={() => {
-                if (filteredContacts.length === 0) {
-                  alert("אין אנשי קשר בקהילה זו לשליחה");
-                  return;
-                }
-                setSelectedContactIds(filteredContacts.map(c => c.id));
-                setIsWhatsAppModalOpen(true);
-              }}
-              className="h-9.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>שליחת וואטסאפ לקהילה</span>
-            </Button>
-
-            {/* If regular custom community, show Add Members button */}
-            {!activeGroupId.startsWith("__") && activeGroup.type !== "smart" && (
+            {/* Left side: Consolidated Actions */}
+            <div className="flex items-center gap-2">
+              {/* Quick WhatsApp button */}
               <Button
-                onClick={() => setIsAddMembersModalOpen(true)}
-                className="h-9.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                onClick={() => {
+                  if (filteredContacts.length === 0) {
+                    alert("אין אנשי קשר בקהילה זו לשליחה");
+                    return;
+                  }
+                  setSelectedContactIds(filteredContacts.map(c => c.id));
+                  setIsWhatsAppModalOpen(true);
+                }}
+                className="h-8.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>הוסף אנשי קשר לקהילה</span>
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">וואטסאפ לקהילה</span>
               </Button>
-            )}
 
-            {/* If custom community, show Edit and Delete buttons */}
-            {!activeGroupId.startsWith("__") && (
-              <>
-                <Button
-                  onClick={() => handleOpenEditGroup(activeGroup)}
-                  variant="outline"
-                  className="h-9.5 px-3 rounded-xl border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  title="ערוך פרמטרים ותנאים לקהילה"
+              {/* + קהילה חדשה button */}
+              <Button
+                onClick={() => handleOpenCreateGroup("manual")}
+                className="h-8.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>קהילה חדשה</span>
+              </Button>
+
+              {/* Actions Dropdown Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                  className={`h-8.5 px-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1 text-xs font-semibold cursor-pointer transition-colors ${
+                    showActionsDropdown ? "bg-slate-100 ring-2 ring-indigo-500/20" : ""
+                  }`}
+                  title="פעולות נוספות"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>ערוך קהילה</span>
-                </Button>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">פעולות</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
 
-                <Button
-                  onClick={() => handleDeleteGroup(activeGroup)}
-                  variant="outline"
-                  className="h-9.5 px-2.5 rounded-xl border-rose-200 text-rose-600 bg-white hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                  title="מחק קהילה זו"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </>
-            )}
+                {showActionsDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowActionsDropdown(false)} />
+                    <div className="absolute left-0 top-full mt-1.5 w-56 bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 animate-in fade-in slide-in-from-top-2 dir-rtl text-xs">
+                      {!activeGroupId.startsWith("__") && activeGroup.type !== "smart" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowActionsDropdown(false);
+                            setIsAddMembersModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-right cursor-pointer"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>הוסף אנשי קשר לקהילה</span>
+                        </button>
+                      )}
 
-            <Button
-              onClick={handleExportCsv}
-              variant="outline"
-              className="h-9.5 px-3 rounded-xl border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-              title="ייצא רשימה לקובץ Excel / CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span>ייצא לאקסל</span>
-            </Button>
-          </div>
-        </div>
+                      {!activeGroupId.startsWith("__") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowActionsDropdown(false);
+                            handleOpenEditGroup(activeGroup);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-right cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                          <span>ערוך הגדרות קהילה</span>
+                        </button>
+                      )}
 
-        {/* Workspace Navigation Tabs (Contacts vs Community Interactions) */}
-        <div className="flex items-center gap-2 border-b border-slate-200 px-5 pt-3 bg-slate-50/40">
-          <button
-            type="button"
-            onClick={() => setWorkspaceTab("contacts")}
-            className={`pb-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
-              workspaceTab === "contacts"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>אנשי קשר בקהילה</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] font-mono ${
-              workspaceTab === "contacts" ? "bg-indigo-50 text-indigo-700 font-bold" : "bg-slate-100 text-slate-600"
-            }`}>
-              {filteredContacts.length}
-            </span>
-          </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowActionsDropdown(false);
+                          handleExportCsv();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors text-right cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-500" />
+                        <span>ייצא רשימה לאקסל</span>
+                      </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setWorkspaceTab("interactions");
-              loadCommunityInteractions();
-            }}
-            className={`pb-3 px-3.5 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
-              workspaceTab === "interactions"
-                ? "border-emerald-600 text-emerald-600"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <MessageCircle className="w-4 h-4 text-emerald-600" />
-            <span>האינטראקציות עם הקהילה</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] font-mono ${
-              workspaceTab === "interactions" ? "bg-emerald-50 text-emerald-700 font-bold" : "bg-slate-100 text-slate-600"
-            }`}>
-              {communityInteractions.length}
-            </span>
-          </button>
-        </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowActionsDropdown(false);
+                          setMainViewMode("whatsapp_import");
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors text-right cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>ייבוא קבוצות וואטסאפ</span>
+                      </button>
 
-        {/* Tab 1: Contacts Table View */}
-        {workspaceTab === "contacts" ? (
-          <div>
-            {/* Quick search sub-bar */}
-            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <Input
-                  type="text"
-                  placeholder="חיפוש מהיר לפי שם, טלפון, עיר..."
-                  value={contactSearchQuery}
-                  onChange={(e) => setContactSearchQuery(e.target.value)}
-                  className="pr-9 bg-slate-50 border-slate-200 rounded-xl text-xs h-9 text-slate-800 placeholder:text-slate-400 w-full"
-                />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowActionsDropdown(false);
+                          handleOpenCreateGroup("smart");
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-amber-800 hover:bg-amber-50 transition-colors text-right cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        <span>צור קהילה חכמה (לפי תנאים)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowActionsDropdown(false);
+                          loadData();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors text-right cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? "animate-spin" : ""}`} />
+                        <span>רענן נתונים</span>
+                      </button>
+
+                      {!activeGroupId.startsWith("__") && (
+                        <div className="border-t border-slate-100 pt-1 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowActionsDropdown(false);
+                              handleDeleteGroup(activeGroup);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors text-right cursor-pointer font-semibold"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>מחק קהילה זו</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-              <span className="text-xs text-slate-400 font-semibold">
-                מוצגים {filteredContacts.length} מתוך {contacts.length} אנשי קשר
+            </div>
+          </div>
+
+          {/* 2. Compact Scrolling Community Pills Strip */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-200">
+            {/* All Contacts Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveGroupId("__all__")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
+                activeGroupId === "__all__"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 opacity-80" />
+              <span>כל אנשי הקשר</span>
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
+                activeGroupId === "__all__" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+              }`}>
+                {totalContacts}
               </span>
+            </button>
+
+            {/* Untagged Contacts Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveGroupId("__untagged__")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
+                activeGroupId === "__untagged__"
+                  ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                  : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+              <span>ללא קהילה</span>
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
+                activeGroupId === "__untagged__" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-900"
+              }`}>
+                {untaggedCount}
+              </span>
+            </button>
+
+            <div className="h-5 w-px bg-slate-200 mx-0.5 shrink-0" />
+
+            {/* Custom Communities Tabs */}
+            {groups.map((g) => {
+              const isActive = activeGroupId === g.id || activeGroupId === g.name;
+              const isSmart = g.type === "smart";
+
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setActiveGroupId(g.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer border ${
+                    isActive
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <span 
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: g.color || "#4f46e5" }}
+                  />
+                  {isSmart && (
+                    <Zap className={`w-3 h-3 shrink-0 ${isActive ? "text-amber-300" : "text-amber-600"}`} />
+                  )}
+                  <span>{g.name}</span>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
+                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {g.count || 0}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Quick Add Community Pill Button */}
+            <button
+              type="button"
+              onClick={() => handleOpenCreateGroup("manual")}
+              className="p-1.5 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 text-slate-400 hover:text-indigo-600 bg-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+              title="צור קהילה חדשה"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* 3. Main Desktop Workspace */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            {/* Tab 1: Contacts Table View */}
+            {workspaceTab === "contacts" ? (
+              <div>
+                {/* Quick search & columns picker sub-bar */}
+            <div className="p-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-white">
+              <div className="flex items-center gap-3 flex-grow max-w-lg">
+                <div className="relative w-full">
+                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="text"
+                    placeholder="חיפוש מהיר לפי שם, טלפון, עיר..."
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    className="pr-9 bg-slate-50 border-slate-200 rounded-xl text-xs h-9 text-slate-800 placeholder:text-slate-400 w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400 font-semibold hidden sm:inline">
+                  מוצגים {filteredContacts.length} מתוך {contacts.length} אנשי קשר
+                </span>
+
+                {/* Column Picker Button & Dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowColumnsDropdown(!showColumnsDropdown)}
+                    className={`px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      showColumnsDropdown ? "bg-slate-100 ring-2 ring-indigo-500/20 text-indigo-700" : "bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Columns className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>בחר עמודות להצגה ({selectedGroupColumns.length})</span>
+                  </button>
+
+                  {showColumnsDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowColumnsDropdown(false)} />
+                      <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-slate-200 shadow-xl rounded-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 dir-rtl">
+                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                          <span className="text-xs font-bold text-slate-800">עמודות בטבלה</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedGroupColumns(["conta_name", "tags"]);
+                              try { localStorage.setItem("crm_groups_selected_columns", JSON.stringify(["conta_name", "tags"])); } catch (e) {}
+                            }}
+                            className="text-[10px] text-indigo-600 hover:underline font-semibold cursor-pointer"
+                          >
+                            איפוס לברירת מחדל
+                          </button>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto space-y-1">
+                          {ALL_GROUP_COLUMNS.map(col => {
+                            const isSelected = selectedGroupColumns.includes(col.id);
+                            return (
+                              <label
+                                key={col.id}
+                                className={`flex items-center gap-2 p-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                  isSelected ? "bg-indigo-50/70 text-indigo-900" : "text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleGroupColumn(col.id)}
+                                  className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <span>{col.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -861,18 +967,20 @@ export default function GroupsClientView() {
                         className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
                       />
                     </th>
-                    <th className="p-3">שם איש קשר</th>
-                    <th className="p-3">טלפון / אימייל</th>
-                    <th className="p-3">עיר</th>
-                    <th className="p-3">סך תשלומים (₪)</th>
-                    <th className="p-3">קהילות משויכות (ריבוי קהילות)</th>
-                    <th className="p-3 text-left">פעולות מהירות</th>
+                    {selectedGroupColumns.map(colId => {
+                      const colDef = ALL_GROUP_COLUMNS.find(c => c.id === colId);
+                      return (
+                        <th key={colId} className={`p-3 ${colId === "actions" ? "text-left" : ""}`}>
+                          {colDef?.label || colId}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredContacts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-16 text-center text-slate-400">
+                      <td colSpan={selectedGroupColumns.length + 1} className="p-16 text-center text-slate-400">
                         {loading ? "טוען נתונים..." : "לא נמצאו אנשי קשר תואמים."}
                       </td>
                     </tr>
@@ -910,198 +1018,271 @@ export default function GroupsClientView() {
                             />
                           </td>
 
-                          {/* Name */}
-                          <td className="p-3 font-semibold text-slate-900">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                {(c.conta_name || "א").charAt(0)}
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-900">{c.conta_name} {c.f_m || ""}</span>
-                                {c.company_name && (
-                                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                                    <Building className="w-3 h-3" />
-                                    {c.company_name}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
+                          {/* Dynamic Columns */}
+                          {selectedGroupColumns.map(colId => {
+                            switch (colId) {
+                              case "conta_name":
+                                return (
+                                  <td key={colId} className="p-3 font-semibold text-slate-900">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                        {(c.conta_name || "א").charAt(0)}
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-slate-900 hover:text-indigo-600 transition-colors">{c.conta_name} {c.f_m || ""}</span>
+                                        {c.company_name && (
+                                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                            <Building className="w-3 h-3" />
+                                            {c.company_name}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              case "tags":
+                                return (
+                                  <td key={colId} className="p-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1.5 flex-wrap relative">
+                                      {contactTags.length === 0 ? (
+                                        <span className="text-[11px] text-slate-400 italic">ללא קהילות</span>
+                                      ) : (
+                                        contactTags.map((tag) => {
+                                          const grp = groups.find((g) => g.name === tag);
+                                          const color = grp?.color || "#4f46e5";
+                                          return (
+                                            <span
+                                              key={tag}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors group"
+                                              style={{
+                                                backgroundColor: `${color}15`,
+                                                borderColor: `${color}40`,
+                                                color: color,
+                                              }}
+                                            >
+                                              <span
+                                                className="w-1.5 h-1.5 rounded-full"
+                                                style={{ backgroundColor: color }}
+                                              />
+                                              <span>{tag}</span>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleToggleTag(c.id, tag);
+                                                }}
+                                                className="hover:opacity-100 opacity-60 ml-0.5 cursor-pointer"
+                                                title={`הסר מקהילת ${tag}`}
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </span>
+                                          );
+                                        })
+                                      )}
 
-                          {/* Phone / Email */}
-                          <td className="p-3">
-                            <div className="flex flex-col gap-0.5">
-                              {c.conta_phone && (
-                                <a 
-                                  href={`tel:${c.conta_phone}`} 
-                                  className="text-slate-600 hover:text-indigo-600 flex items-center gap-1 font-mono text-[11px]"
-                                  dir="ltr"
-                                >
-                                  <Phone className="w-3 h-3 text-slate-400" />
-                                  {c.conta_phone}
-                                </a>
-                              )}
-                              {c.email && (
-                                <a 
-                                  href={`mailto:${c.email}`} 
-                                  className="text-slate-400 hover:text-indigo-600 flex items-center gap-1 truncate max-w-[170px]"
-                                >
-                                  <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                                  <span className="truncate">{c.email}</span>
-                                </a>
-                              )}
-                            </div>
-                          </td>
+                                      {/* Plus button to open inline community multi-select picker */}
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTagDropdownContactId(isTagDropdownOpen ? null : c.id);
+                                          }}
+                                          className="w-5 h-5 rounded-md border border-dashed border-slate-300 hover:border-indigo-500 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors cursor-pointer"
+                                          title="שייך לקהילה נוספת"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                        </button>
 
-                          {/* City */}
-                          <td className="p-3 text-slate-600">
-                            {c.mh_crm_city ? (
-                              <span className="flex items-center gap-1 text-[11px]">
-                                <MapPin className="w-3 h-3 text-slate-400" />
-                                {c.mh_crm_city}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">-</span>
-                            )}
-                          </td>
-
-                          {/* Total Spent */}
-                          <td className="p-3 font-mono font-bold text-slate-800">
-                            {c.total_spent !== undefined && Number(c.total_spent) > 0 ? (
-                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                ₪{Number(c.total_spent).toLocaleString()}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 font-normal">₪0</span>
-                            )}
-                          </td>
-
-                          {/* Associated Communities with Quick Tag Multi-Select Dropdown */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-1.5 flex-wrap relative">
-                              {contactTags.length === 0 ? (
-                                <span className="text-[11px] text-slate-400 italic">ללא קהילות</span>
-                              ) : (
-                                contactTags.map((tag) => {
-                                  const grp = groups.find((g) => g.name === tag);
-                                  const color = grp?.color || "#4f46e5";
-                                  return (
-                                    <span
-                                      key={tag}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors group"
-                                      style={{
-                                        backgroundColor: `${color}15`,
-                                        borderColor: `${color}40`,
-                                        color: color,
-                                      }}
-                                    >
-                                      <span
-                                        className="w-1.5 h-1.5 rounded-full"
-                                        style={{ backgroundColor: color }}
-                                      />
-                                      <span>{tag}</span>
+                                        {/* Inline Dropdown Popover */}
+                                        {isTagDropdownOpen && (
+                                          <div 
+                                            className="absolute top-full right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 animate-in fade-in zoom-in-95"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <div className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider border-b border-slate-100 mb-1">
+                                              בחר קהילות לשיוך:
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                                              {groups.map((g) => {
+                                                const isChecked = contactTags.includes(g.name);
+                                                return (
+                                                  <button
+                                                    key={g.id}
+                                                    type="button"
+                                                    onClick={() => handleToggleTag(c.id, g.name)}
+                                                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                                      isChecked
+                                                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                                                        : "text-slate-700 hover:bg-slate-50"
+                                                    }`}
+                                                  >
+                                                    <div className="flex items-center gap-2 truncate">
+                                                      <span
+                                                        className="w-2 h-2 rounded-full shrink-0"
+                                                        style={{ backgroundColor: g.color || "#4f46e5" }}
+                                                      />
+                                                      <span className="truncate">{g.name}</span>
+                                                    </div>
+                                                    {isChecked && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              case "conta_phone":
+                                return (
+                                  <td key={colId} className="p-3" onClick={(e) => e.stopPropagation()}>
+                                    {c.conta_phone ? (
+                                      <a 
+                                        href={`tel:${c.conta_phone}`} 
+                                        className="text-slate-600 hover:text-indigo-600 flex items-center gap-1 font-mono text-[11px]"
+                                        dir="ltr"
+                                      >
+                                        <Phone className="w-3 h-3 text-slate-400" />
+                                        {c.conta_phone}
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-300">-</span>
+                                    )}
+                                  </td>
+                                );
+                              case "email":
+                                return (
+                                  <td key={colId} className="p-3" onClick={(e) => e.stopPropagation()}>
+                                    {c.email ? (
+                                      <a 
+                                        href={`mailto:${c.email}`} 
+                                        className="text-slate-600 hover:text-indigo-600 flex items-center gap-1 truncate max-w-[170px]"
+                                      >
+                                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <span className="truncate">{c.email}</span>
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-300">-</span>
+                                    )}
+                                  </td>
+                                );
+                              case "mh_crm_city":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-600">
+                                    {c.mh_crm_city ? (
+                                      <span className="flex items-center gap-1 text-[11px]">
+                                        <MapPin className="w-3 h-3 text-slate-400" />
+                                        {c.mh_crm_city}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300">-</span>
+                                    )}
+                                  </td>
+                                );
+                              case "total_spent":
+                                return (
+                                  <td key={colId} className="p-3 font-mono font-bold text-slate-800">
+                                    {c.total_spent !== undefined && Number(c.total_spent) > 0 ? (
+                                      <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                        ₪{Number(c.total_spent).toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-normal">₪0</span>
+                                    )}
+                                  </td>
+                                );
+                              case "campaign_amount":
+                                return (
+                                  <td key={colId} className="p-3 font-mono font-bold text-slate-800">
+                                    {c.campaign_amount !== undefined && Number(c.campaign_amount) > 0 ? (
+                                      <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                        ₪{Number(c.campaign_amount).toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-normal">₪0</span>
+                                    )}
+                                  </td>
+                                );
+                              case "lead_source":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-600">
+                                    {c.lead_source || "-"}
+                                  </td>
+                                );
+                              case "gender":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-600">
+                                    {c.gender === "male" || c.gender === "זכר" ? "זכר" : (c.gender === "female" || c.gender === "נקבה" ? "נקבה" : (c.gender || "-"))}
+                                  </td>
+                                );
+                              case "company_name":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-600">
+                                    {c.company_name || "-"}
+                                  </td>
+                                );
+                              case "job_title":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-600">
+                                    {c.job_title || "-"}
+                                  </td>
+                                );
+                              case "status":
+                                return (
+                                  <td key={colId} className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      c.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                                    }`}>
+                                      {c.status === "active" ? "פעיל" : (c.status || "פעיל")}
+                                    </span>
+                                  </td>
+                                );
+                              case "createdAt":
+                                return (
+                                  <td key={colId} className="p-3 text-slate-500 font-mono text-[11px]">
+                                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString("he-IL") : "-"}
+                                  </td>
+                                );
+                              case "actions":
+                                return (
+                                  <td key={colId} className="p-3 text-left" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1.5 justify-end">
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleToggleTag(c.id, tag);
+                                          setSelectedContactIds([c.id]);
+                                          setIsWhatsAppModalOpen(true);
                                         }}
-                                        className="hover:opacity-100 opacity-60 ml-0.5 cursor-pointer"
-                                        title={`הסר מקהילת ${tag}`}
+                                        className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                        title="שלח וואטסאפ לאיש קשר זה"
                                       >
-                                        <X className="w-3 h-3" />
+                                        <MessageCircle className="w-4 h-4" />
                                       </button>
-                                    </span>
-                                  );
-                                })
-                              )}
 
-                              {/* Plus button to open inline community multi-select picker */}
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTagDropdownContactId(isTagDropdownOpen ? null : c.id);
-                                  }}
-                                  className="w-5 h-5 rounded-md border border-dashed border-slate-300 hover:border-indigo-500 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors cursor-pointer"
-                                  title="שייך לקהילה נוספת"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </button>
-
-                                {/* Inline Dropdown Popover */}
-                                {isTagDropdownOpen && (
-                                  <div 
-                                    className="absolute top-full right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 animate-in fade-in zoom-in-95"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider border-b border-slate-100 mb-1">
-                                      בחר קהילות לשיוך:
+                                      {!activeGroupId.startsWith("__") && activeGroup.type !== "smart" && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleTag(c.id, activeGroup.name);
+                                          }}
+                                          className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
+                                          title={`הסר מ-${activeGroup.name}`}
+                                        >
+                                          הסר
+                                        </button>
+                                      )}
                                     </div>
-                                    <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
-                                      {groups.map((g) => {
-                                        const isChecked = contactTags.includes(g.name);
-                                        return (
-                                          <button
-                                            key={g.id}
-                                            type="button"
-                                            onClick={() => handleToggleTag(c.id, g.name)}
-                                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                                              isChecked
-                                                ? "bg-indigo-50 text-indigo-700 font-bold"
-                                                : "text-slate-700 hover:bg-slate-50"
-                                            }`}
-                                          >
-                                            <div className="flex items-center gap-2 truncate">
-                                              <span
-                                                className="w-2 h-2 rounded-full shrink-0"
-                                                style={{ backgroundColor: g.color || "#4f46e5" }}
-                                              />
-                                              <span className="truncate">{g.name}</span>
-                                            </div>
-                                            {isChecked && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Quick Actions */}
-                          <td className="p-3 text-left">
-                            <div className="flex items-center gap-1.5 justify-end">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedContactIds([c.id]);
-                                  setIsWhatsAppModalOpen(true);
-                                }}
-                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                                title="שלח וואטסאפ לאיש קשר זה"
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                              </button>
-
-                              {!activeGroupId.startsWith("__") && activeGroup.type !== "smart" && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleTag(c.id, activeGroup.name);
-                                  }}
-                                  className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
-                                  title={`הסר מ-${activeGroup.name}`}
-                                >
-                                  הסר
-                                </button>
-                              )}
-                            </div>
-                          </td>
+                                  </td>
+                                );
+                              default:
+                                return <td key={colId} className="p-3 text-slate-600">{String(c[colId] || "-")}</td>;
+                            }
+                          })}
                         </tr>
                       );
                     })
@@ -1567,7 +1748,7 @@ export default function GroupsClientView() {
               </button>
             </div>
 
-            {/* Basic Parameters */}
+            {/* Basic Parameters: Community Name & Leader Name */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1575,14 +1756,29 @@ export default function GroupsClientView() {
                 </label>
                 <Input
                   type="text"
-                  placeholder="לדוגמה: תורמי זהב, מתפללי שחרית, בוגרי הישיבה..."
+                  placeholder="לדוגמה: קהילת חב&quot;ד נווה שאנן, תורמי זהב..."
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="bg-white border-slate-200 text-slate-900 rounded-xl h-10 text-xs"
+                  className="bg-white border-slate-200 text-slate-900 rounded-xl h-10 text-xs font-semibold"
                   autoFocus
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  שם מוביל הקהילה:
+                </label>
+                <Input
+                  type="text"
+                  placeholder="לדוגמה: הרב ישראל כהן"
+                  value={formLeaderName}
+                  onChange={(e) => setFormLeaderName(e.target.value)}
+                  className="bg-white border-slate-200 text-slate-900 rounded-xl h-10 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   צבע מזהה:
@@ -1603,19 +1799,19 @@ export default function GroupsClientView() {
                   ))}
                 </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                תיאור קצר (אופציונלי):
-              </label>
-              <Input
-                type="text"
-                placeholder="הסבר קצר על הקהילה..."
-                value={formDesc}
-                onChange={(e) => setFormDesc(e.target.value)}
-                className="bg-white border-slate-200 text-slate-900 rounded-xl h-9 text-xs"
-              />
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  תיאור קצר (אופציונלי):
+                </label>
+                <Input
+                  type="text"
+                  placeholder="הסבר קצר על הקהילה..."
+                  value={formDesc}
+                  onChange={(e) => setFormDesc(e.target.value)}
+                  className="bg-white border-slate-200 text-slate-900 rounded-xl h-10 text-xs"
+                />
+              </div>
             </div>
 
             {/* Vision & Purpose Section */}
@@ -1725,20 +1921,31 @@ export default function GroupsClientView() {
                 </select>
               </div>
 
-              {/* Community Page Info & Direct Link */}
+              {/* Community Page Slug (English Only) & Direct Link */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-blue-600" />
-                  <span>עמוד הקהילה באתר:</span>
-                </label>
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl h-10 px-3 text-xs">
-                  <span className="text-slate-400 font-mono">/</span>
-                  <span className="font-bold text-indigo-700 font-mono truncate flex-1">
-                    {formPageUrl || (editingGroupId ? `comm-${editingGroupId}` : `comm-[יווצר אוטומטית]`)}
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>סלאג לעמוד הקהילה (באנגלית בלבד):</span>
                   </span>
-                  {formPageUrl && (
+                  <span className="text-[10px] text-slate-400 font-mono">a-z, 0-9, -</span>
+                </label>
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl h-10 px-3 text-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                  <span className="text-slate-400 font-mono font-bold">/</span>
+                  <input
+                    type="text"
+                    value={formPageSlug}
+                    onChange={(e) => {
+                      const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+                      setFormPageSlug(val);
+                    }}
+                    placeholder={editingGroupId ? `comm-${editingGroupId.substring(0, 8)}` : "my-community"}
+                    className="w-full bg-transparent font-mono text-xs text-indigo-700 font-bold outline-none text-left"
+                    dir="ltr"
+                  />
+                  {(formPageUrl || formPageSlug) && (
                     <a
-                      href={formPageUrl}
+                      href={formPageSlug ? `/${formPageSlug}` : formPageUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors"
@@ -1749,7 +1956,7 @@ export default function GroupsClientView() {
                   )}
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  ✨ עמוד אינטרנט מלא בעורך האתר נוצר אוטומטית ביחד עם הקמת הקהילה.
+                  ✨ הכתובת יכולה להכיל אותיות באנגלית, מספרים ומקפים בלבד (לדוגמה: <span className="font-mono text-indigo-600">tanya-community</span>).
                 </p>
               </div>
             </div>
@@ -2178,6 +2385,15 @@ export default function GroupsClientView() {
         contact={selectedContactForModal}
         onSuccess={() => {
           loadData();
+        }}
+      />
+
+      {/* Floating Action Navigation Menu */}
+      <CrmFloatingNav 
+        activePage="groups"
+        onOpenNewContact={() => {
+          setSelectedContactForModal(null);
+          setIsContactModalOpen(true);
         }}
       />
     </div>

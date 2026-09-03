@@ -229,8 +229,18 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
     const docId = group.id && !group.id.startsWith("new_") ? group.id : groupsRef.doc().id;
 
-    // Define page slug & URL
-    const pageSlug = group.pageSlug || `comm-${docId}`;
+    // Define page slug & URL (strictly English letters, numbers, and hyphens only)
+    let cleanSlug = (group.pageSlug || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    if (!cleanSlug || cleanSlug.length < 2) {
+      cleanSlug = `comm-${docId.substring(0, 8)}`;
+    }
+    const pageSlug = cleanSlug;
     const pageUrl = `/${pageSlug}`;
     const targetCampId = group.mainCampaignId || "home";
 
@@ -292,20 +302,27 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
         // 5. campaignHeader (נתוני הקמפיין)
         // 6. campaignDonors (הטאבים של הקמפיין)
         // 7-15. כל שאר האזורים ממוקמים למטה ובמצב מוסתר
+        // Exact section ordering as requested:
+        // 1. videoGallery (מדיה מעמוד הקמפיין)
+        // 2. richContent (אזור אודות / תוכן מעוצב עם כותרת הקהילה והחזון)
+        // 3. campaignTiers (כפתורי הקמפיין)
+        // 4. campaignHeader (נתוני הקמפיין)
+        // 5. campaignDonors (הטאבים של הקמפיין)
+        // 6-15. כל שאר האזורים ממוקמים למטה ובמצב מוסתר (הירו ותוכן מרכזי מוסתרים)
         sectionOrder: [
           "videoGallery",
-          "hero",
-          "mainContent",
+          "richContent",
           "campaignTiers",
           "campaignHeader",
           "campaignDonors",
+          "hero",
+          "mainContent",
           "services",
           "community",
           "pricing",
           "livePosts",
           "faq",
           "timer",
-          "richContent",
           "landingSection",
           "contact"
         ],
@@ -322,32 +339,18 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
           objectFit: inheritedVideoGallery?.objectFit || "cover",
           desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
         },
-        // 2. Hero Section (חלק הירו עם המסלול הטבעי ותמונה מהגלריה)
-        hero: {
+        // 2. Rich Content / About Section (אזור אודות / תוכן מעוצב: כותרת הקהילה והחזון)
+        richContent: {
           visible: true,
-          anchorId: "hero",
+          anchorId: "richContent",
+          heading: cleanName,
           title: cleanName,
-          subtitle: group.vision || group.purpose || `קהילת ${cleanName}`,
-          description: group.purpose || group.description || "",
-          imageSrc: communityHeroImage,
-          layout: "progressive", // המסלול הטבעי
-          buttonsVisible: false, // כפתורי הקמפיין ממוקמים ישירות מתחת
-          heroStyle: "hero",
-          flexDirection: "col"
-        },
-        // 3. About / Vision Section (חזון הקהילה ששם הקהילה ככותרת באזור התוכן האודות)
-        mainContent: {
-          visible: true,
-          anchorId: "mainContent",
-          title: cleanName, // שם הקהילה ככותרת
-          subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
-          description: group.vision
+          body: group.vision
             ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
             : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
-          imageSrc: communitySecondaryImage,
-          layout: "course-banner"
+          layout: "classic"
         },
-        // 4. Campaign Tiers / Action Buttons (כפתורי הקמפיין)
+        // 3. Campaign Tiers / Action Buttons (כפתורי הקמפיין)
         campaignTiers: {
           visible: true,
           anchorId: "campaignTiers",
@@ -360,20 +363,47 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
             { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
           ]
         },
-        // 5. Campaign Stats & Header (נתוני הקמפיין)
+        // 4. Campaign Stats & Header (נתוני הקמפיין)
         campaignHeader: {
           visible: true,
           anchorId: "campaignHeader",
-          campaignId: targetCampId
+          campaignId: targetCampId,
+          ambassadorSlug: pageSlug,
+          ambassadorName: cleanName
         },
-        // 6. Campaign Tabs (הטאבים של הקמפיין)
+        // 5. Campaign Tabs & Donor Cards (הטאבים של הקמפיין)
         campaignDonors: {
           visible: true,
           anchorId: "campaignDonors",
           campaignId: targetCampId,
+          ambassadorSlug: pageSlug,
+          ambassadorName: cleanName,
           campaignDescription: group.vision || group.purpose || group.description || ""
         },
-        // 7-15. All other sections positioned at the bottom and hidden:
+        // 6. Hero Section (מוסתר כברירת מחדל לפי בקשה)
+        hero: {
+          visible: false,
+          anchorId: "hero",
+          title: cleanName,
+          subtitle: group.vision || group.purpose || `קהילת ${cleanName}`,
+          description: group.purpose || group.description || "",
+          imageSrc: communityHeroImage,
+          layout: "progressive",
+          buttonsVisible: false,
+          heroStyle: "hero",
+          flexDirection: "col"
+        },
+        // 7. Main Content Section (מוסתר כברירת מחדל לפי בקשה)
+        mainContent: {
+          visible: false,
+          anchorId: "mainContent",
+          title: cleanName,
+          subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
+          description: group.vision || group.purpose || "",
+          imageSrc: communitySecondaryImage,
+          layout: "course-banner"
+        },
+        // 8-15. All other sections positioned at the bottom and hidden:
         services: {
           visible: false,
           items: []
@@ -398,9 +428,6 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
         timer: {
           visible: false
         },
-        richContent: {
-          visible: false
-        },
         landingSection: {
           visible: false
         },
@@ -422,6 +449,8 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
     const dataToSave: SmartGroup = {
       id: docId,
       name: cleanName,
+      leaderName: group.leaderName || cleanName,
+      targetGoal: Number(group.targetGoal || 5000),
       color: group.color || "#6366f1",
       description: group.description || "",
       type: group.type || "manual",
@@ -439,6 +468,43 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
     };
 
     await groupsRef.doc(docId).set(dataToSave, { merge: true });
+
+    // Sync community directly to campaign ambassadors subcollection for real-time listener updates
+    try {
+      const campIdToSync = (targetCampId === "/" || targetCampId === "") ? "home" : targetCampId;
+      const ambData = {
+        id: pageSlug,
+        name: cleanName,
+        leaderName: group.leaderName || cleanName,
+        slug: pageSlug,
+        targetGoal: Number(group.targetGoal || 5000),
+        totalRaised: 0,
+        message: group.vision || group.description || "",
+        vision: group.vision || "",
+        gallery: group.gallery || [],
+        campaignId: campIdToSync,
+        pageUrl: pageUrl,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adminDb
+        .collection("campaigns")
+        .doc(campIdToSync)
+        .collection("ambassadors")
+        .doc(pageSlug)
+        .set(ambData, { merge: true });
+
+      if (campIdToSync === "home") {
+        await adminDb
+          .collection("campaigns")
+          .doc("default-campaign")
+          .collection("ambassadors")
+          .doc(pageSlug)
+          .set(ambData, { merge: true });
+      }
+    } catch (ambSyncErr) {
+      console.warn("Could not sync community to campaign ambassadors:", ambSyncErr);
+    }
 
     revalidatePath("/dashboard/crm/groups");
     revalidatePath("/dashboard/crm/analytics");

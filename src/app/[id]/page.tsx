@@ -19,21 +19,36 @@ import { staticLandingPages } from "@/data/landing-pages";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  const decodedId = decodeURIComponent(id);
+  const idsToCheck = Array.from(new Set([id, decodedId]));
+
   try {
-    let docSnap = await adminDb.collection("landing").doc(id).get();
-    if (!docSnap.exists) {
-      docSnap = await adminDb.collection("pages").doc(id).get();
+    for (const checkId of idsToCheck) {
+      let docSnap = await adminDb.collection("landing").doc(checkId).get();
+      if (!docSnap.exists) {
+        docSnap = await adminDb.collection("pages").doc(checkId).get();
+      }
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        return {
+          title: data?.seo?.title || data?.hero?.title || data?.title || "עמוד נחיתה",
+          description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
+        };
+      }
     }
-    if (docSnap.exists) {
-      const data = docSnap.data();
+
+    // Query fallback by slug
+    const querySnap = await adminDb.collection("pages").where("slug", "in", idsToCheck).limit(1).get();
+    if (!querySnap.empty) {
+      const data = querySnap.docs[0].data();
       return {
-        title: data?.seo?.title || data?.hero?.title || "עמוד נחיתה",
+        title: data?.seo?.title || data?.hero?.title || data?.title || "עמוד נחיתה",
         description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
       };
     }
   } catch (e) {}
   
-  const fallback = staticLandingPages.find(p => p.id === id);
+  const fallback = staticLandingPages.find(p => idsToCheck.includes(p.id));
   if (fallback) {
     return {
       title: fallback.seo.title,
@@ -49,6 +64,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function LandingPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const { id } = await params;
+  const decodedId = decodeURIComponent(id);
+  const idsToCheck = Array.from(new Set([id, decodedId]));
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const isPreview = resolvedSearchParams.preview === "true";
   const session = await auth();
@@ -58,14 +75,27 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   let detectedCollection = "landing";
 
   try {
-    let docSnap = await adminDb.collection("landing").doc(id).get();
-    if (docSnap.exists) {
-      pageConfig = docSnap.data();
-      detectedCollection = "landing";
-    } else {
-      docSnap = await adminDb.collection("pages").doc(id).get();
+    for (const checkId of idsToCheck) {
+      let docSnap = await adminDb.collection("landing").doc(checkId).get();
       if (docSnap.exists) {
         pageConfig = docSnap.data();
+        detectedCollection = "landing";
+        break;
+      } else {
+        docSnap = await adminDb.collection("pages").doc(checkId).get();
+        if (docSnap.exists) {
+          pageConfig = docSnap.data();
+          detectedCollection = "pages";
+          break;
+        }
+      }
+    }
+
+    // If not found by direct doc ID, query pages by slug
+    if (!pageConfig) {
+      const querySnap = await adminDb.collection("pages").where("slug", "in", idsToCheck).limit(1).get();
+      if (!querySnap.empty) {
+        pageConfig = querySnap.docs[0].data();
         detectedCollection = "pages";
       }
     }
@@ -74,7 +104,7 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   }
 
   if (!pageConfig) {
-    const fallback = staticLandingPages.find(p => p.id === id);
+    const fallback = staticLandingPages.find(p => idsToCheck.includes(p.id));
     if (fallback) {
       pageConfig = fallback;
     } else {

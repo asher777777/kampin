@@ -16,6 +16,8 @@ export interface SmartGroup {
   ownerId?: string;
 
   // Community enhanced parameters
+  leaderName?: string; // שם מוביל הקהילה
+  targetGoal?: number; // יעד כספי לקהילה
   gallery?: string[]; // א. גלריית תמונות
   vision?: string; // ב. חזון הקהילה
   purpose?: string; // ג. מטרת הקהילה

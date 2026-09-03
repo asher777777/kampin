@@ -7,6 +7,7 @@ import { getContactById, handleBulkAction, deleteTagGlobally } from "@/features/
 import { mergeDuplicateContacts } from "@/features/crm/mergeContacts";
 import { syncKesherClients } from "@/features/kesher/actions";
 import { ContactModal } from "../ContactModal";
+import { CrmFloatingNav } from "@/components/navigation/CrmFloatingNav";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { 
@@ -68,13 +69,8 @@ export default function AnalyticsDashboardPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     "conta_name", 
-    "conta_phone", 
-    "total_spent", 
-    "campaign_amount",
-    "mh_crm_city", 
-    "lead_source", 
-    "tg1",
-    "campaign_title"
+    "tags", 
+    "total_spent"
   ]);
   const [filterSource, setFilterSource] = useState("");
   const [filterTag, setFilterTag] = useState("");
@@ -237,8 +233,11 @@ export default function AnalyticsDashboardPage() {
 
   const getColumnLabel = (col: string) => {
     const map: Record<string, string> = {
-      "conta_name": "שם לקוח / חברה",
+      "conta_name": "איש קשר",
       "f_m": "שם פרטי",
+      "tags": "קהילה",
+      "community": "קהילה",
+      "total_spent": "סכום בפועל (₪)",
       "conta_phone": "טלפון",
       "email": "אימייל",
       "gender": "מין",
@@ -250,7 +249,6 @@ export default function AnalyticsDashboardPage() {
       "website": "אתר אינטרנט",
       "birth_date": "תאריך לידה",
       "status": "סטטוס",
-      "total_spent": "הכנסות בפועל (₪)",
       "campaign_amount": "סכום תרומה / קמפיין (₪)",
       "order_count": "כמות הזמנות",
       "last_order_date": "תאריך הזמנה אחרונה",
@@ -646,6 +644,13 @@ export default function AnalyticsDashboardPage() {
   }, [data]);
 
   const getContactValue = (c: any, col: string) => {
+    if (col === "tags" || col === "community") {
+      if (Array.isArray(c.tags) && c.tags.length > 0) return c.tags.join(", ");
+      return c.community || c.mh_crm_community || c.tg1 || "";
+    }
+    if (col === "total_spent") {
+      return c.total_spent !== undefined && c.total_spent !== null ? `₪${Number(c.total_spent).toLocaleString()}` : (c.campaign_amount ? `₪${Number(c.campaign_amount).toLocaleString()}` : "₪0");
+    }
     return c[col];
   };
 
@@ -679,8 +684,10 @@ export default function AnalyticsDashboardPage() {
 
     // 1. Community filter
     if (filterCommunity) {
-      const comm = (c.community || c.mh_crm_community || "").trim();
-      if (comm !== filterCommunity) return false;
+      const cTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+      const comm = (c.community || c.mh_crm_community || c.tg1 || "").trim();
+      const matchesCommunity = cTags.includes(filterCommunity) || comm === filterCommunity;
+      if (!matchesCommunity) return false;
     }
 
     // 2. Lead Source filter
@@ -2304,8 +2311,15 @@ export default function AnalyticsDashboardPage() {
                         return (
                           <td 
                             key={col} 
-                            className="px-4 py-3 text-slate-700 max-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors group" 
-                            title={String(val || "")}
+                            className={`px-4 py-3 text-slate-700 max-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors group ${
+                              col === "conta_name" ? "font-bold text-slate-900" : ""
+                            }`} 
+                            title={col === "conta_name" ? "לחץ לפתיחת כרטיס איש קשר" : String(val || "")}
+                            onClick={(e) => {
+                              if (col === "conta_name") {
+                                handleEditClick(contact.id, e);
+                              }
+                            }}
                             onDoubleClick={() => {
                               setEditingCell({ id: contact.id || "", field: col });
                               setEditValue(String(val || ""));
@@ -2325,7 +2339,13 @@ export default function AnalyticsDashboardPage() {
                               />
                             ) : (
                               <div className="flex items-center justify-between">
-                                <span className="truncate">{formatCellValue(val)}</span>
+                                {col === "conta_name" ? (
+                                  <span className="truncate text-indigo-600 hover:text-indigo-800 font-bold hover:underline">
+                                    {formatCellValue(val)}
+                                  </span>
+                                ) : (
+                                  <span className="truncate">{formatCellValue(val)}</span>
+                                )}
                                 <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
                             )}
@@ -2420,6 +2440,15 @@ export default function AnalyticsDashboardPage() {
         onClose={() => setModalOpen(false)} 
         contact={selectedContact} 
         onSuccess={loadData} 
+      />
+
+      {/* Floating Action Navigation Menu */}
+      <CrmFloatingNav 
+        activePage="analytics"
+        onOpenNewContact={() => {
+          setSelectedContact(null);
+          setModalOpen(true);
+        }}
       />
     </div>
   );

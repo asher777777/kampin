@@ -16,7 +16,7 @@ interface LoginModalProps {
   redirectTo?: string;
 }
 
-export function LoginModal({ isOpen, onClose, redirectTo = "/gen-dashboard" }: LoginModalProps) {
+export function LoginModal({ isOpen, onClose, redirectTo = "/auth-redirect" }: LoginModalProps) {
   const router = useRouter();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");

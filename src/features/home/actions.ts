@@ -831,6 +831,31 @@ export async function savePageConfig(collectionName: string, docId: string, cont
     try {
       await docRef.set(dataToSave, { merge: true });
       console.log("Saved successfully to Firebase!");
+
+      // Sync campaign targetGoal and metadata to campaigns collection
+      if (content.campaignHeader) {
+        const campId = (content.campaignHeader.campaignId && content.campaignHeader.campaignId !== "default-campaign")
+          ? content.campaignHeader.campaignId
+          : (docId && docId !== "home" ? docId : "home");
+
+        try {
+          const campUpdates: Record<string, any> = {
+            updatedAt: new Date().toISOString(),
+          };
+          if (content.campaignHeader.targetGoal !== undefined && !isNaN(Number(content.campaignHeader.targetGoal))) {
+            campUpdates.targetGoal = Number(content.campaignHeader.targetGoal);
+          }
+          if (content.campaignHeader.title) {
+            campUpdates.title = content.campaignHeader.title;
+          }
+          if (Object.keys(campUpdates).length > 1) {
+            await adminDb.collection("campaigns").doc(campId).set(campUpdates, { merge: true });
+            console.log(`Synced campaign updates to campaigns/${campId}:`, campUpdates);
+          }
+        } catch (campErr) {
+          console.warn(`Could not sync to campaigns/${campId}:`, campErr);
+        }
+      }
     } catch (dbError) {
       const errMsg = (dbError as Error).message || "";
       if (errMsg.includes("Could not load the default credentials") || errMsg.includes("UNAUTHENTICATED") || errMsg.includes("credential")) {

@@ -118,18 +118,18 @@ export async function createCommunity(data: Partial<Community>) {
         },
         sectionOrder: [
           "videoGallery",
-          "hero",
-          "mainContent",
+          "richContent",
           "campaignTiers",
           "campaignHeader",
           "campaignDonors",
+          "hero",
+          "mainContent",
           "services",
           "community",
           "pricing",
           "livePosts",
           "faq",
           "timer",
-          "richContent",
           "landingSection",
           "contact"
         ],
@@ -145,28 +145,15 @@ export async function createCommunity(data: Partial<Community>) {
           objectFit: inheritedVideoGallery?.objectFit || "cover",
           desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
         },
-        hero: {
+        richContent: {
           visible: true,
-          anchorId: "hero",
+          anchorId: "richContent",
+          heading: data.name || "",
           title: data.name || "",
-          subtitle: data.vision || data.purpose || `קהילת ${data.name || ""}`,
-          description: data.purpose || "",
-          imageSrc: communityHeroImage,
-          layout: "progressive",
-          buttonsVisible: false,
-          heroStyle: "hero",
-          flexDirection: "col"
-        },
-        mainContent: {
-          visible: true,
-          anchorId: "mainContent",
-          title: data.name || "",
-          subtitle: data.vision ? "חזון הקהילה" : (data.purpose ? "מטרות הקהילה" : ""),
-          description: data.vision
+          body: data.vision
             ? `${data.vision}${data.purpose ? `\n\nמטרות ויעדים:\n${data.purpose}` : ""}`
             : (data.purpose || `ברוכים הבאים לעמוד קהילת ${data.name || ""}`),
-          imageSrc: communitySecondaryImage,
-          layout: "course-banner"
+          layout: "classic"
         },
         campaignTiers: {
           visible: true,
@@ -183,13 +170,38 @@ export async function createCommunity(data: Partial<Community>) {
         campaignHeader: {
           visible: true,
           anchorId: "campaignHeader",
-          campaignId: targetCampId
+          campaignId: targetCampId,
+          ambassadorSlug: pageSlug,
+          ambassadorName: data.name || ""
         },
         campaignDonors: {
           visible: true,
           anchorId: "campaignDonors",
           campaignId: targetCampId,
+          ambassadorSlug: pageSlug,
+          ambassadorName: data.name || "",
           campaignDescription: data.vision || data.purpose || ""
+        },
+        hero: {
+          visible: false,
+          anchorId: "hero",
+          title: data.name || "",
+          subtitle: data.vision || data.purpose || `קהילת ${data.name || ""}`,
+          description: data.purpose || "",
+          imageSrc: communityHeroImage,
+          layout: "progressive",
+          buttonsVisible: false,
+          heroStyle: "hero",
+          flexDirection: "col"
+        },
+        mainContent: {
+          visible: false,
+          anchorId: "mainContent",
+          title: data.name || "",
+          subtitle: data.vision ? "חזון הקהילה" : (data.purpose ? "מטרות הקהילה" : ""),
+          description: data.vision || data.purpose || "",
+          imageSrc: communitySecondaryImage,
+          layout: "course-banner"
         },
         services: { visible: false, items: [] },
         community: { visible: false, title: data.name || "", description: "", gallery: data.gallery || [] },
@@ -197,7 +209,6 @@ export async function createCommunity(data: Partial<Community>) {
         livePosts: { visible: false },
         faq: { visible: false, items: [] },
         timer: { visible: false },
-        richContent: { visible: false },
         landingSection: { visible: false },
         contact: { visible: false }
       };

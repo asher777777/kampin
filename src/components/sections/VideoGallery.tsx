@@ -126,6 +126,7 @@ export const VideoGallery = ({
 }: VideoGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -136,14 +137,14 @@ export const VideoGallery = ({
   // Check if natural height mode is selected
   const isNaturalMode = heightDesktop === "natural" || heightDesktop === "auto" || !heightDesktop;
 
-  // Background gallery rotation
+  // Background gallery rotation (paused while hovering or modal is open)
   useEffect(() => {
-    if (normalizedImages.length <= 1 || isModalOpen) return;
+    if (normalizedImages.length <= 1 || isModalOpen || isHovered) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % normalizedImages.length);
     }, 4500);
     return () => clearInterval(interval);
-  }, [normalizedImages, isModalOpen]);
+  }, [normalizedImages, isModalOpen, isHovered]);
 
   // Handle modal close
   const handleClose = () => {
@@ -255,63 +256,37 @@ export const VideoGallery = ({
     // ==========================================
     if (isNaturalMode) {
       return (
-        <div className="w-full relative overflow-hidden flex items-center justify-center">
-          {/* Main active image dictates natural container height */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={safeCurrentIndex}
-              initial={
-                effect === "zoom-in" ? { opacity: 0, scale: 1.05 } :
-                effect === "slide" ? { opacity: 0, x: 40 } :
-                { opacity: 0 }
-              }
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={
-                effect === "zoom-in" ? { opacity: 0, scale: 0.98 } :
-                effect === "slide" ? { opacity: 0, x: -40 } :
-                { opacity: 0 }
-              }
-              transition={{
-                duration: effect === "zoom-in" ? 1.0 : effect === "slide" ? 0.7 : 0.8,
-                ease: "easeOut"
-              }}
-              className="w-full relative flex items-center justify-center"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={current.url}
-                alt={current.title || `Gallery ${safeCurrentIndex}`}
-                className={cn(
-                  "w-full h-auto max-w-full block transition-all",
-                  fitClass
-                )}
-                style={{
-                  objectFit: resolvedObjectFit,
-                  display: "block",
-                  margin: "0 auto",
-                }}
-              />
-
-              {/* Digital squares effect overlay */}
-              {effect === "digital-squares" && (
-                <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 pointer-events-none">
-                  {Array.from({ length: 100 }).map((_, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 1 }}
-                      animate={{ opacity: 0 }}
-                      transition={{ 
-                        duration: 0.7, 
-                        delay: Math.random() * 0.4, 
-                        ease: "easeOut"
-                      }}
-                      className="bg-black/50"
-                    />
-                  ))}
+        <div className="w-full relative overflow-hidden flex items-center justify-center select-none pointer-events-none">
+          {/* Active image dictates natural height stably with zero layout collapse */}
+          <div className="w-full relative flex items-center justify-center">
+            {normalizedImages.map((imgObj, idx) => {
+              const isActive = idx === safeCurrentIndex;
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    "w-full transition-opacity duration-700 ease-in-out",
+                    isActive ? "relative opacity-100 z-10" : "absolute inset-0 opacity-0 z-0 pointer-events-none"
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imgObj.url}
+                    alt={imgObj.title || `Gallery ${idx}`}
+                    className={cn(
+                      "w-full h-auto max-w-full block select-none pointer-events-none",
+                      fitClass
+                    )}
+                    style={{
+                      objectFit: resolvedObjectFit,
+                      display: "block",
+                      margin: "0 auto",
+                    }}
+                  />
                 </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+              );
+            })}
+          </div>
         </div>
       );
     }
@@ -574,8 +549,10 @@ export const VideoGallery = ({
   return (
     <section 
       id={id} 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "relative w-full overflow-hidden group transition-all duration-500",
+        "relative w-full overflow-hidden group",
         getDimensionClasses()
       )}
       style={{ backgroundColor: backgroundColor || "#0f172a" }}
@@ -587,18 +564,19 @@ export const VideoGallery = ({
       {/* Animated Title Overlay */}
       {renderTitleOverlay()}
 
-      {/* Center Play Button - absolutely centered with zero layout displacement */}
+      {/* Center Play Button - stable rendering with zero hover jitter or bounding box thrashing */}
       {videoUrl && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <button
             type="button"
             onClick={handleOpen}
-            className="pointer-events-auto group/btn flex items-center justify-center cursor-pointer transition-transform duration-300 hover:scale-105"
+            className="pointer-events-auto group/btn relative flex items-center justify-center cursor-pointer transition-transform duration-300 hover:scale-105 transform-gpu select-none"
             aria-label="הפעל וידאו"
           >
-            <div className="absolute inset-0 bg-amber-500/25 rounded-full blur-xl scale-150 group-hover/btn:scale-175 transition-transform duration-500" />
-            <div className="relative w-16 h-16 md:w-24 md:h-24 bg-black/50 backdrop-blur-md border-2 border-amber-400/70 hover:border-amber-300 rounded-full flex items-center justify-center hover:bg-black/70 shadow-[0_0_35px_rgba(245,158,11,0.4)]">
-              <Play className="w-8 h-8 md:w-11 md:h-11 text-amber-300 ml-1 drop-shadow" fill="currentColor" />
+            {/* Ambient glow - pointer-events-none so it doesn't cause hover flickering */}
+            <div className="absolute inset-0 bg-amber-500/25 rounded-full blur-xl scale-125 group-hover/btn:scale-150 transition-transform duration-300 pointer-events-none select-none" />
+            <div className="relative w-16 h-16 md:w-24 md:h-24 bg-black/50 backdrop-blur-md border-2 border-amber-400/70 group-hover/btn:border-amber-300 rounded-full flex items-center justify-center group-hover/btn:bg-black/70 shadow-[0_0_35px_rgba(245,158,11,0.4)] pointer-events-none transition-colors duration-200">
+              <Play className="w-8 h-8 md:w-11 md:h-11 text-amber-300 ml-1 drop-shadow pointer-events-none" fill="currentColor" />
             </div>
           </button>
         </div>

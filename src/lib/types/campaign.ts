@@ -19,14 +19,18 @@ export interface Ambassador {
   id: string;
   campaignId: string;
   name: string;
+  leaderName?: string;
   slug: string;
   targetGoal: number;
   totalRaised: number;
-  donorCount: number;
+  donorCount?: number;
   message?: string;
+  vision?: string;
   phone?: string;
   email?: string;
   avatarUrl?: string;
+  gallery?: string[];
+  pageUrl?: string;
   createdAt: any;
 }
 

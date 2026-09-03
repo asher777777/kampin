@@ -12,8 +12,9 @@ export default async function AuthRedirect() {
   }
 
   const role = (session.user as any)?.role;
+  const userId = (session.user as any)?.id;
   
-  if (role === "SUPERADMIN") {
+  if (role === "SUPERADMIN" || role === "ADMIN" || userId === "1") {
     redirect("/admin");
   } else {
     // Direct new and registering users to our live agent onboarding builder path

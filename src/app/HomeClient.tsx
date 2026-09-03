@@ -184,6 +184,9 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           <CampaignHeaderSection
             config={config.campaignHeader}
             campaignId={activeCampaignId}
+            ambassadorId={config.campaignHeader?.ambassadorId || config.campaignDonors?.ambassadorId}
+            ambassadorSlug={config.campaignHeader?.ambassadorSlug || config.campaignDonors?.ambassadorSlug}
+            ambassadorName={config.campaignHeader?.ambassadorName || config.campaignDonors?.ambassadorName}
           />
         );
       case "campaignTiers":
@@ -207,6 +210,9 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           <CampaignDonorsSection
             config={config.campaignDonors}
             campaignId={activeCampaignId}
+            ambassadorId={config.campaignDonors?.ambassadorId || config.campaignHeader?.ambassadorId}
+            ambassadorSlug={config.campaignDonors?.ambassadorSlug || config.campaignHeader?.ambassadorSlug}
+            ambassadorName={config.campaignDonors?.ambassadorName || config.campaignHeader?.ambassadorName}
             onOpenAmbassadorModal={() => setIsAmbassadorModalOpen(true)}
           />
         );
