@@ -987,7 +987,8 @@ export default function GroupsClientView() {
                   ) : (
                     filteredContacts.map((c) => {
                       const isSelected = selectedContactIds.includes(c.id);
-                      const contactTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+                      const rawTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+                      const contactTags: string[] = Array.from(new Set(rawTags.filter(Boolean)));
                       const isTagDropdownOpen = tagDropdownContactId === c.id;
 
                       return (
@@ -1047,12 +1048,12 @@ export default function GroupsClientView() {
                                       {contactTags.length === 0 ? (
                                         <span className="text-[11px] text-slate-400 italic">ללא קהילות</span>
                                       ) : (
-                                        contactTags.map((tag) => {
+                                        contactTags.map((tag, tIdx) => {
                                           const grp = groups.find((g) => g.name === tag);
                                           const color = grp?.color || "#4f46e5";
                                           return (
                                             <span
-                                              key={tag}
+                                              key={`${c.id}-${tag}-${tIdx}`}
                                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors group"
                                               style={{
                                                 backgroundColor: `${color}15`,

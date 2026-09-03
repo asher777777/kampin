@@ -740,6 +740,8 @@ export async function importContacts(importedContacts: Partial<Contact>[]) {
         total_spent: cData.total_spent || 0,
         order_count: cData.order_count || 0,
         last_order_date: cData.last_order_date || "",
+        tags: Array.isArray(cData.tags) ? cData.tags : (cData.tags ? [cData.tags] : (cData.tg1 ? [cData.tg1] : [])),
+        community: cData.community || cData.tg1 || "",
         createdAt: cData.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -756,6 +758,8 @@ export async function importContacts(importedContacts: Partial<Contact>[]) {
     }
 
     revalidatePath("/dashboard/crm");
+    revalidatePath("/dashboard/crm/analytics");
+    revalidatePath("/dashboard/crm/groups");
     return { success: true, created, updated, skipped };
   } catch (error) {
     console.error("Error in importContacts:", error);

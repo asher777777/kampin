@@ -59,24 +59,27 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
       .get();
 
     const savedGroups: Map<string, SmartGroup> = new Map();
+    const batch = adminDb.batch();
+    let hasDeletes = false;
+
     groupsSnap.forEach((gDoc) => {
       const gData = gDoc.data() as SmartGroup;
-      savedGroups.set(gData.name, { ...gData, id: gDoc.id });
-    });
+      const gName = (gData.name || "").trim();
 
-    // Ensure all existing tags in contacts exist as groups
-    tagsMap.forEach((count, tagName) => {
-      if (!savedGroups.has(tagName)) {
-        savedGroups.set(tagName, {
-          id: tagName,
-          name: tagName,
-          color: "#4f46e5",
-          type: "manual",
-        });
+      // Clean up numeric titles or invalid groups automatically
+      if (!gName || /^\d+$/.test(gName)) {
+        batch.delete(gDoc.ref);
+        hasDeletes = true;
+      } else {
+        savedGroups.set(gName, { ...gData, id: gDoc.id });
       }
     });
 
-    // Calculate dynamic member count for all groups
+    if (hasDeletes) {
+      await batch.commit().catch(err => console.warn("Failed to delete numeric groups:", err));
+    }
+
+    // Calculate dynamic member count for saved groups only
     const groups: SmartGroup[] = Array.from(savedGroups.values()).map((g) => {
       const count = contacts.filter((c) => isContactInGroup(c, g)).length;
       return {
@@ -785,6 +788,319 @@ export async function bulkPermanentDeleteContacts(
   } catch (error: any) {
     console.error("Error in bulkPermanentDeleteContacts:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export interface ExcelGroupImportRow {
+  groupName: string;
+  leaderName?: string;
+  targetGoal?: number;
+  vision?: string;
+  description?: string;
+  slug?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  amount?: number;
+  city?: string;
+  leadSource?: string;
+}
+
+export interface ExcelGroupImportOptions {
+  autoCreateGroups: boolean;
+  tagExistingContacts: boolean;
+  createNewContacts: boolean;
+  defaultCampaignId?: string;
+}
+
+export async function importGroupsFromExcelAction(
+  rows: ExcelGroupImportRow[],
+  options: ExcelGroupImportOptions
+): Promise<{
+  success: boolean;
+  createdGroupsCount: number;
+  updatedContactsCount: number;
+  createdContactsCount: number;
+  error?: string;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const ownerId = session.user.id;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { success: false, createdGroupsCount: 0, updatedContactsCount: 0, createdContactsCount: 0, error: "אין שורות נתונים לייבוא" };
+    }
+
+    let createdGroupsCount = 0;
+    let updatedContactsCount = 0;
+    let createdContactsCount = 0;
+
+    // 1. Fetch existing groups for this owner
+    const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
+    const groupsSnap = await groupsRef.get();
+    const existingGroupsMap = new Map<string, any>();
+    groupsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.name) existingGroupsMap.set(data.name.trim().toLowerCase(), { id: doc.id, ...data });
+    });
+
+    // 2. Process and create groups if enabled
+    const PRESET_COLORS = [
+      "#4f46e5", "#059669", "#d97706", "#dc2626", 
+      "#7c3aed", "#2563eb", "#0891b2", "#db2777"
+    ];
+
+    const uniqueGroupsInRows = new Map<string, ExcelGroupImportRow>();
+    rows.forEach((r) => {
+      const gName = (r.groupName || "").trim();
+      if (gName && !uniqueGroupsInRows.has(gName.toLowerCase())) {
+        uniqueGroupsInRows.set(gName.toLowerCase(), r);
+      }
+    });
+
+    if (options.autoCreateGroups) {
+      for (const [lowerName, row] of uniqueGroupsInRows.entries()) {
+        if (!existingGroupsMap.has(lowerName)) {
+          const gName = row.groupName.trim();
+          const docId = groupsRef.doc().id;
+
+          // Generate English slug
+          let cleanSlug = (row.slug || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "");
+
+          if (!cleanSlug || cleanSlug.length < 2) {
+            cleanSlug = `comm-${docId.substring(0, 8)}`;
+          }
+
+          const pageUrl = `/${cleanSlug}`;
+          const targetCampId = options.defaultCampaignId || "home";
+
+          const newGroupData: SmartGroup = {
+            id: docId,
+            name: gName,
+            leaderName: row.leaderName || gName,
+            targetGoal: Number(row.targetGoal || 5000),
+            color: PRESET_COLORS[createdGroupsCount % PRESET_COLORS.length],
+            description: row.description || "",
+            vision: row.vision || "",
+            purpose: "",
+            gallery: [],
+            pageId: cleanSlug,
+            pageSlug: cleanSlug,
+            pageUrl: pageUrl,
+            mainCampaignId: targetCampId === "/" ? "home" : targetCampId,
+            campaignTitle: "",
+            type: "manual",
+            matchType: "all",
+            rules: [],
+            ownerId
+          };
+
+          await groupsRef.doc(docId).set(newGroupData, { merge: true });
+
+          // Also auto-create page document in 'pages'
+          try {
+            await adminDb.collection("pages").doc(cleanSlug).set({
+              id: cleanSlug,
+              ownerId,
+              title: gName,
+              slug: cleanSlug,
+              collectionName: "pages",
+              updatedAt: new Date().toISOString(),
+              seo: {
+                title: gName,
+                description: row.vision || row.description || `קהילת ${gName}`,
+              },
+              sectionOrder: ["videoGallery", "richContent", "campaignTiers", "campaignHeader", "campaignDonors"],
+              richContent: {
+                visible: true,
+                anchorId: "about",
+                title: `אודות ${gName}`,
+                heading: `חזון ופעילות ${gName}`,
+                body: row.vision || row.description || `ברוכים הבאים לעמוד קהילת ${gName}`,
+                layout: "classic"
+              },
+              campaignHeader: {
+                visible: true,
+                anchorId: "campaignHeader",
+                campaignId: targetCampId,
+                ambassadorSlug: cleanSlug,
+                ambassadorName: gName,
+                targetGoal: Number(row.targetGoal || 5000)
+              },
+              campaignDonors: {
+                visible: true,
+                anchorId: "campaignDonors",
+                campaignId: targetCampId,
+                ambassadorSlug: cleanSlug,
+                ambassadorName: gName,
+                campaignDescription: row.vision || row.description || ""
+              },
+              hero: { visible: false },
+              mainContent: { visible: false },
+              services: { visible: false },
+              community: { visible: false },
+              pricing: { visible: false },
+              livePosts: { visible: false },
+              faq: { visible: false },
+              timer: { visible: false },
+              contact: { visible: false }
+            }, { merge: true });
+          } catch (pErr) {
+            console.warn("Could not create page document for imported group:", pErr);
+          }
+
+          existingGroupsMap.set(lowerName, newGroupData);
+          createdGroupsCount++;
+        }
+      }
+    }
+
+    // 3. Process contacts
+    if (options.tagExistingContacts || options.createNewContacts) {
+      // Fetch all existing contacts
+      const contactsSnap = await adminDb.collection("contacts").where("ownerId", "==", ownerId).get();
+      const contactByPhoneMap = new Map<string, any>();
+      const contactByEmailMap = new Map<string, any>();
+      const contactByNameMap = new Map<string, any>();
+
+      contactsSnap.docs.forEach((cDoc) => {
+        const cData = cDoc.data();
+        const contactObj = { id: cDoc.id, ...cData };
+        if (cData.conta_phone) {
+          const digits = String(cData.conta_phone).replace(/\D/g, "");
+          if (digits) contactByPhoneMap.set(digits, contactObj);
+        }
+        if (cData.phone) {
+          const digits = String(cData.phone).replace(/\D/g, "");
+          if (digits) contactByPhoneMap.set(digits, contactObj);
+        }
+        if (cData.email && typeof cData.email === "string" && cData.email.trim()) {
+          contactByEmailMap.set(cData.email.trim().toLowerCase(), contactObj);
+        }
+        if (cData.conta_name && typeof cData.conta_name === "string" && cData.conta_name.trim()) {
+          contactByNameMap.set(cData.conta_name.trim().toLowerCase(), contactObj);
+        }
+      });
+
+      let currentBatch = adminDb.batch();
+      let batchCount = 0;
+
+      for (const row of rows) {
+        const gName = (row.groupName || "").trim();
+        const rawPhone = row.phone ? String(row.phone).replace(/\D/g, "") : "";
+        const rawEmail = row.email ? String(row.email).trim().toLowerCase() : "";
+        const rawName = (row.contactName || "").trim();
+
+        if (!rawPhone && !rawEmail && !rawName) continue;
+
+        // Try to match existing contact
+        let matched = null;
+        if (rawPhone && contactByPhoneMap.has(rawPhone)) {
+          matched = contactByPhoneMap.get(rawPhone);
+        } else if (rawEmail && contactByEmailMap.has(rawEmail)) {
+          matched = contactByEmailMap.get(rawEmail);
+        } else if (rawName && contactByNameMap.has(rawName.toLowerCase())) {
+          matched = contactByNameMap.get(rawName.toLowerCase());
+        }
+
+        if (matched) {
+          if (options.tagExistingContacts && gName) {
+            const currentTags = Array.isArray(matched.tags) ? [...matched.tags] : [];
+            let needsUpdate = false;
+
+            if (!currentTags.includes(gName)) {
+              currentTags.push(gName);
+              needsUpdate = true;
+            }
+
+            const updateData: any = {
+              tags: currentTags,
+              updatedAt: new Date().toISOString()
+            };
+
+            if (!matched.community) {
+              updateData.community = gName;
+              needsUpdate = true;
+            }
+
+            if (row.amount && Number(row.amount) > 0 && (!matched.total_spent || Number(matched.total_spent) === 0)) {
+              updateData.total_spent = Number(row.amount);
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              const cRef = adminDb.collection("contacts").doc(matched.id);
+              currentBatch.update(cRef, updateData);
+              batchCount++;
+              updatedContactsCount++;
+              matched.tags = currentTags; // reflect in local memory
+            }
+          }
+        } else if (options.createNewContacts) {
+          // Create new contact
+          const newDocRef = adminDb.collection("contacts").doc();
+          const newContactData: any = {
+            ownerId,
+            conta_name: rawName || "לקוח חדש",
+            conta_phone: row.phone || "",
+            email: row.email || "",
+            tags: gName ? [gName] : [],
+            community: gName || "",
+            mh_crm_city: row.city || "",
+            lead_source: row.leadSource || "ייבוא אקסל",
+            total_spent: Number(row.amount || 0),
+            status: "active",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          currentBatch.set(newDocRef, newContactData);
+          batchCount++;
+          createdContactsCount++;
+
+          const createdObj = { id: newDocRef.id, ...newContactData };
+          if (rawPhone) contactByPhoneMap.set(rawPhone, createdObj);
+          if (rawEmail) contactByEmailMap.set(rawEmail, createdObj);
+          if (rawName) contactByNameMap.set(rawName.toLowerCase(), createdObj);
+        }
+
+        if (batchCount >= 450) {
+          await currentBatch.commit();
+          currentBatch = adminDb.batch();
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        await currentBatch.commit();
+      }
+    }
+
+    revalidatePath("/dashboard/crm/analytics");
+    revalidatePath("/dashboard/crm/groups");
+    revalidatePath("/dashboard/crm");
+
+    return {
+      success: true,
+      createdGroupsCount,
+      updatedContactsCount,
+      createdContactsCount
+    };
+  } catch (error: any) {
+    console.error("Error in importGroupsFromExcelAction:", error);
+    return {
+      success: false,
+      createdGroupsCount: 0,
+      updatedContactsCount: 0,
+      createdContactsCount: 0,
+      error: error.message || String(error)
+    };
   }
 }
 

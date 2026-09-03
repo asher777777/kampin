@@ -127,16 +127,30 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
     const communitiesCount: Record<string, number> = {};
     const formsCount: Record<string, number> = {};
 
-    // Pre-populate defined CRM groups so all communities appear in the filter
+    // Pre-populate defined CRM groups so all valid communities appear in the filter
+    const validGroupNamesSet = new Set<string>();
     try {
       const groupsSnap = await adminDb.collection("users").doc(ownerId).collection("crm_groups").get();
+      const batch = adminDb.batch();
+      let hasDeletes = false;
+
       groupsSnap.docs.forEach((gDoc) => {
         const gData = gDoc.data();
-        if (gData.name && typeof gData.name === "string" && gData.name.trim()) {
-          const gName = gData.name.trim();
+        const gName = (gData.name || "").trim();
+
+        // Delete numeric / invalid groups
+        if (!gName || /^\d+$/.test(gName)) {
+          batch.delete(gDoc.ref);
+          hasDeletes = true;
+        } else {
           communitiesCount[gName] = 0;
+          validGroupNamesSet.add(gName.toLowerCase());
         }
       });
+
+      if (hasDeletes) {
+        await batch.commit().catch(err => console.warn("Failed to delete numeric groups:", err));
+      }
     } catch (gErr) {
       console.warn("Could not fetch crm_groups for communitiesCount:", gErr);
     }
@@ -168,35 +182,33 @@ export async function getCRMAnalytics(filter?: CRMAnalyticsFilter) {
         totalCampaignAmount += campAmount;
       }
 
-      // Real Tags (filter out pure numeric IDs like TZ)
-      const rawTags: string[] = Array.isArray(c.tags) ? c.tags : [];
+      // Real Tags (tg1, tg2, tg3, tags)
+      const rawTags: string[] = Array.isArray(c.tags) ? [...c.tags] : [];
+      if (c.tg1) rawTags.push(c.tg1);
       if (c.tg2) rawTags.push(c.tg2);
       if (c.tg3) rawTags.push(c.tg3);
 
       rawTags.forEach((t) => {
         if (t && typeof t === "string" && t.trim()) {
           const trimmed = t.trim();
-          // Filter out pure numbers with 5+ digits (like Israeli IDs)
-          if (!/^\d{5,}$/.test(trimmed)) {
-            tagsCount[trimmed] = (tagsCount[trimmed] || 0) + 1;
-          }
+          tagsCount[trimmed] = (tagsCount[trimmed] || 0) + 1;
         }
       });
 
-      // Communities (from c.tags array AND c.community / c.mh_crm_community)
+      // Real Communities ONLY (from c.community / c.mh_crm_community OR matching defined CRM groups)
       const contactCommunities = new Set<string>();
+      if (c.community && typeof c.community === "string" && c.community.trim() && !/^\d+$/.test(c.community.trim())) {
+        contactCommunities.add(c.community.trim());
+      }
+      if (c.mh_crm_community && typeof c.mh_crm_community === "string" && c.mh_crm_community.trim() && !/^\d+$/.test(c.mh_crm_community.trim())) {
+        contactCommunities.add(c.mh_crm_community.trim());
+      }
       if (Array.isArray(c.tags)) {
         c.tags.forEach((t: any) => {
-          if (t && typeof t === "string" && t.trim()) {
+          if (t && typeof t === "string" && t.trim() && validGroupNamesSet.has(t.trim().toLowerCase())) {
             contactCommunities.add(t.trim());
           }
         });
-      }
-      if (c.community && typeof c.community === "string" && c.community.trim()) {
-        contactCommunities.add(c.community.trim());
-      }
-      if (c.mh_crm_community && typeof c.mh_crm_community === "string" && c.mh_crm_community.trim()) {
-        contactCommunities.add(c.mh_crm_community.trim());
       }
 
       contactCommunities.forEach((comm) => {

@@ -44,7 +44,8 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Upload
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { 
@@ -52,6 +53,8 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { Contact } from "@/features/crm/types";
+import { ContactImportModal } from "@/app/dashboard/crm/ContactImportModal";
+import { GroupImportModal } from "@/app/dashboard/crm/GroupImportModal";
 
 const COLORS = ['#4f46e5', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#3b82f6'];
 
@@ -60,6 +63,8 @@ export default function AnalyticsDashboardPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [showContactImportModal, setShowContactImportModal] = useState(false);
+  const [showGroupImportModal, setShowGroupImportModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [dataSource, setDataSource] = useState<"contacts" | "forms">("contacts");
   const [contactStatus, setContactStatus] = useState<"active" | "all" | "trashed">("active");
@@ -235,8 +240,11 @@ export default function AnalyticsDashboardPage() {
     const map: Record<string, string> = {
       "conta_name": "איש קשר",
       "f_m": "שם פרטי",
-      "tags": "קהילה",
       "community": "קהילה",
+      "tags": "תגיות",
+      "tg1": "תגית 1",
+      "tg2": "תגית 2",
+      "tg3": "תגית 3",
       "total_spent": "סכום בפועל (₪)",
       "conta_phone": "טלפון",
       "email": "אימייל",
@@ -254,9 +262,6 @@ export default function AnalyticsDashboardPage() {
       "last_order_date": "תאריך הזמנה אחרונה",
       "lead_source": "מקור הגעה",
       "segment": "מגזר / סגמנט",
-      "tg1": "תגית 1",
-      "tg2": "תגית 2",
-      "tg3": "תגית 3",
       "notes": "הערות",
       "campaign_title": "שם קמפיין",
       "campaign_donation_mode": "אופן תרומה",
@@ -644,9 +649,21 @@ export default function AnalyticsDashboardPage() {
   }, [data]);
 
   const getContactValue = (c: any, col: string) => {
-    if (col === "tags" || col === "community") {
+    if (col === "tags") {
       if (Array.isArray(c.tags) && c.tags.length > 0) return c.tags.join(", ");
-      return c.community || c.mh_crm_community || c.tg1 || "";
+      return c.tg1 || "";
+    }
+    if (col === "community") {
+      return c.community || c.mh_crm_community || "";
+    }
+    if (col === "tg1") {
+      return c.tg1 || "";
+    }
+    if (col === "tg2") {
+      return c.tg2 || "";
+    }
+    if (col === "tg3") {
+      return c.tg3 || "";
     }
     if (col === "total_spent") {
       return c.total_spent !== undefined && c.total_spent !== null ? `₪${Number(c.total_spent).toLocaleString()}` : (c.campaign_amount ? `₪${Number(c.campaign_amount).toLocaleString()}` : "₪0");
@@ -908,6 +925,11 @@ export default function AnalyticsDashboardPage() {
       "f_m",
       "conta_phone",
       "email",
+      "community",
+      "tags",
+      "tg1",
+      "tg2",
+      "tg3",
       "gender",
       "mh_crm_city",
       "mh_crm_street",
@@ -918,9 +940,6 @@ export default function AnalyticsDashboardPage() {
       "work_phone",
       "website",
       "birth_date",
-      "tg1",
-      "tg2",
-      "tg3",
       "notes",
       "total_spent",
       "campaign_amount",
@@ -1050,6 +1069,16 @@ export default function AnalyticsDashboardPage() {
           >
             <RotateCcw className="w-4 h-4 text-indigo-600" />
             איחוד כפילויות
+          </Button>
+
+          <Button 
+            onClick={() => setShowContactImportModal(true)}
+            variant="outline"
+            className="rounded-xl h-11 font-bold border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 flex items-center gap-2 cursor-pointer transition-colors"
+            title="ייבא אנשי קשר חדשים ועדכן קיימים מקובץ Excel"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            <span>ייבוא אנשי קשר מאקסל</span>
           </Button>
 
           <Button 
@@ -2027,6 +2056,16 @@ export default function AnalyticsDashboardPage() {
             </Button>
 
             <Button 
+              onClick={() => setShowContactImportModal(true)}
+              variant="outline" 
+              className="rounded-xl h-10 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 flex items-center gap-2 transition-colors cursor-pointer"
+              title="ייבא אנשי קשר מקובץ Excel (.xlsx / .csv)"
+            >
+              <Upload className="w-4 h-4 text-indigo-600" />
+              <span>ייבוא אנשי קשר מאקסל</span>
+            </Button>
+
+            <Button 
               onClick={() => window.print()}
               variant="outline" 
               className="rounded-xl h-10 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
@@ -2440,6 +2479,12 @@ export default function AnalyticsDashboardPage() {
         onClose={() => setModalOpen(false)} 
         contact={selectedContact} 
         onSuccess={loadData} 
+      />
+
+      <ContactImportModal
+        isOpen={showContactImportModal}
+        onClose={() => setShowContactImportModal(false)}
+        onSuccess={loadData}
       />
 
       {/* Floating Action Navigation Menu */}
