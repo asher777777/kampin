@@ -681,26 +681,38 @@ export async function deleteSmartGroup(groupNameOrId: string): Promise<{ success
       }
     }
 
-    // Remove tag from contacts
+    // Remove tag and community from contacts
     const snap = await adminDb
       .collection("contacts")
       .where("ownerId", "==", ownerId)
-      .where("tags", "array-contains", targetTagName)
       .get();
 
     const batch = adminDb.batch();
+    let batchCount = 0;
     snap.forEach((doc) => {
-      const currentTags = doc.data().tags || [];
-      batch.update(doc.ref, {
-        tags: currentTags.filter((t: string) => t !== tagName),
-        community: doc.data().community === tagName ? "" : (doc.data().community || ""),
-        updatedAt: new Date().toISOString(),
-      });
+      const d = doc.data();
+      const currentTags: string[] = Array.isArray(d.tags) ? d.tags : [];
+      const hasTag = currentTags.includes(targetTagName);
+      const isComm = d.community === targetTagName;
+      const isMhComm = d.mh_crm_community === targetTagName;
+
+      if (hasTag || isComm || isMhComm) {
+        batch.update(doc.ref, {
+          tags: currentTags.filter((t: string) => t !== targetTagName),
+          community: isComm ? "" : (d.community || ""),
+          mh_crm_community: isMhComm ? "" : (d.mh_crm_community || ""),
+          updatedAt: new Date().toISOString(),
+        });
+        batchCount++;
+      }
     });
-    await batch.commit();
+    if (batchCount > 0) {
+      await batch.commit();
+    }
 
     revalidatePath("/dashboard/crm/groups");
     revalidatePath("/dashboard/crm/analytics");
+    revalidatePath("/dashboard/crm");
     return { success: true };
   } catch (error: any) {
     console.error("Error in deleteSmartGroup:", error);
