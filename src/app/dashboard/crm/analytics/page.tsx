@@ -32,6 +32,7 @@ import {
   Building, 
   Calendar, 
   CreditCard,
+  Heart,
   X,
   CheckSquare,
   RotateCcw,
@@ -633,6 +634,26 @@ export default function AnalyticsDashboardPage() {
         }
       },
       {
+        id: "camp",
+        label: "קמפיינים ותרומות",
+        icon: Heart,
+        filterFn: (c: any) => {
+          return (
+            (c.campaign_amount !== undefined && Number(c.campaign_amount) > 0) ||
+            Boolean(c.campaign_id || c.campaignId) ||
+            Boolean(c.campaign_title || c.campaignTitle) ||
+            Boolean(c.campaign_tier || c.campaignTier) ||
+            Boolean(c.campaign_ambassador_name || c.campaignAmbassadorName) ||
+            Boolean(c.campaign_role || c.campaignRole) ||
+            Boolean(c.campaign_donation_mode || c.campaignDonationMode) ||
+            Boolean(c.campaign_receipt_url || c.campaignReceiptUrl) ||
+            Boolean(c.campaign_transaction_id || c.campaignTransactionId) ||
+            (Array.isArray(c.campaign_donations_history) && c.campaign_donations_history.length > 0) ||
+            (Array.isArray(c.campaignDonationsHistory) && c.campaignDonationsHistory.length > 0)
+          );
+        }
+      },
+      {
         id: "payments",
         label: "תשלומים",
         icon: CreditCard,
@@ -640,7 +661,6 @@ export default function AnalyticsDashboardPage() {
           return (
             (c.total_spent !== undefined && Number(c.total_spent) > 0) ||
             (c.order_count !== undefined && Number(c.order_count) > 0) ||
-            (c.campaign_amount !== undefined && Number(c.campaign_amount) > 0) ||
             (c.last_order_date !== null && c.last_order_date !== undefined && c.last_order_date !== "")
           );
         }

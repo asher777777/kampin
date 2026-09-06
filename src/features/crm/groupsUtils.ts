@@ -15,6 +15,10 @@ export interface SmartGroup {
   count?: number;
   ownerId?: string;
 
+  // Category & Community distinction
+  isCommunity?: boolean; // true if it has a page or is designated as a community
+  category?: "community" | "group";
+
   // Community enhanced parameters
   leaderName?: string; // שם מוביל הקהילה
   targetGoal?: number; // יעד כספי לקהילה

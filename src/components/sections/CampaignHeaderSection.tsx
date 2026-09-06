@@ -6,7 +6,8 @@ import { TrendingUp, Award, Target, Sparkles, ArrowUpRight, HeartHandshake, Laye
 import { Campaign, CampaignHeaderConfig, DonationTier, Ambassador } from "@/lib/types/campaign";
 import { doc, onSnapshot, collection, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getCampaignData, getCampaignDonationsAction } from "@/features/campaigns/actions";
+import { getCampaignData } from "@/features/campaigns/actions";
+import { getCampaignDonationsAction } from "@/features/campaigns/campaignDonationsAction";
 import Link from "next/link";
 
 interface CampaignHeaderSectionProps {
@@ -150,7 +151,7 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
     }
   }, [targetCampaignId, ambassadorId, ambassadorSlug]);
 
-  // 4. Real-time Firestore Listener on Donations subcollection to keep community total live
+  // 4. Real-time Firestore Listener on Donations subcollection to keep community total live with deduplication
   useEffect(() => {
     if (!targetCampaignId || !isAmbassadorView) return;
 
@@ -160,6 +161,7 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
       const cleanSlug = ambassadorSlug?.trim();
       const cleanName = ambassadorName?.trim().toLowerCase();
       const cleanId = ambassadorId?.trim();
+      const seenSigs = new Set<string>();
 
       snap.docs.forEach((dDoc) => {
         const d = dDoc.data();
@@ -168,7 +170,20 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
           const matchSlug = cleanSlug && ((d as any).ambassadorSlug === cleanSlug || d.ambassadorId === cleanSlug);
           const matchId = cleanId && d.ambassadorId === cleanId;
           if (matchName || matchSlug || matchId) {
-            sum += Number(d.amount || 0);
+            const dName = (d.donorName || "").trim().toLowerCase();
+            const amt = Number(d.amount || 0);
+            const dPhone = (d.phone || "").replace(/\D/g, "");
+
+            const keys = [];
+            if (dName && amt > 0) keys.push(`name_${dName}_${amt}`);
+            if (dPhone && amt > 0) keys.push(`phone_${dPhone}_${amt}`);
+            if (d.contactId) keys.push(`contact_${d.contactId}_${amt}`);
+            keys.push(`id_${dDoc.id}`);
+
+            if (!keys.some(k => seenSigs.has(k))) {
+              keys.forEach(k => seenSigs.add(k));
+              sum += amt;
+            }
           }
         }
       });
@@ -187,21 +202,23 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
   const currentAmbassadorRaised = calculatedAmbassadorRaised ?? liveAmbassador?.totalRaised ?? ambassadorRaised ?? 0;
   const currentAmbassadorGoal = calculatedAmbassadorGoal ?? liveAmbassador?.targetGoal ?? ambassadorGoal ?? 5000;
 
-  // Prioritize config values set in the page editor if provided
-  const currentGoal = (config?.targetGoal !== undefined && config?.targetGoal !== null && Number(config.targetGoal) > 0)
-    ? Number(config.targetGoal)
-    : (isAmbassadorView ? currentAmbassadorGoal : (liveCampaign?.targetGoal ?? targetGoal ?? 100000));
+  // In Ambassador/Community view, the target goal is strictly the community's goal (e.g. 5,000)
+  const currentGoal = isAmbassadorView
+    ? currentAmbassadorGoal
+    : ((config?.targetGoal !== undefined && config?.targetGoal !== null && Number(config.targetGoal) > 0)
+        ? Number(config.targetGoal)
+        : (liveCampaign?.targetGoal ?? targetGoal ?? 100000));
 
   const currentRaised = isAmbassadorView
-    ? (currentAmbassadorRaised > 0 ? currentAmbassadorRaised : (config?.totalRaised ?? 0))
+    ? currentAmbassadorRaised
     : (liveCampaign?.totalRaised ?? config?.totalRaised ?? totalRaised ?? 0);
 
   const percentage = Math.round((currentRaised / (currentGoal || 1)) * 100);
+  const remainingToGoal = Math.max(0, currentGoal - currentRaised);
 
   // Overall Campaign totals (strictly from the main campaign database)
-  const overallCampaignRaised = liveCampaign?.totalRaised ?? totalRaised;
+  const overallCampaignRaised = liveCampaign?.totalRaised ?? totalRaised ?? 0;
   const overallCampaignGoal = liveCampaign?.targetGoal ?? 100000;
-  const overallPercentage = Math.round((overallCampaignRaised / (overallCampaignGoal || 1)) * 100);
 
   const resolvedCampaignTitle = campaignTitle || liveCampaign?.title || "הקמפיין הראשי";
   const resolvedMainUrl = mainCampaignUrl || (targetCampaignId === "home" ? "/" : `/c/${targetCampaignId}`);
@@ -276,7 +293,7 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
           strokeWidth="12"
           strokeLinecap="round"
           initial={{ pathLength: 0 }}
-          animate={{ pathLength: Math.max(0.05, percentage / 100) }}
+          animate={{ pathLength: Math.min(1, Math.max(0.05, percentage / 100)) }}
           transition={{ duration: 1.8, ease: "easeOut" }}
         />
 
@@ -345,14 +362,20 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
             {percentage >= 100 ? (
               <>
                 <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
-                <span>{percentage}% מהיעד (הושג!)</span>
+                <span>{percentage}% הושגו (היעד הושלם!)</span>
               </>
             ) : (
               <>
                 <TrendingUp className="w-4 h-4 text-emerald-700" />
-                <span>{percentage}% מהיעד</span>
+                <span>{percentage}% הושגו</span>
               </>
             )}
+          </div>
+
+          {/* Remaining to Goal Badge */}
+          <div className="flex items-center gap-1.5 bg-white text-slate-800 px-3.5 py-1.5 rounded-full border border-slate-200/90 shadow-2xs">
+            <span className="text-slate-500 font-medium">נותרו ליעד:</span>
+            <span className="font-bold text-slate-900">{currency}{formatAmount(remainingToGoal)}</span>
           </div>
 
           {/* Donors Count Badge */}
@@ -383,16 +406,24 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
                 <div className="text-sm md:text-base font-black text-slate-900 flex items-baseline gap-1.5">
                   <span className="text-emerald-800">{currency}{formatAmount(overallCampaignRaised)}</span>
                   <span className="text-xs font-normal text-slate-400">
-                    מתוך יעד {currency}{formatAmount(overallCampaignGoal)}
+                    (מתוכם {currency}{formatAmount(currentRaised)} ע"י הקהילה)
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-              <span className="bg-emerald-100 text-emerald-900 font-extrabold px-3 py-1 rounded-xl text-xs">
-                {overallPercentage}% מהקמפיין
-              </span>
+              {remainingToGoal > 0 ? (
+                <div className="bg-emerald-50 text-emerald-950 border border-emerald-200/80 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                  <span className="text-emerald-800/80 font-normal">נותרו ליעד הקהילה:</span>
+                  <span className="font-black text-emerald-950">{currency}{formatAmount(remainingToGoal)}</span>
+                </div>
+              ) : (
+                <div className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                  <span>יעד הקהילה הושלם!</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -521,6 +521,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         isOpen={isDonationDrawerOpen}
         onClose={() => setIsDonationDrawerOpen(false)}
         campaignId={activeCampaignId}
+        ambassadorId={config.campaignHeader?.ambassadorId || config.campaignDonors?.ambassadorId || config.campaignHeader?.ambassadorSlug || config.campaignDonors?.ambassadorSlug || null}
+        ambassadorName={config.campaignHeader?.ambassadorName || config.campaignDonors?.ambassadorName || null}
         configTiers={config.campaignTiers?.tiers}
         configDonationType={config.campaignTiers?.donationType}
         configRecurringMonths={config.campaignTiers?.recurringMonths}

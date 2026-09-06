@@ -6,7 +6,7 @@ import { Heart, Sparkles, X } from "lucide-react";
 import { collection, query, where, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Donation, DonationTier } from "@/lib/types/campaign";
-import { getCampaignDonationsAction } from "@/features/campaigns/actions";
+import { getCampaignDonationsAction } from "@/features/campaigns/campaignDonationsAction";
 import { defaultTiers } from "./CampaignTiersList";
 
 export interface LiveDonationAlertProps {

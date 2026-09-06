@@ -16,7 +16,6 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     const ownerId = session.user.id;
-
     // Fetch contacts
     const snap = await adminDb
       .collection("contacts")
@@ -26,13 +25,14 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
     const contacts: any[] = [];
     const tagsMap = new Map<string, number>();
     const citiesSet = new Set<string>();
+    const isNumericTag = (t: string) => /^\d+$/.test(t.trim());
 
     snap.forEach((doc) => {
       const d = doc.data();
       if (d.status === "trashed") return;
 
       const tags: string[] = Array.isArray(d.tags)
-        ? d.tags.filter((t: any) => typeof t === "string" && t.trim() !== "")
+        ? d.tags.filter((t: any) => typeof t === "string" && t.trim() !== "" && !isNumericTag(t))
         : [];
 
       if (d.mh_crm_city && typeof d.mh_crm_city === "string" && d.mh_crm_city.trim()) {
@@ -47,7 +47,9 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
 
       tags.forEach((tag) => {
         const cleanTag = tag.trim();
-        tagsMap.set(cleanTag, (tagsMap.get(cleanTag) || 0) + 1);
+        if (!isNumericTag(cleanTag)) {
+          tagsMap.set(cleanTag, (tagsMap.get(cleanTag) || 0) + 1);
+        }
       });
     });
 
@@ -71,7 +73,13 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
         batch.delete(gDoc.ref);
         hasDeletes = true;
       } else {
-        savedGroups.set(gName, { ...gData, id: gDoc.id });
+        const isCommunity = Boolean(gData.isCommunity || gData.pageSlug || gData.pageUrl || gData.pageId);
+        savedGroups.set(gName, {
+          ...gData,
+          id: gDoc.id,
+          isCommunity,
+          category: isCommunity ? "community" : "group",
+        });
       }
     });
 
@@ -79,7 +87,32 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
       await batch.commit().catch(err => console.warn("Failed to delete numeric groups:", err));
     }
 
-    // Calculate dynamic member count for saved groups only
+    // Auto-discover any tags from contacts that are not yet in crm_groups and add them as Groups
+    const PRESET_COLORS = [
+      "#4f46e5", "#059669", "#d97706", "#dc2626", 
+      "#7c3aed", "#0284c7", "#0891b2", "#475569"
+    ];
+    let colorIndex = 0;
+    tagsMap.forEach((_cnt, tagName) => {
+      const cleanTag = tagName.trim();
+      if (!savedGroups.has(cleanTag) && cleanTag && !/^\d+$/.test(cleanTag)) {
+        savedGroups.set(cleanTag, {
+          id: `tag_${encodeURIComponent(cleanTag)}`,
+          name: cleanTag,
+          color: PRESET_COLORS[colorIndex % PRESET_COLORS.length],
+          description: "קבוצת תגית",
+          type: "manual",
+          isCommunity: false,
+          category: "group",
+          rules: [],
+          matchType: "all",
+          ownerId,
+        });
+        colorIndex++;
+      }
+    });
+
+    // Calculate dynamic member count for all groups and communities
     const groups: SmartGroup[] = Array.from(savedGroups.values()).map((g) => {
       const count = contacts.filter((c) => isContactInGroup(c, g)).length;
       return {
@@ -88,8 +121,12 @@ export async function getGroupsData(): Promise<GroupsDataResponse> {
       };
     });
 
-    // Sort groups descending by count
-    groups.sort((a, b) => (b.count || 0) - (a.count || 0));
+    // Sort groups: communities first, then by count descending
+    groups.sort((a, b) => {
+      if (a.isCommunity && !b.isCommunity) return -1;
+      if (!a.isCommunity && b.isCommunity) return 1;
+      return (b.count || 0) - (a.count || 0);
+    });
 
     // Calculate untagged count (contacts with no tags and in 0 groups)
     const untaggedCount = contacts.filter((c) => {
@@ -220,233 +257,308 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
   }
 }
 
-export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ success: boolean; id?: string; pageUrl?: string; error?: string }> {
+export async function saveSmartGroup(group: Partial<SmartGroup> & { 
+  createPage?: boolean;
+  previousName?: string;
+}): Promise<{ success: boolean; id?: string; pageUrl?: string; error?: string }> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     const ownerId = session.user.id;
 
-    if (!group.name || !group.name.trim()) throw new Error("שם הקהילה הוא שדה חובה");
+    if (!group.name || !group.name.trim()) throw new Error("שם הוא שדה חובה");
     const cleanName = group.name.trim();
+    const previousName = group.previousName ? group.previousName.trim() : "";
 
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
-    const docId = group.id && !group.id.startsWith("new_") ? group.id : groupsRef.doc().id;
+    let docId = group.id && !group.id.startsWith("new_") && !group.id.startsWith("tag_") ? group.id : groupsRef.doc().id;
 
-    // Define page slug & URL (strictly English letters, numbers, and hyphens only)
-    let cleanSlug = (group.pageSlug || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
-
-    if (!cleanSlug || cleanSlug.length < 2) {
-      cleanSlug = `comm-${docId.substring(0, 8)}`;
+    // Check if docId already exists by name
+    if (group.id?.startsWith("tag_") || !group.id) {
+      const existingByName = await groupsRef.where("name", "==", cleanName).get();
+      if (!existingByName.empty) {
+        docId = existingByName.docs[0].id;
+      }
     }
-    const pageSlug = cleanSlug;
-    const pageUrl = `/${pageSlug}`;
+
+    const shouldCreatePage = Boolean(group.createPage);
+    const isCommunity = shouldCreatePage || Boolean(group.isCommunity && group.category === "community");
+    let pageSlug = "";
+    let pageUrl = "";
     const targetCampId = group.mainCampaignId || "home";
 
-    // Auto-create/update page in 'pages' collection with full home editor capabilities
-    try {
-      const pageRef = adminDb.collection("pages").doc(pageSlug);
-      const pageSnap = await pageRef.get();
-      
-      // Inherit videoGallery, tiers, header, donors from main campaign or home
-      let inheritedVideoGallery: any = null;
-      let inheritedTiers: any = null;
-      let inheritedHeader: any = null;
-      let inheritedDonors: any = null;
+    if (shouldCreatePage) {
+      // Define page slug & URL (strictly English letters, numbers, and hyphens only)
+      let cleanSlug = (group.pageSlug || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
 
+      if (!cleanSlug || cleanSlug.length < 2) {
+        cleanSlug = `comm-${docId.substring(0, 8)}`;
+      }
+      pageSlug = cleanSlug;
+      pageUrl = `/${pageSlug}`;
+
+      // Auto-create/update page in 'pages' collection with full home editor capabilities
       try {
-        let campDoc = await adminDb.collection("pages").doc(targetCampId === "home" ? "home" : targetCampId).get();
-        if (!campDoc.exists && targetCampId !== "home") {
-          campDoc = await adminDb.collection("campaigns").doc(targetCampId).get();
-        }
-        if (!campDoc.exists) {
-          campDoc = await adminDb.collection("pages").doc("home").get();
+        const pageRef = adminDb.collection("pages").doc(pageSlug);
+        const pageSnap = await pageRef.get();
+        
+        // Inherit videoGallery, tiers, header, donors from main campaign or home
+        let inheritedVideoGallery: any = null;
+        let inheritedTiers: any = null;
+        let inheritedHeader: any = null;
+        let inheritedDonors: any = null;
+
+        try {
+          let campDoc = await adminDb.collection("pages").doc(targetCampId === "home" ? "home" : targetCampId).get();
+          if (!campDoc.exists && targetCampId !== "home") {
+            campDoc = await adminDb.collection("campaigns").doc(targetCampId).get();
+          }
+          if (!campDoc.exists) {
+            campDoc = await adminDb.collection("pages").doc("home").get();
+          }
+
+          if (campDoc.exists) {
+            const cData = campDoc.data() || {};
+            inheritedVideoGallery = cData.videoGallery || null;
+            inheritedTiers = cData.campaignTiers || null;
+            inheritedHeader = cData.campaignHeader || null;
+            inheritedDonors = cData.campaignDonors || null;
+          }
+        } catch (inheritErr) {
+          console.warn("Could not fetch inherited campaign data:", inheritErr);
         }
 
-        if (campDoc.exists) {
-          const cData = campDoc.data() || {};
-          inheritedVideoGallery = cData.videoGallery || null;
-          inheritedTiers = cData.campaignTiers || null;
-          inheritedHeader = cData.campaignHeader || null;
-          inheritedDonors = cData.campaignDonors || null;
+        const communityHeroImage = group.gallery && group.gallery.length > 0 
+          ? group.gallery[0] 
+          : (inheritedVideoGallery?.images?.[0] || "");
+
+        const communitySecondaryImage = group.gallery && group.gallery.length > 1 
+          ? group.gallery[1] 
+          : communityHeroImage;
+
+        const pageData: any = {
+          id: pageSlug,
+          ownerId,
+          title: cleanName,
+          slug: pageSlug,
+          collectionName: "pages",
+          updatedAt: new Date().toISOString(),
+          seo: {
+            title: cleanName,
+            description: group.vision || group.purpose || group.description || `קהילת ${cleanName}`,
+          },
+          sectionOrder: [
+            "videoGallery",
+            "richContent",
+            "campaignTiers",
+            "campaignHeader",
+            "campaignDonors",
+            "hero",
+            "mainContent",
+            "services",
+            "community",
+            "pricing",
+            "livePosts",
+            "faq",
+            "timer",
+            "landingSection",
+            "contact"
+          ],
+          // 1. Video & Media Gallery
+          videoGallery: {
+            visible: true,
+            anchorId: "videoGallery",
+            images: (inheritedVideoGallery?.images && inheritedVideoGallery.images.length > 0)
+              ? inheritedVideoGallery.images
+              : (group.gallery || []),
+            videoUrl: inheritedVideoGallery?.videoUrl || "",
+            videoType: inheritedVideoGallery?.videoType || "youtube",
+            effect: inheritedVideoGallery?.effect || "fade",
+            objectFit: inheritedVideoGallery?.objectFit || "cover",
+            desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
+          },
+          // 2. Rich Content / About Section
+          richContent: {
+            visible: true,
+            anchorId: "richContent",
+            heading: cleanName,
+            title: cleanName,
+            body: group.vision
+              ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
+              : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
+            layout: "classic"
+          },
+          // 3. Campaign Tiers
+          campaignTiers: {
+            visible: true,
+            anchorId: "campaignTiers",
+            campaignId: targetCampId,
+            donationType: inheritedTiers?.donationType || "both",
+            tiers: inheritedTiers?.tiers || [
+              { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות הקהילה" },
+              { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית בפעילות" },
+              { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
+              { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
+            ]
+          },
+          // 4. Campaign Header
+          campaignHeader: {
+            visible: true,
+            anchorId: "campaignHeader",
+            campaignId: targetCampId,
+            ambassadorSlug: pageSlug,
+            ambassadorName: cleanName
+          },
+          // 5. Campaign Donors
+          campaignDonors: {
+            visible: true,
+            anchorId: "campaignDonors",
+            campaignId: targetCampId,
+            ambassadorSlug: pageSlug,
+            ambassadorName: cleanName,
+            campaignDescription: group.vision || group.purpose || group.description || ""
+          },
+          // 6. Hero Section (מוסתר כברירת מחדל)
+          hero: {
+            visible: false,
+            anchorId: "hero",
+            title: cleanName,
+            subtitle: group.vision || group.purpose || `קהילת ${cleanName}`,
+            description: group.purpose || group.description || "",
+            imageSrc: communityHeroImage,
+            layout: "progressive",
+            buttonsVisible: false,
+            heroStyle: "hero",
+            flexDirection: "col"
+          },
+          // 7. Main Content Section (מוסתר כברירת מחדל)
+          mainContent: {
+            visible: false,
+            anchorId: "mainContent",
+            title: cleanName,
+            subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
+            description: group.vision || group.purpose || "",
+            imageSrc: communitySecondaryImage,
+            layout: "course-banner"
+          },
+          services: { visible: false, items: [] },
+          community: { visible: false, title: cleanName, description: group.description || "", gallery: group.gallery || [] },
+          pricing: { visible: false, packages: [] },
+          livePosts: { visible: false },
+          faq: { visible: false, items: [] },
+          timer: { visible: false },
+          landingSection: { visible: false },
+          contact: { visible: false }
+        };
+
+        if (!pageSnap.exists) {
+          pageData.createdAt = new Date().toISOString();
+          await pageRef.set(pageData);
+        } else {
+          await pageRef.set(pageData, { merge: true });
         }
-      } catch (inheritErr) {
-        console.warn("Could not fetch inherited campaign data:", inheritErr);
+      } catch (pageErr) {
+        console.warn("Could not auto-create/update community page document:", pageErr);
       }
 
-      const communityHeroImage = group.gallery && group.gallery.length > 0 
-        ? group.gallery[0] 
-        : (inheritedVideoGallery?.images?.[0] || "");
+      // Sync community directly to campaign ambassadors subcollection
+      try {
+        const campIdToSync = (targetCampId === "/" || targetCampId === "") ? "home" : targetCampId;
+        const ambData = {
+          id: pageSlug,
+          name: cleanName,
+          leaderName: group.leaderName || cleanName,
+          slug: pageSlug,
+          targetGoal: Number(group.targetGoal || 5000),
+          totalRaised: 0,
+          message: group.vision || group.description || "",
+          vision: group.vision || "",
+          gallery: group.gallery || [],
+          campaignId: campIdToSync,
+          pageUrl: pageUrl,
+          updatedAt: new Date().toISOString(),
+        };
 
-      const communitySecondaryImage = group.gallery && group.gallery.length > 1 
-        ? group.gallery[1] 
-        : communityHeroImage;
+        await adminDb
+          .collection("campaigns")
+          .doc(campIdToSync)
+          .collection("ambassadors")
+          .doc(pageSlug)
+          .set(ambData, { merge: true });
 
-      const pageData: any = {
-        id: pageSlug,
-        ownerId,
-        title: cleanName,
-        slug: pageSlug,
-        collectionName: "pages",
-        updatedAt: new Date().toISOString(),
-        seo: {
-          title: cleanName,
-          description: group.vision || group.purpose || group.description || `קהילת ${cleanName}`,
-        },
-        // Exact section ordering as requested:
-        // 1. videoGallery (מדיה מעמוד הקמפיין)
-        // 2. hero (חלק הירו עם המסלול הטבעי ותמונה מהגלריה של הקהילה)
-        // 3. mainContent (חזון הקהילה ששם הקהילה ככותרת באזור התוכן האודות)
-        // 4. campaignTiers (כפתורי הקמפיין)
-        // 5. campaignHeader (נתוני הקמפיין)
-        // 6. campaignDonors (הטאבים של הקמפיין)
-        // 7-15. כל שאר האזורים ממוקמים למטה ובמצב מוסתר
-        // Exact section ordering as requested:
-        // 1. videoGallery (מדיה מעמוד הקמפיין)
-        // 2. richContent (אזור אודות / תוכן מעוצב עם כותרת הקהילה והחזון)
-        // 3. campaignTiers (כפתורי הקמפיין)
-        // 4. campaignHeader (נתוני הקמפיין)
-        // 5. campaignDonors (הטאבים של הקמפיין)
-        // 6-15. כל שאר האזורים ממוקמים למטה ובמצב מוסתר (הירו ותוכן מרכזי מוסתרים)
-        sectionOrder: [
-          "videoGallery",
-          "richContent",
-          "campaignTiers",
-          "campaignHeader",
-          "campaignDonors",
-          "hero",
-          "mainContent",
-          "services",
-          "community",
-          "pricing",
-          "livePosts",
-          "faq",
-          "timer",
-          "landingSection",
-          "contact"
-        ],
-        // 1. Video & Media Gallery (מדיה מעמוד הקמפיין)
-        videoGallery: {
-          visible: true,
-          anchorId: "videoGallery",
-          images: (inheritedVideoGallery?.images && inheritedVideoGallery.images.length > 0)
-            ? inheritedVideoGallery.images
-            : (group.gallery || []),
-          videoUrl: inheritedVideoGallery?.videoUrl || "",
-          videoType: inheritedVideoGallery?.videoType || "youtube",
-          effect: inheritedVideoGallery?.effect || "fade",
-          objectFit: inheritedVideoGallery?.objectFit || "cover",
-          desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
-        },
-        // 2. Rich Content / About Section (אזור אודות / תוכן מעוצב: כותרת הקהילה והחזון)
-        richContent: {
-          visible: true,
-          anchorId: "richContent",
-          heading: cleanName,
-          title: cleanName,
-          body: group.vision
-            ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
-            : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
-          layout: "classic"
-        },
-        // 3. Campaign Tiers / Action Buttons (כפתורי הקמפיין)
-        campaignTiers: {
-          visible: true,
-          anchorId: "campaignTiers",
-          campaignId: targetCampId,
-          donationType: inheritedTiers?.donationType || "both",
-          tiers: inheritedTiers?.tiers || [
-            { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות הקהילה" },
-            { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית בפעילות" },
-            { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
-            { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
-          ]
-        },
-        // 4. Campaign Stats & Header (נתוני הקמפיין)
-        campaignHeader: {
-          visible: true,
-          anchorId: "campaignHeader",
-          campaignId: targetCampId,
-          ambassadorSlug: pageSlug,
-          ambassadorName: cleanName
-        },
-        // 5. Campaign Tabs & Donor Cards (הטאבים של הקמפיין)
-        campaignDonors: {
-          visible: true,
-          anchorId: "campaignDonors",
-          campaignId: targetCampId,
-          ambassadorSlug: pageSlug,
-          ambassadorName: cleanName,
-          campaignDescription: group.vision || group.purpose || group.description || ""
-        },
-        // 6. Hero Section (מוסתר כברירת מחדל לפי בקשה)
-        hero: {
-          visible: false,
-          anchorId: "hero",
-          title: cleanName,
-          subtitle: group.vision || group.purpose || `קהילת ${cleanName}`,
-          description: group.purpose || group.description || "",
-          imageSrc: communityHeroImage,
-          layout: "progressive",
-          buttonsVisible: false,
-          heroStyle: "hero",
-          flexDirection: "col"
-        },
-        // 7. Main Content Section (מוסתר כברירת מחדל לפי בקשה)
-        mainContent: {
-          visible: false,
-          anchorId: "mainContent",
-          title: cleanName,
-          subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
-          description: group.vision || group.purpose || "",
-          imageSrc: communitySecondaryImage,
-          layout: "course-banner"
-        },
-        // 8-15. All other sections positioned at the bottom and hidden:
-        services: {
-          visible: false,
-          items: []
-        },
-        community: {
-          visible: false,
-          title: cleanName,
-          description: group.description || "",
-          gallery: group.gallery || []
-        },
-        pricing: {
-          visible: false,
-          packages: []
-        },
-        livePosts: {
-          visible: false
-        },
-        faq: {
-          visible: false,
-          items: []
-        },
-        timer: {
-          visible: false
-        },
-        landingSection: {
-          visible: false
-        },
-        contact: {
-          visible: false
+        if (campIdToSync === "home") {
+          await adminDb
+            .collection("campaigns")
+            .doc("default-campaign")
+            .collection("ambassadors")
+            .doc(pageSlug)
+            .set(ambData, { merge: true });
         }
-      };
-
-      if (!pageSnap.exists) {
-        pageData.createdAt = new Date().toISOString();
-        await pageRef.set(pageData);
-      } else {
-        await pageRef.set(pageData, { merge: true });
+      } catch (ambSyncErr) {
+        console.warn("Could not sync community to campaign ambassadors:", ambSyncErr);
       }
-    } catch (pageErr) {
-      console.warn("Could not auto-create/update community page document:", pageErr);
+    } else if (group.id) {
+      // If user chose NOT to have a page, clean up old page/ambassador documents if they existed
+      try {
+        const oldGroupDoc = await groupsRef.doc(docId).get();
+        if (oldGroupDoc.exists) {
+          const oldG = oldGroupDoc.data() as SmartGroup;
+          const oldSlug = oldG.pageSlug || oldG.pageId;
+          if (oldSlug) {
+            await adminDb.collection("pages").doc(oldSlug).delete().catch(() => {});
+            await adminDb.collection("campaigns").doc(oldG.mainCampaignId || "home").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
+            await adminDb.collection("campaigns").doc("home").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
+            await adminDb.collection("campaigns").doc("default-campaign").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
+          }
+        }
+      } catch (cleanErr) {}
+    }
+
+    // If name changed from previousName, update all contacts where tags contain previousName
+    if (previousName && previousName !== cleanName) {
+      try {
+        const contactsSnap = await adminDb
+          .collection("contacts")
+          .where("ownerId", "==", ownerId)
+          .where("tags", "array-contains", previousName)
+          .get();
+
+        if (!contactsSnap.empty) {
+          let batch = adminDb.batch();
+          let opCount = 0;
+
+          for (const doc of contactsSnap.docs) {
+            const currentTags = doc.data().tags || [];
+            const newTags = currentTags.map((t: string) => (t === previousName ? cleanName : t));
+            const updateObj: any = {
+              tags: newTags,
+              updatedAt: new Date().toISOString(),
+            };
+            if (doc.data().community === previousName) {
+              updateObj.community = cleanName;
+            }
+            batch.update(doc.ref, updateObj);
+            opCount++;
+
+            if (opCount >= 450) {
+              await batch.commit();
+              batch = adminDb.batch();
+              opCount = 0;
+            }
+          }
+
+          if (opCount > 0) {
+            await batch.commit();
+          }
+        }
+      } catch (renameErr) {
+        console.warn("Could not rename tags across contacts:", renameErr);
+      }
     }
 
     const dataToSave: SmartGroup = {
@@ -454,67 +566,78 @@ export async function saveSmartGroup(group: Partial<SmartGroup>): Promise<{ succ
       name: cleanName,
       leaderName: group.leaderName || cleanName,
       targetGoal: Number(group.targetGoal || 5000),
-      color: group.color || "#6366f1",
+      color: group.color || "#4f46e5",
       description: group.description || "",
       type: group.type || "manual",
       rules: group.rules || [],
       matchType: group.matchType || "all",
+      isCommunity: isCommunity,
+      category: isCommunity ? "community" : "group",
       ownerId,
       gallery: group.gallery || [],
       vision: group.vision || "",
       purpose: group.purpose || "",
-      pageId: pageSlug,
-      pageSlug: pageSlug,
-      pageUrl: pageUrl,
-      mainCampaignId: group.mainCampaignId || "",
-      campaignTitle: group.campaignTitle || ""
+      pageId: shouldCreatePage ? pageSlug : "",
+      pageSlug: shouldCreatePage ? pageSlug : "",
+      pageUrl: shouldCreatePage ? pageUrl : "",
+      mainCampaignId: shouldCreatePage ? (group.mainCampaignId || "") : "",
+      campaignTitle: shouldCreatePage ? (group.campaignTitle || "") : ""
     };
 
     await groupsRef.doc(docId).set(dataToSave, { merge: true });
 
-    // Sync community directly to campaign ambassadors subcollection for real-time listener updates
-    try {
-      const campIdToSync = (targetCampId === "/" || targetCampId === "") ? "home" : targetCampId;
-      const ambData = {
-        id: pageSlug,
-        name: cleanName,
-        leaderName: group.leaderName || cleanName,
-        slug: pageSlug,
-        targetGoal: Number(group.targetGoal || 5000),
-        totalRaised: 0,
-        message: group.vision || group.description || "",
-        vision: group.vision || "",
-        gallery: group.gallery || [],
-        campaignId: campIdToSync,
-        pageUrl: pageUrl,
-        updatedAt: new Date().toISOString(),
-      };
+    revalidatePath("/dashboard/crm/groups");
+    revalidatePath("/dashboard/crm/analytics");
+    if (pageUrl) revalidatePath(pageUrl);
+    return { success: true, id: docId, pageUrl: shouldCreatePage ? pageUrl : "" };
+  } catch (error: any) {
+    console.error("Error in saveSmartGroup:", error);
+    return { success: false, error: error.message };
+  }
+}
 
-      await adminDb
-        .collection("campaigns")
-        .doc(campIdToSync)
-        .collection("ambassadors")
-        .doc(pageSlug)
-        .set(ambData, { merge: true });
+export async function deleteCommunityPageAction(groupId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const ownerId = session.user.id;
 
-      if (campIdToSync === "home") {
-        await adminDb
-          .collection("campaigns")
-          .doc("default-campaign")
-          .collection("ambassadors")
-          .doc(pageSlug)
-          .set(ambData, { merge: true });
-      }
-    } catch (ambSyncErr) {
-      console.warn("Could not sync community to campaign ambassadors:", ambSyncErr);
+    const groupRef = adminDb.collection("users").doc(ownerId).collection("crm_groups").doc(groupId);
+    const groupSnap = await groupRef.get();
+    if (!groupSnap.exists) throw new Error("קהילה לא נמצאה");
+
+    const groupData = groupSnap.data() as SmartGroup;
+    const pageSlug = groupData.pageSlug || groupData.pageId;
+    const mainCampId = groupData.mainCampaignId || "home";
+
+    // 1. Delete page from 'pages' collection
+    if (pageSlug) {
+      await adminDb.collection("pages").doc(pageSlug).delete().catch(() => {});
+      await adminDb.collection("campaigns").doc(mainCampId).collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+      await adminDb.collection("campaigns").doc("home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+      await adminDb.collection("campaigns").doc("default-campaign").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
     }
+
+    // 2. Clear page fields from crm_groups document and set isCommunity = false
+    await groupRef.update({
+      pageId: "",
+      pageSlug: "",
+      pageUrl: "",
+      mainCampaignId: "",
+      campaignTitle: "",
+      isCommunity: false,
+      category: "group",
+      updatedAt: new Date().toISOString()
+    });
 
     revalidatePath("/dashboard/crm/groups");
     revalidatePath("/dashboard/crm/analytics");
-    revalidatePath(pageUrl);
-    return { success: true, id: docId, pageUrl };
+    revalidatePath("/");
+    if (pageSlug) revalidatePath(`/${pageSlug}`);
+
+    return { success: true };
   } catch (error: any) {
-    console.error("Error in saveSmartGroup:", error);
+    console.error("Error in deleteCommunityPageAction:", error);
     return { success: false, error: error.message };
   }
 }
@@ -525,23 +648,44 @@ export async function deleteSmartGroup(groupNameOrId: string): Promise<{ success
     if (!session?.user?.id) throw new Error("Unauthorized");
     const ownerId = session.user.id;
 
-    // Delete definition
+    let targetTagName = groupNameOrId;
+    if (groupNameOrId.startsWith("tag_")) {
+      targetTagName = decodeURIComponent(groupNameOrId.replace("tag_", ""));
+    }
+
+    // Delete definition and any associated landing page
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
     const byId = await groupsRef.doc(groupNameOrId).get();
-    let tagName = groupNameOrId;
+    
     if (byId.exists) {
-      tagName = byId.data()?.name || groupNameOrId;
+      const gData = byId.data();
+      targetTagName = gData?.name || targetTagName;
+      const pageSlug = gData?.pageSlug || gData?.pageId;
+      if (pageSlug) {
+        await adminDb.collection("pages").doc(pageSlug).delete().catch(() => {});
+        await adminDb.collection("campaigns").doc(gData?.mainCampaignId || "home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+        await adminDb.collection("campaigns").doc("home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+        await adminDb.collection("campaigns").doc("default-campaign").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+      }
       await groupsRef.doc(groupNameOrId).delete();
     } else {
-      const byName = await groupsRef.where("name", "==", groupNameOrId).get();
-      byName.forEach(async (d) => await d.ref.delete());
+      const byName = await groupsRef.where("name", "==", targetTagName).get();
+      for (const d of byName.docs) {
+        const gData = d.data();
+        const pageSlug = gData?.pageSlug || gData?.pageId;
+        if (pageSlug) {
+          await adminDb.collection("pages").doc(pageSlug).delete().catch(() => {});
+          await adminDb.collection("campaigns").doc(gData?.mainCampaignId || "home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+        }
+        await d.ref.delete();
+      }
     }
 
     // Remove tag from contacts
     const snap = await adminDb
       .collection("contacts")
       .where("ownerId", "==", ownerId)
-      .where("tags", "array-contains", tagName)
+      .where("tags", "array-contains", targetTagName)
       .get();
 
     const batch = adminDb.batch();
@@ -549,6 +693,7 @@ export async function deleteSmartGroup(groupNameOrId: string): Promise<{ success
       const currentTags = doc.data().tags || [];
       batch.update(doc.ref, {
         tags: currentTags.filter((t: string) => t !== tagName),
+        community: doc.data().community === tagName ? "" : (doc.data().community || ""),
         updatedAt: new Date().toISOString(),
       });
     });

@@ -6,7 +6,7 @@ import { Search, ChevronDown, Users, Target, Info, Share2, Plus, Sparkles, Heart
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Ambassador, Donation, CampaignDonorsConfig } from "@/lib/types/campaign";
-import { getCampaignDonationsAction } from "@/features/campaigns/actions";
+import { getCampaignDonationsAction } from "@/features/campaigns/campaignDonationsAction";
 import { formatDistanceToNow } from "date-fns";
 import { he } from "date-fns/locale";
 
@@ -111,9 +111,35 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   }, [targetCampaignId]);
 
 
-  // Display real completed donations from database with smart ambassador filtering
+  // Display real completed donations from database with strict multi-key deduplication & ambassador filtering
   const allCompletedDonations = useMemo(() => {
-    return donations.filter(d => d.paymentStatus === "completed");
+    const rawCompleted = donations.filter(d => d.paymentStatus === "completed");
+    
+    const unique: Donation[] = [];
+    const seenSignatures = new Set<string>();
+
+    rawCompleted.forEach(d => {
+      const cleanName = (d.donorName || "").trim().toLowerCase();
+      const amount = Number(d.amount || 0);
+      const cleanPhone = (d.phone || "").replace(/\D/g, "");
+      const txId = (d.transactionId || "").trim();
+
+      const keysToCheck: string[] = [];
+      if (d.contactId) keysToCheck.push(`contact_${d.contactId}`);
+      if (txId) keysToCheck.push(`tx_${txId}`);
+      if (cleanPhone && amount > 0) keysToCheck.push(`phone_${cleanPhone}_${amount}`);
+      if (cleanName && amount > 0) keysToCheck.push(`name_${cleanName}_${amount}`);
+      keysToCheck.push(`id_${d.id}`);
+
+      const isDuplicate = keysToCheck.some(k => seenSignatures.has(k));
+
+      if (!isDuplicate) {
+        keysToCheck.forEach(k => seenSignatures.add(k));
+        unique.push(d);
+      }
+    });
+
+    return unique;
   }, [donations]);
 
   const ambassadorDonations = useMemo(() => {
@@ -148,7 +174,18 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   }, [allCompletedDonations, ambassadorDonations, isAmbassadorView, searchQuery, sortBy]);
 
   const displayAmbassadors = useMemo(() => {
-    return ambassadors;
+    const unique: Ambassador[] = [];
+    const seenNames = new Set<string>();
+
+    ambassadors.forEach(amb => {
+      const cleanN = (amb.name || "").trim().toLowerCase();
+      if (!seenNames.has(cleanN)) {
+        seenNames.add(cleanN);
+        unique.push(amb);
+      }
+    });
+
+    return unique;
   }, [ambassadors]);
 
   const getInitials = (name: string) => {
@@ -404,7 +441,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                         )}
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                            {ambPercentage}% מהיעד
+                            {ambPercentage}% הושגו
                           </span>
                           <h4 className="font-bold text-slate-900 text-lg">{amb.name}</h4>
                         </div>
