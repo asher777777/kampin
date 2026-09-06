@@ -305,42 +305,86 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-    const ownerId = session.user.id;
+    const rawOwnerId = String(session.user.id).trim();
+    if (!rawOwnerId) throw new Error("Unauthorized: Invalid user ID");
+    const ownerId = rawOwnerId.replace(/\//g, "_");
 
     if (!group.name || !group.name.trim()) throw new Error("שם הוא שדה חובה");
     const cleanName = group.name.trim();
     const previousName = group.previousName ? group.previousName.trim() : "";
 
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
-    let docId = group.id && !group.id.startsWith("new_") && !group.id.startsWith("tag_") ? group.id : groupsRef.doc().id;
+    let docId = group.id && !group.id.startsWith("new_") && !group.id.startsWith("tag_") ? group.id.replace(/\//g, "-") : "";
 
     // Check if docId already exists by name
-    if (group.id?.startsWith("tag_") || !group.id) {
-      const existingByName = await groupsRef.where("name", "==", cleanName).get();
-      if (!existingByName.empty) {
-        docId = existingByName.docs[0].id;
+    if (group.id?.startsWith("tag_") || !docId) {
+      try {
+        const existingByName = await groupsRef.where("name", "==", cleanName).limit(1).get();
+        if (!existingByName.empty) {
+          docId = existingByName.docs[0].id;
+        } else {
+          docId = groupsRef.doc().id;
+        }
+      } catch (findErr) {
+        console.warn("Could not query existing group by name:", findErr);
+        docId = groupsRef.doc().id;
       }
     }
 
+    if (!docId || !docId.trim()) {
+      docId = groupsRef.doc().id;
+    }
+    docId = docId.trim();
+
     const shouldCreatePage = Boolean(group.createPage);
     const isCommunity = shouldCreatePage || Boolean(group.isCommunity && group.category === "community");
+    
+    // Sanitize target goal
+    const targetGoalNum = isNaN(Number(group.targetGoal)) ? 5000 : Math.max(0, Number(group.targetGoal));
+
+    // Sanitize campaign ID
+    let rawCampId = (group.mainCampaignId || "").trim();
+    rawCampId = rawCampId.replace(/^\/+|\/+$/g, "");
+    if (rawCampId.startsWith("c/")) rawCampId = rawCampId.replace(/^c\//, "");
+    if (rawCampId.startsWith("service/")) rawCampId = rawCampId.replace(/^service\//, "");
+    const cleanCampId = rawCampId && rawCampId !== "home" && !rawCampId.includes("/") ? rawCampId : "home";
+
+    // Sanitize gallery
+    const cleanGallery = (group.gallery || [])
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((img) => img.trim());
+
+    // Sanitize rules (no undefined fields in arrays)
+    const cleanRules: GroupRule[] = (group.rules || []).map((r) => {
+      let cleanVal: string | number = "";
+      if (r.field === "total_spent" || r.field === "order_count") {
+        cleanVal = isNaN(Number(r.value)) ? 0 : Number(r.value);
+      } else {
+        cleanVal = r.value !== undefined && r.value !== null ? String(r.value).trim() : "";
+      }
+      return {
+        field: r.field || "mh_crm_city",
+        operator: r.operator || "eq",
+        value: cleanVal,
+      };
+    });
+
     let pageSlug = "";
     let pageUrl = "";
-    const targetCampId = group.mainCampaignId || "home";
 
     if (shouldCreatePage) {
       // Define page slug & URL (strictly English letters, numbers, and hyphens only)
-      let cleanSlug = (group.pageSlug || "")
-        .trim()
-        .toLowerCase()
+      let rawSlug = (group.pageSlug || "").trim().toLowerCase();
+      if (!rawSlug || rawSlug === "/" || rawSlug.length < 2) {
+        const cleanIdPart = docId.replace(/[^a-z0-9]/gi, "").toLowerCase().substring(0, 8) || Math.random().toString(36).substring(2, 8);
+        rawSlug = `comm-${cleanIdPart}`;
+      }
+      const cleanSlug = rawSlug
         .replace(/[^a-z0-9-]/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 
-      if (!cleanSlug || cleanSlug.length < 2) {
-        cleanSlug = `comm-${docId.substring(0, 8)}`;
-      }
-      pageSlug = cleanSlug;
+      pageSlug = cleanSlug || `comm-${Math.random().toString(36).substring(2, 8)}`;
       pageUrl = `/${pageSlug}`;
 
       // Auto-create/update page in 'pages' collection with full home editor capabilities
@@ -348,160 +392,187 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
         const pageRef = adminDb.collection("pages").doc(pageSlug);
         const pageSnap = await pageRef.get();
         
-        // Inherit videoGallery, tiers, header, donors from main campaign or home
-        let inheritedVideoGallery: any = null;
-        let inheritedTiers: any = null;
-        let inheritedHeader: any = null;
-        let inheritedDonors: any = null;
-
-        try {
-          let campDoc = await adminDb.collection("pages").doc(targetCampId === "home" ? "home" : targetCampId).get();
-          if (!campDoc.exists && targetCampId !== "home") {
-            campDoc = await adminDb.collection("campaigns").doc(targetCampId).get();
-          }
-          if (!campDoc.exists) {
-            campDoc = await adminDb.collection("pages").doc("home").get();
-          }
-
-          if (campDoc.exists) {
-            const cData = campDoc.data() || {};
-            inheritedVideoGallery = cData.videoGallery || null;
-            inheritedTiers = cData.campaignTiers || null;
-            inheritedHeader = cData.campaignHeader || null;
-            inheritedDonors = cData.campaignDonors || null;
-          }
-        } catch (inheritErr) {
-          console.warn("Could not fetch inherited campaign data:", inheritErr);
-        }
-
-        const communityHeroImage = group.gallery && group.gallery.length > 0 
-          ? group.gallery[0] 
-          : (inheritedVideoGallery?.images?.[0] || "");
-
-        const communitySecondaryImage = group.gallery && group.gallery.length > 1 
-          ? group.gallery[1] 
-          : communityHeroImage;
-
-        const pageData: any = {
-          id: pageSlug,
-          ownerId,
-          title: cleanName,
-          slug: pageSlug,
-          collectionName: "pages",
-          updatedAt: new Date().toISOString(),
-          seo: {
-            title: cleanName,
-            description: group.vision || group.purpose || group.description || `קהילת ${cleanName}`,
-          },
-          sectionOrder: [
-            "videoGallery",
-            "richContent",
-            "campaignTiers",
-            "campaignHeader",
-            "campaignDonors",
-            "hero",
-            "mainContent",
-            "services",
-            "community",
-            "pricing",
-            "livePosts",
-            "faq",
-            "timer",
-            "landingSection",
-            "contact"
-          ],
-          // 1. Video & Media Gallery
-          videoGallery: {
-            visible: true,
-            anchorId: "videoGallery",
-            images: (inheritedVideoGallery?.images && inheritedVideoGallery.images.length > 0)
-              ? inheritedVideoGallery.images
-              : (group.gallery || []),
-            videoUrl: inheritedVideoGallery?.videoUrl || "",
-            videoType: inheritedVideoGallery?.videoType || "youtube",
-            effect: inheritedVideoGallery?.effect || "fade",
-            objectFit: inheritedVideoGallery?.objectFit || "cover",
-            desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
-          },
-          // 2. Rich Content / About Section (קלאסי ממורכז כברירת מחדל)
-          richContent: {
-            visible: true,
-            anchorId: "richContent",
-            heading: cleanName,
-            title: cleanName,
-            body: group.vision
-              ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
-              : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
-            layout: "center"
-          },
-          // 3. Campaign Tiers
-          campaignTiers: {
-            visible: true,
-            anchorId: "campaignTiers",
-            campaignId: targetCampId,
-            donationType: inheritedTiers?.donationType || "both",
-            tiers: inheritedTiers?.tiers || [
-              { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות הקהילה" },
-              { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית בפעילות" },
-              { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
-              { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
-            ]
-          },
-          // 4. Campaign Header
-          campaignHeader: {
-            visible: true,
-            anchorId: "campaignHeader",
-            campaignId: targetCampId,
-            ambassadorSlug: pageSlug,
-            ambassadorName: cleanName
-          },
-          // 5. Campaign Donors
-          campaignDonors: {
-            visible: true,
-            anchorId: "campaignDonors",
-            campaignId: targetCampId,
-            ambassadorSlug: pageSlug,
+        if (pageSnap.exists) {
+          const existingPage = pageSnap.data() || {};
+          const updatedCampaignHeader = {
+            ...(existingPage.campaignHeader || {}),
+            targetGoal: targetGoalNum,
             ambassadorName: cleanName,
-            campaignDescription: group.vision || group.purpose || group.description || ""
-          },
-          // 6. Hero Section (מוסתר כברירת מחדל)
-          hero: {
-            visible: false,
-            anchorId: "hero",
+            ambassadorSlug: pageSlug,
+            campaignId: cleanCampId
+          };
+          const updatedSeo = {
+            ...(existingPage.seo || {}),
             title: cleanName,
-            subtitle: group.vision || group.purpose || `קהילת ${cleanName}`,
-            description: group.purpose || group.description || "",
-            imageSrc: communityHeroImage,
-            layout: "progressive",
-            buttonsVisible: false,
-            heroStyle: "hero",
-            flexDirection: "col"
-          },
-          // 7. Main Content Section (מוסתר כברירת מחדל)
-          mainContent: {
-            visible: false,
-            anchorId: "mainContent",
+            description: (group.vision || group.purpose || group.description || existingPage.seo?.description || `קהילת ${cleanName}`).trim()
+          };
+          const updatePayload: any = {
             title: cleanName,
-            subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
-            description: group.vision || group.purpose || "",
-            imageSrc: communitySecondaryImage,
-            layout: "course-banner"
-          },
-          services: { visible: false, items: [] },
-          community: { visible: false, title: cleanName, description: group.description || "", gallery: group.gallery || [] },
-          pricing: { visible: false, packages: [] },
-          livePosts: { visible: false },
-          faq: { visible: false, items: [] },
-          timer: { visible: false },
-          landingSection: { visible: false },
-          contact: { visible: false }
-        };
-
-        if (!pageSnap.exists) {
-          pageData.createdAt = new Date().toISOString();
-          await pageRef.set(pageData);
+            updatedAt: new Date().toISOString(),
+            campaignHeader: updatedCampaignHeader,
+            seo: updatedSeo
+          };
+          if (group.vision) {
+            updatePayload.vision = group.vision.trim();
+          }
+          if (group.purpose) {
+            updatePayload.purpose = group.purpose.trim();
+          }
+          if (cleanGallery.length > 0) {
+            updatePayload.gallery = cleanGallery;
+          }
+          await pageRef.set(JSON.parse(JSON.stringify(updatePayload)), { merge: true });
         } else {
-          await pageRef.set(pageData, { merge: true });
+          // Inherit videoGallery, tiers, header, donors from main campaign or home
+          let inheritedVideoGallery: any = null;
+          let inheritedTiers: any = null;
+          let inheritedHeader: any = null;
+          let inheritedDonors: any = null;
+
+          try {
+            let campDoc = await adminDb.collection("pages").doc(cleanCampId === "home" ? "home" : cleanCampId).get();
+            if (!campDoc.exists && cleanCampId !== "home") {
+              campDoc = await adminDb.collection("campaigns").doc(cleanCampId).get();
+            }
+            if (!campDoc.exists) {
+              campDoc = await adminDb.collection("pages").doc("home").get();
+            }
+
+            if (campDoc.exists) {
+              const cData = campDoc.data() || {};
+              inheritedVideoGallery = cData.videoGallery || null;
+              inheritedTiers = cData.campaignTiers || null;
+              inheritedHeader = cData.campaignHeader || null;
+              inheritedDonors = cData.campaignDonors || null;
+            }
+          } catch (inheritErr) {
+            console.warn("Could not fetch inherited campaign data:", inheritErr);
+          }
+
+          const rawHeroImg = cleanGallery.length > 0 
+            ? cleanGallery[0] 
+            : (typeof inheritedVideoGallery?.images?.[0] === "string" ? inheritedVideoGallery.images[0] : inheritedVideoGallery?.images?.[0]?.url || "");
+
+          const rawSecImg = cleanGallery.length > 1 
+            ? cleanGallery[1] 
+            : rawHeroImg;
+
+          const pageData: any = {
+            id: pageSlug,
+            ownerId,
+            title: cleanName,
+            slug: pageSlug,
+            collectionName: "pages",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            seo: {
+              title: cleanName,
+              description: (group.vision || group.purpose || group.description || `קהילת ${cleanName}`).trim(),
+            },
+            sectionOrder: [
+              "videoGallery",
+              "richContent",
+              "campaignTiers",
+              "campaignHeader",
+              "campaignDonors",
+              "hero",
+              "mainContent",
+              "services",
+              "community",
+              "pricing",
+              "livePosts",
+              "faq",
+              "timer",
+              "landingSection",
+              "contact"
+            ],
+            // 1. Video & Media Gallery
+            videoGallery: {
+              visible: true,
+              anchorId: "videoGallery",
+              images: cleanGallery,
+              videoUrl: inheritedVideoGallery?.videoUrl || "",
+              videoType: inheritedVideoGallery?.videoType || "youtube",
+              effect: inheritedVideoGallery?.effect || "fade",
+              objectFit: inheritedVideoGallery?.objectFit || "cover",
+              desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
+            },
+            // 2. Rich Content / About Section
+            richContent: {
+              visible: true,
+              anchorId: "richContent",
+              heading: cleanName,
+              title: cleanName,
+              body: group.vision
+                ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
+                : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
+              layout: "center"
+            },
+            // 3. Campaign Tiers
+            campaignTiers: {
+              visible: true,
+              anchorId: "campaignTiers",
+              campaignId: cleanCampId,
+              donationType: inheritedTiers?.donationType || "both",
+              tiers: inheritedTiers?.tiers || [
+                { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות הקהילה" },
+                { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית בפעילות" },
+                { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
+                { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקהילה" }
+              ]
+            },
+            // 4. Campaign Header
+            campaignHeader: {
+              visible: true,
+              anchorId: "campaignHeader",
+              campaignId: cleanCampId,
+              ambassadorSlug: pageSlug,
+              ambassadorName: cleanName,
+              targetGoal: targetGoalNum
+            },
+            // 5. Campaign Donors
+            campaignDonors: {
+              visible: true,
+              anchorId: "campaignDonors",
+              campaignId: cleanCampId,
+              ambassadorSlug: pageSlug,
+              ambassadorName: cleanName,
+              campaignDescription: (group.vision || group.purpose || group.description || "").trim()
+            },
+            // 6. Hero Section
+            hero: {
+              visible: false,
+              anchorId: "hero",
+              title: cleanName,
+              subtitle: (group.vision || group.purpose || `קהילת ${cleanName}`).trim(),
+              description: (group.purpose || group.description || "").trim(),
+              imageSrc: typeof rawHeroImg === "string" ? rawHeroImg : "",
+              layout: "progressive",
+              buttonsVisible: false,
+              heroStyle: "hero",
+              flexDirection: "col"
+            },
+            // 7. Main Content Section
+            mainContent: {
+              visible: false,
+              anchorId: "mainContent",
+              title: cleanName,
+              subtitle: group.vision ? `חזון הקהילה` : (group.purpose ? "מטרות הקהילה" : ""),
+              description: (group.vision || group.purpose || "").trim(),
+              imageSrc: typeof rawSecImg === "string" ? rawSecImg : "",
+              layout: "course-banner"
+            },
+            services: { visible: false, items: [] },
+            community: { visible: false, title: cleanName, description: (group.description || "").trim(), gallery: cleanGallery },
+            pricing: { visible: false, packages: [] },
+            livePosts: { visible: false },
+            faq: { visible: false, items: [] },
+            timer: { visible: false },
+            landingSection: { visible: false },
+            contact: { visible: false }
+          };
+
+          await pageRef.set(JSON.parse(JSON.stringify(pageData)));
         }
       } catch (pageErr) {
         console.warn("Could not auto-create/update community page document:", pageErr);
@@ -509,50 +580,53 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
 
       // Sync community directly to campaign ambassadors subcollection
       try {
-        const campIdToSync = (targetCampId === "/" || targetCampId === "") ? "home" : targetCampId;
         const ambData = {
           id: pageSlug,
           name: cleanName,
-          leaderName: group.leaderName || cleanName,
+          leaderName: (group.leaderName || "").trim() || cleanName,
           slug: pageSlug,
-          targetGoal: Number(group.targetGoal || 5000),
-          totalRaised: 0,
-          message: group.vision || group.description || "",
-          vision: group.vision || "",
-          gallery: group.gallery || [],
-          campaignId: campIdToSync,
+          targetGoal: targetGoalNum,
+          message: (group.vision || group.description || "").trim(),
+          vision: (group.vision || "").trim(),
+          gallery: cleanGallery,
+          campaignId: cleanCampId,
           pageUrl: pageUrl,
           updatedAt: new Date().toISOString(),
         };
 
+        const sanitizedAmbData = JSON.parse(JSON.stringify(ambData));
         await adminDb
           .collection("campaigns")
-          .doc(campIdToSync)
+          .doc(cleanCampId)
           .collection("ambassadors")
           .doc(pageSlug)
-          .set(ambData, { merge: true });
+          .set(sanitizedAmbData, { merge: true });
 
-        if (campIdToSync === "home") {
+        if (cleanCampId === "home") {
           await adminDb
             .collection("campaigns")
             .doc("default-campaign")
             .collection("ambassadors")
             .doc(pageSlug)
-            .set(ambData, { merge: true });
+            .set(sanitizedAmbData, { merge: true })
+            .catch(() => {});
         }
       } catch (ambSyncErr) {
         console.warn("Could not sync community to campaign ambassadors:", ambSyncErr);
       }
-    } else if (group.id) {
+    } else if (docId) {
       // If user chose NOT to have a page, clean up old page/ambassador documents if they existed
       try {
         const oldGroupDoc = await groupsRef.doc(docId).get();
         if (oldGroupDoc.exists) {
           const oldG = oldGroupDoc.data() as SmartGroup;
           const oldSlug = oldG.pageSlug || oldG.pageId;
+          const oldCampId = (oldG.mainCampaignId || "home").replace(/^\/+|\/+$/g, "") || "home";
           if (oldSlug) {
             await adminDb.collection("pages").doc(oldSlug).delete().catch(() => {});
-            await adminDb.collection("campaigns").doc(oldG.mainCampaignId || "home").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
+            if (!oldCampId.includes("/")) {
+              await adminDb.collection("campaigns").doc(oldCampId).collection("ambassadors").doc(oldSlug).delete().catch(() => {});
+            }
             await adminDb.collection("campaigns").doc("home").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
             await adminDb.collection("campaigns").doc("default-campaign").collection("ambassadors").doc(oldSlug).delete().catch(() => {});
           }
@@ -605,35 +679,46 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
     const dataToSave: SmartGroup = {
       id: docId,
       name: cleanName,
-      leaderName: group.leaderName || cleanName,
-      targetGoal: Number(group.targetGoal || 5000),
+      leaderName: (group.leaderName || "").trim() || cleanName,
+      targetGoal: targetGoalNum,
       color: group.color || "#4f46e5",
-      description: group.description || "",
-      type: group.type || "manual",
-      rules: group.rules || [],
-      matchType: group.matchType || "all",
+      description: (group.description || "").trim(),
+      type: group.type === "smart" ? "smart" : "manual",
+      rules: group.type === "smart" ? cleanRules : [],
+      matchType: group.matchType === "any" ? "any" : "all",
       isCommunity: isCommunity,
       category: isCommunity ? "community" : "group",
       ownerId,
-      gallery: group.gallery || [],
-      vision: group.vision || "",
-      purpose: group.purpose || "",
+      gallery: cleanGallery,
+      vision: (group.vision || "").trim(),
+      purpose: (group.purpose || "").trim(),
       pageId: shouldCreatePage ? pageSlug : "",
       pageSlug: shouldCreatePage ? pageSlug : "",
       pageUrl: shouldCreatePage ? pageUrl : "",
-      mainCampaignId: shouldCreatePage ? (group.mainCampaignId || "") : "",
-      campaignTitle: shouldCreatePage ? (group.campaignTitle || "") : ""
+      mainCampaignId: shouldCreatePage ? cleanCampId : "",
+      campaignTitle: shouldCreatePage ? (group.campaignTitle || "").trim() : ""
     };
 
-    await groupsRef.doc(docId).set(dataToSave, { merge: true });
+    try {
+      const sanitizedDataToSave = JSON.parse(JSON.stringify(dataToSave));
+      await groupsRef.doc(docId).set(sanitizedDataToSave);
+    } catch (saveDocErr: any) {
+      console.error("Error saving group document in crm_groups:", saveDocErr, { ownerId, docId, dataToSave });
+      throw new Error(`שגיאה בשמירת מסמך הקבוצה: ${saveDocErr.message}`);
+    }
 
-    revalidatePath("/dashboard/crm/groups");
-    revalidatePath("/dashboard/crm/analytics");
-    if (pageUrl) revalidatePath(pageUrl);
+    try {
+      revalidatePath("/dashboard/crm/groups");
+      revalidatePath("/dashboard/crm/analytics");
+      if (pageUrl) revalidatePath(pageUrl);
+    } catch (revalErr) {
+      console.warn("Revalidate error ignored:", revalErr);
+    }
+
     return { success: true, id: docId, pageUrl: shouldCreatePage ? pageUrl : "" };
   } catch (error: any) {
     console.error("Error in saveSmartGroup:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "שגיאה לא צפויה בשמירה" };
   }
 }
 
@@ -696,19 +781,27 @@ export async function deleteSmartGroup(groupNameOrId: string): Promise<{ success
 
     // Delete definition and any associated landing page
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
-    const byId = await groupsRef.doc(groupNameOrId).get();
+    let byId: any = { exists: false };
+    if (!groupNameOrId.startsWith("tag_") && !groupNameOrId.includes("/")) {
+      try {
+        byId = await groupsRef.doc(groupNameOrId).get();
+      } catch {}
+    }
     
     if (byId.exists) {
       const gData = byId.data();
       targetTagName = gData?.name || targetTagName;
       const pageSlug = gData?.pageSlug || gData?.pageId;
+      const mainCampId = (gData?.mainCampaignId || "home").replace(/^\/+|\/+$/g, "") || "home";
       if (pageSlug) {
         await adminDb.collection("pages").doc(pageSlug).delete().catch(() => {});
-        await adminDb.collection("campaigns").doc(gData?.mainCampaignId || "home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+        if (!mainCampId.includes("/")) {
+          await adminDb.collection("campaigns").doc(mainCampId).collection("ambassadors").doc(pageSlug).delete().catch(() => {});
+        }
         await adminDb.collection("campaigns").doc("home").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
         await adminDb.collection("campaigns").doc("default-campaign").collection("ambassadors").doc(pageSlug).delete().catch(() => {});
       }
-      await groupsRef.doc(groupNameOrId).delete();
+      await groupsRef.doc(groupNameOrId).delete().catch(() => {});
     } else {
       const byName = await groupsRef.where("name", "==", targetTagName).get();
       for (const d of byName.docs) {
