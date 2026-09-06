@@ -43,7 +43,21 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     activeSlug?.trim() ||
     (ambassadorName && ambassadorName.trim() !== "")
   );
-  const [activeTab, setActiveTab] = useState<"donors" | "teams" | "about">(config?.defaultTab || "donors");
+  const showTeamsTab = config?.showTeamsTab !== false && config?.showCommunitiesTab !== false;
+  const showAboutTab = config?.showAboutTab !== false;
+  const showDonorsTab = config?.showDonorsTab !== false;
+
+  const initialTab = config?.defaultTab === "teams" && !showTeamsTab
+    ? (showDonorsTab ? "donors" : "about")
+    : (config?.defaultTab || "donors");
+
+  const [activeTab, setActiveTab] = useState<"donors" | "teams" | "about">(initialTab);
+
+  useEffect(() => {
+    if (activeTab === "teams" && !showTeamsTab) {
+      setActiveTab(showDonorsTab ? "donors" : "about");
+    }
+  }, [showTeamsTab, showDonorsTab, activeTab]);
   const [donorFilterMode, setDonorFilterMode] = useState<"ambassador_only" | "all">(
     isAmbassadorView ? "ambassador_only" : "all"
   );
@@ -238,41 +252,47 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
 
         {/* Tab Navigation Header */}
         <div className="flex items-center justify-center border-b border-slate-200 gap-8 text-base md:text-lg font-bold">
-          <button
-            onClick={() => setActiveTab("donors")}
-            className={`pb-3 relative transition-colors ${
-              activeTab === "donors" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>{displayDonations.length} תורמים</span>
-            {activeTab === "donors" && (
-              <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
-            )}
-          </button>
+          {showDonorsTab && (
+            <button
+              onClick={() => setActiveTab("donors")}
+              className={`pb-3 relative transition-colors cursor-pointer ${
+                activeTab === "donors" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>{displayDonations.length} תורמים</span>
+              {activeTab === "donors" && (
+                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
+              )}
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab("teams")}
-            className={`pb-3 relative transition-colors ${
-              activeTab === "teams" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>{displayAmbassadors.length} קהילות</span>
-            {activeTab === "teams" && (
-              <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
-            )}
-          </button>
+          {showTeamsTab && (
+            <button
+              onClick={() => setActiveTab("teams")}
+              className={`pb-3 relative transition-colors cursor-pointer ${
+                activeTab === "teams" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>{displayAmbassadors.length} קהילות</span>
+              {activeTab === "teams" && (
+                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
+              )}
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab("about")}
-            className={`pb-3 relative transition-colors ${
-              activeTab === "about" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>אודות הקמפיין</span>
-            {activeTab === "about" && (
-              <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
-            )}
-          </button>
+          {showAboutTab && (
+            <button
+              onClick={() => setActiveTab("about")}
+              className={`pb-3 relative transition-colors cursor-pointer ${
+                activeTab === "about" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>{config?.aboutTitle || "אודות הקמפיין"}</span>
+              {activeTab === "about" && (
+                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Donors Tab Content */}

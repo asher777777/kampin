@@ -314,7 +314,7 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
     const previousName = group.previousName ? group.previousName.trim() : "";
 
     const groupsRef = adminDb.collection("users").doc(ownerId).collection("crm_groups");
-    let docId = group.id && !group.id.startsWith("new_") && !group.id.startsWith("tag_") ? group.id.replace(/\//g, "-") : "";
+    let docId = group.id && !group.id.startsWith("new_") && !group.id.startsWith("tag_") ? group.id.replace(/[^a-zA-Z0-9_-]/g, "_") : "";
 
     // Check if docId already exists by name
     if (group.id?.startsWith("tag_") || !docId) {

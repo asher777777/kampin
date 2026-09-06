@@ -318,32 +318,106 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
             </div>
           </div>
 
-          {/* Checkboxes */}
-          <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-2">
-            <div className="flex items-center gap-2">
+          {/* Checkboxes for Features & Tabs */}
+          <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-3">
+            <div className="text-xs font-bold text-amber-400">הצגת לשוניות (טאבים) ואפשרויות</div>
+            
+            {/* Show / Hide Communities Tab */}
+            <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-700/80">
               <input
                 type="checkbox"
-                id="showSearch"
-                checked={config.showSearch !== false}
-                onChange={(e) => onChange({ ...config, showSearch: e.target.checked })}
-                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700"
+                id="showTeamsTab"
+                checked={config.showTeamsTab !== false && config.showCommunitiesTab !== false}
+                onChange={(e) => onChange({ 
+                  ...config, 
+                  showTeamsTab: e.target.checked, 
+                  showCommunitiesTab: e.target.checked,
+                  defaultTab: !e.target.checked && config.defaultTab === "teams" ? "donors" : config.defaultTab
+                })}
+                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
               />
-              <label htmlFor="showSearch" className="text-xs text-slate-300 font-semibold cursor-pointer">
-                הצג תיבת חיפוש תורמים
+              <label htmlFor="showTeamsTab" className="text-xs text-white font-bold cursor-pointer flex items-center justify-between w-full">
+                <span>הצג טאב קהילות / שגרירים (Teams)</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  config.showTeamsTab !== false && config.showCommunitiesTab !== false ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                }`}>
+                  {config.showTeamsTab !== false && config.showCommunitiesTab !== false ? "מוצג" : "מוסתר"}
+                </span>
               </label>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Show / Hide Donors Tab */}
+            <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-700/80">
               <input
                 type="checkbox"
-                id="showSort"
-                checked={config.showSort !== false}
-                onChange={(e) => onChange({ ...config, showSort: e.target.checked })}
-                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700"
+                id="showDonorsTab"
+                checked={config.showDonorsTab !== false}
+                onChange={(e) => onChange({ 
+                  ...config, 
+                  showDonorsTab: e.target.checked,
+                  defaultTab: !e.target.checked && config.defaultTab === "donors" ? "about" : config.defaultTab
+                })}
+                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
               />
-              <label htmlFor="showSort" className="text-xs text-slate-300 font-semibold cursor-pointer">
-                הצג אפשרויות מיון (הכי עדכני / הכי ישן / הכי גבוה)
+              <label htmlFor="showDonorsTab" className="text-xs text-white font-bold cursor-pointer flex items-center justify-between w-full">
+                <span>הצג טאב תורמים (Donors)</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  config.showDonorsTab !== false ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                }`}>
+                  {config.showDonorsTab !== false ? "מוצג" : "מוסתר"}
+                </span>
               </label>
+            </div>
+
+            {/* Show / Hide About Tab */}
+            <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-700/80">
+              <input
+                type="checkbox"
+                id="showAboutTab"
+                checked={config.showAboutTab !== false}
+                onChange={(e) => onChange({ 
+                  ...config, 
+                  showAboutTab: e.target.checked,
+                  defaultTab: !e.target.checked && config.defaultTab === "about" ? "donors" : config.defaultTab
+                })}
+                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="showAboutTab" className="text-xs text-white font-bold cursor-pointer flex items-center justify-between w-full">
+                <span>הצג טאב אודות הקמפיין (About)</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  config.showAboutTab !== false ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                }`}>
+                  {config.showAboutTab !== false ? "מוצג" : "מוסתר"}
+                </span>
+              </label>
+            </div>
+
+            <div className="pt-1 space-y-2 border-t border-slate-700/60">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSearch"
+                  checked={config.showSearch !== false}
+                  onChange={(e) => onChange({ ...config, showSearch: e.target.checked })}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700"
+                />
+                <label htmlFor="showSearch" className="text-xs text-slate-300 font-semibold cursor-pointer">
+                  הצג תיבת חיפוש תורמים
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSort"
+                  checked={config.showSort !== false}
+                  onChange={(e) => onChange({ ...config, showSort: e.target.checked })}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700"
+                />
+                <label htmlFor="showSort" className="text-xs text-slate-300 font-semibold cursor-pointer">
+                  הצג אפשרויות מיון (הכי עדכני / הכי ישן / הכי גבוה)
+                </label>
+              </div>
             </div>
           </div>
 

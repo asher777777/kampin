@@ -33,6 +33,9 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       const gName = gData.name.trim();
       if (INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName)) return;
 
+      const isCommunity = Boolean(gData.isCommunity && (gData.pageSlug || gData.pageUrl) && gData.category !== "group");
+      if (!isCommunity) return;
+
       const gMainCamp = (gData.mainCampaignId || "").trim();
 
       // Strict campaign linkage: ONLY if explicitly assigned to this campaign
