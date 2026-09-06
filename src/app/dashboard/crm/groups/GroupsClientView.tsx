@@ -454,7 +454,13 @@ export default function GroupsClientView() {
         gallery: formGallery,
         targetGoal: formTargetGoal === "" ? 5000 : Number(formTargetGoal),
         mainCampaignId: formCreatePage ? formMainCampaignId : "",
-        campaignTitle: formCreatePage ? (chosenCampaign?.title || "") : "",
+        campaignTitle: formCreatePage ? (
+          (chosenCampaign?.title || "")
+            .replace(/\((comm|pmm|page)-[^)]+\)/gi, "")
+            .replace(/^(comm|pmm|page)-/gi, "")
+            .replace(/^[🎯📄⚙️🌐🏠]\s*/, "")
+            .trim()
+        ) : "",
         pageSlug: formCreatePage ? (formPageSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || undefined) : undefined,
         pageUrl: formCreatePage ? (formPageUrl || undefined) : undefined,
         createPage: formCreatePage,
@@ -741,7 +747,7 @@ export default function GroupsClientView() {
                   {activeGroup.campaignTitle && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 font-semibold rounded-lg text-xs border border-rose-200">
                       <HeartHandshake className="w-3 h-3 text-rose-500" />
-                      <span>קמפיין: {activeGroup.campaignTitle}</span>
+                      <span>קמפיין: {decodeURIComponent(activeGroup.campaignTitle).replace(/\((comm|pmm|page)-[^)]+\)/gi, "").replace(/^(comm|pmm|page)-/gi, "").replace(/^[🎯📄⚙️🌐🏠]\s*/, "").trim()}</span>
                     </span>
                   )}
                 </div>
@@ -2203,11 +2209,25 @@ export default function GroupsClientView() {
                         <optgroup key={category} label={`🔹 ${category}`}>
                           {campaigns
                             .filter(c => (c.category || "עמודים") === category)
-                            .map((camp) => (
-                              <option key={camp.id} value={camp.id}>
-                                {camp.title} {camp.target && camp.target > 0 ? `(יעד: ₪${camp.target.toLocaleString()})` : ""}
-                              </option>
-                            ))}
+                            .map((camp) => {
+                              let cleanTitle = camp.title || "";
+                              try {
+                                cleanTitle = decodeURIComponent(cleanTitle);
+                              } catch {}
+                              cleanTitle = cleanTitle
+                                .replace(/\((comm|pmm|page)-[^)]+\)/gi, "")
+                                .replace(/^(comm|pmm|page)-/gi, "")
+                                .replace(/^[🎯📄⚙️🌐🏠]\s*/, "");
+                              try {
+                                cleanTitle = decodeURIComponent(cleanTitle);
+                              } catch {}
+                              const display = (cleanTitle.trim() || camp.id);
+                              return (
+                                <option key={camp.id} value={camp.id}>
+                                  {display} {camp.target && camp.target > 0 ? `(יעד: ₪${camp.target.toLocaleString()})` : ""}
+                                </option>
+                              );
+                            })}
                         </optgroup>
                       ))}
                     </select>

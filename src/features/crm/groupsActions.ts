@@ -187,26 +187,51 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
     // 1. Home Page
     items.push({
       id: "home",
-      title: "🏠 דף הבית הראשי (/)",
+      title: "🏠 דף הבית הראשי",
       category: "עמוד ראשי",
       type: "home",
       url: "/",
     });
 
     const getCleanTitle = (d: any, id: string, defaultFallback: string) => {
-      let title = d?.title || d?.name || d?.campaignName || d?.pageTitle || d?.heading || "";
-      if (!title) {
+      let title = d?.title || d?.name || d?.campaignName || d?.pageTitle || d?.heading || d?.richContent?.title || d?.richContent?.heading || "";
+      
+      // If title is empty or is a slug/id
+      if (!title || title.startsWith("comm-") || title.startsWith("pmm-") || title.startsWith("page-")) {
         try {
-          title = decodeURIComponent(id);
+          title = decodeURIComponent(title || id || "");
         } catch {
-          title = id;
+          title = title || id || "";
         }
       } else {
         try {
           title = decodeURIComponent(title);
         } catch {}
       }
-      return title || defaultFallback;
+
+      // Remove prefix like "comm-", "pmm-", "page-"
+      title = title.replace(/^(comm|pmm|page)-/gi, "");
+
+      // If it has parentheses like "(comm-...)" or "קמפיין (comm-...)"
+      const parenMatch = title.match(/^(.*?)\s*\((.*?)\)$/);
+      if (parenMatch) {
+        const prefixPart = parenMatch[1].trim();
+        const inside = parenMatch[2].trim();
+        if (["קמפיין", "עמוד", "דף נחיתה", "שירות", "פוסט / מאמר"].includes(prefixPart)) {
+          title = inside.replace(/^(comm|pmm|page)-/gi, "");
+          try {
+            title = decodeURIComponent(title);
+          } catch {}
+        } else if (prefixPart) {
+          title = prefixPart;
+        }
+      }
+
+      try {
+        title = decodeURIComponent(title);
+      } catch {}
+
+      return title.trim() || defaultFallback;
     };
 
     // 2. Campaigns
