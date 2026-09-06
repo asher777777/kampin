@@ -153,7 +153,7 @@ export async function createCommunity(data: Partial<Community>) {
           body: data.vision
             ? `${data.vision}${data.purpose ? `\n\nמטרות ויעדים:\n${data.purpose}` : ""}`
             : (data.purpose || `ברוכים הבאים לעמוד קהילת ${data.name || ""}`),
-          layout: "classic"
+          layout: "center"
         },
         campaignTiers: {
           visible: true,

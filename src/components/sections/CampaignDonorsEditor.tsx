@@ -223,9 +223,10 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
             <select
               value={config.campaignId || "default-campaign"}
               onChange={(e) => onChange({ ...config, campaignId: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-semibold"
+              style={{ colorScheme: "dark" }}
+              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-semibold [color-scheme:dark]"
             >
-              <option value="default-campaign">קמפיין ברירת מחדל (Default Campaign)</option>
+              <option value="default-campaign" className="bg-slate-900 text-white" style={{ backgroundColor: "#0f172a", color: "#ffffff" }}>קמפיין ברירת מחדל (Default Campaign)</option>
               {Object.entries(
                 campaigns.reduce((acc: Record<string, any[]>, item: any) => {
                   const cat = item.category || "קמפיינים";
@@ -234,10 +235,10 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
                   return acc;
                 }, {})
               ).map(([category, items]) => (
-                <optgroup key={category} label={category} className="bg-slate-800 text-amber-400 font-bold">
-                  {(items as any[]).map((c) => (
-                    <option key={c.id} value={c.id} className="bg-slate-900 text-white font-normal">
-                      {c.title} {c.id !== "home" ? `(${c.id})` : ""}
+                <optgroup key={category} label={category} className="bg-slate-800 text-amber-400 font-bold" style={{ backgroundColor: "#1e293b", color: "#f59e0b" }}>
+                  {(items as any[]).map((c: any) => (
+                    <option key={c.id} value={c.id} className="bg-slate-900 text-white font-normal" style={{ backgroundColor: "#0f172a", color: "#ffffff" }}>
+                      {c.title || c.name || (c.id === "home" ? "דף הבית הראשי" : decodeURIComponent(c.id || ""))}
                     </option>
                   ))}
                 </optgroup>

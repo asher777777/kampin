@@ -193,6 +193,22 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
       url: "/",
     });
 
+    const getCleanTitle = (d: any, id: string, defaultFallback: string) => {
+      let title = d?.title || d?.name || d?.campaignName || d?.pageTitle || d?.heading || "";
+      if (!title) {
+        try {
+          title = decodeURIComponent(id);
+        } catch {
+          title = id;
+        }
+      } else {
+        try {
+          title = decodeURIComponent(title);
+        } catch {}
+      }
+      return title || defaultFallback;
+    };
+
     // 2. Campaigns
     campaignsSnap.docs.forEach((doc: any) => {
       const d = doc.data();
@@ -200,7 +216,7 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
       const raised = Number(d.currentAmount || d.raised || d.totalRaised || 0);
       items.push({
         id: doc.id,
-        title: `🎯 ${d.title || d.name || `קמפיין (${doc.id})`}`,
+        title: `🎯 ${getCleanTitle(d, doc.id, "קמפיין")}`,
         category: "קמפיינים ותרומות",
         type: "campaign",
         url: `/c/${doc.id}`,
@@ -215,7 +231,7 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
       const d = doc.data();
       items.push({
         id: doc.id,
-        title: `📄 ${d.title || d.name || `דף נחיתה (${doc.id})`}`,
+        title: `📄 ${getCleanTitle(d, doc.id, "דף נחיתה")}`,
         category: "דפי נחיתה",
         type: "landing",
         url: `/${doc.id}`,
@@ -227,7 +243,7 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
       const d = doc.data();
       items.push({
         id: doc.id,
-        title: `⚙️ ${d.title || d.name || `שירות (${doc.id})`}`,
+        title: `⚙️ ${getCleanTitle(d, doc.id, "עמוד שירות")}`,
         category: "עמודי שירות ופעילות",
         type: "service",
         url: `/service/${doc.id}`,
@@ -242,7 +258,7 @@ export async function getCampaignsListForSelect(): Promise<SelectablePageOrCampa
       if (!items.some(it => it.id === doc.id)) {
         items.push({
           id: doc.id,
-          title: `🌐 ${d.title || d.name || `עמוד (${doc.id})`}`,
+          title: `🌐 ${getCleanTitle(d, doc.id, "עמוד")}`,
           category: "עמודי אתר נוספים",
           type: "page",
           url: `/${doc.id}`,
@@ -382,7 +398,7 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
             objectFit: inheritedVideoGallery?.objectFit || "cover",
             desktopHeight: inheritedVideoGallery?.desktopHeight || "500px"
           },
-          // 2. Rich Content / About Section
+          // 2. Rich Content / About Section (קלאסי ממורכז כברירת מחדל)
           richContent: {
             visible: true,
             anchorId: "richContent",
@@ -391,7 +407,7 @@ export async function saveSmartGroup(group: Partial<SmartGroup> & {
             body: group.vision
               ? `${group.vision}${group.purpose ? `\n\nמטרות ויעדים:\n${group.purpose}` : ""}`
               : (group.purpose || group.description || `ברוכים הבאים לעמוד קהילת ${cleanName}`),
-            layout: "classic"
+            layout: "center"
           },
           // 3. Campaign Tiers
           campaignTiers: {
@@ -1080,7 +1096,7 @@ export async function importGroupsFromExcelAction(
                 title: `אודות ${gName}`,
                 heading: `חזון ופעילות ${gName}`,
                 body: row.vision || row.description || `ברוכים הבאים לעמוד קהילת ${gName}`,
-                layout: "classic"
+                layout: "center"
               },
               campaignHeader: {
                 visible: true,

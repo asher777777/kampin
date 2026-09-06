@@ -11,7 +11,22 @@ import { findExistingContact } from "@/features/crm/mergeContacts";
 export async function getAllCampaigns(): Promise<Campaign[]> {
   try {
     const snap = await adminDb.collection("campaigns").get();
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign));
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      let title = data.title || data.name || data.campaignName || "";
+      if (!title) {
+        try {
+          title = decodeURIComponent(doc.id);
+        } catch {
+          title = doc.id;
+        }
+      } else {
+        try {
+          title = decodeURIComponent(title);
+        } catch {}
+      }
+      return { id: doc.id, ...data, title } as Campaign;
+    });
   } catch (error) {
     console.error("Error fetching all campaigns:", error);
     return [];
@@ -282,7 +297,7 @@ export async function createAmbassadorAction(data: {
           heading: name.trim(),
           title: name.trim(),
           body: message || `ברוכים הבאים לעמוד קהילת ${name.trim()} בקמפיין ${campaignTitle}`,
-          layout: "classic"
+          layout: "center"
         },
         // 3. Campaign Tiers
         campaignTiers: {

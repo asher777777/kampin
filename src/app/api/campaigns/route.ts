@@ -21,10 +21,26 @@ export async function GET() {
       totalRaised?: number;
     }> = [];
 
+    const getCleanTitle = (data: any, id: string, defaultFallback: string) => {
+      let title = data?.title || data?.name || data?.campaignName || data?.pageTitle || data?.heading || "";
+      if (!title) {
+        try {
+          title = decodeURIComponent(id);
+        } catch {
+          title = id;
+        }
+      } else {
+        try {
+          title = decodeURIComponent(title);
+        } catch {}
+      }
+      return title || defaultFallback;
+    };
+
     // 1. Always include Home Page
     items.push({
       id: "home",
-      title: "דף הבית הראשי (Home)",
+      title: "דף הבית הראשי",
       type: "home",
       category: "עמוד ראשי",
       url: "/",
@@ -35,7 +51,7 @@ export async function GET() {
       const data = doc.data();
       items.push({
         id: doc.id,
-        title: data.title || data.name || `קמפיין (${doc.id})`,
+        title: getCleanTitle(data, doc.id, "קמפיין"),
         type: "campaign",
         category: "קמפיינים",
         url: `/c/${doc.id}`,
@@ -49,7 +65,7 @@ export async function GET() {
       const data = doc.data();
       items.push({
         id: doc.id,
-        title: data.title || data.name || `דף נחיתה (${doc.id})`,
+        title: getCleanTitle(data, doc.id, "דף נחיתה"),
         type: "landing",
         category: "דפי נחיתה",
         url: `/landing-pages/${doc.id}`,
@@ -61,7 +77,7 @@ export async function GET() {
       const data = doc.data();
       items.push({
         id: doc.id,
-        title: data.title || data.name || `עמוד שירות (${doc.id})`,
+        title: getCleanTitle(data, doc.id, "עמוד שירות"),
         type: "service",
         category: "עמודי שירות",
         url: `/service/${doc.id}`,
@@ -73,7 +89,7 @@ export async function GET() {
       const data = doc.data();
       items.push({
         id: doc.id,
-        title: data.title || data.name || `פוסט / מאמר (${doc.id})`,
+        title: getCleanTitle(data, doc.id, "פוסט / מאמר"),
         type: "post",
         category: "פוסטים ומאמרים",
         url: `/post/${doc.id}`,
@@ -86,7 +102,7 @@ export async function GET() {
       if (doc.id !== "home") {
         items.push({
           id: doc.id,
-          title: data.title || data.name || `עמוד (${doc.id})`,
+          title: getCleanTitle(data, doc.id, "עמוד"),
           type: "page",
           category: "עמודים נוספים",
           url: `/${doc.id}`,

@@ -131,6 +131,7 @@ export default function GroupsClientView() {
   const [formMainCampaignId, setFormMainCampaignId] = useState("");
   const [formPageUrl, setFormPageUrl] = useState("");
   const [formPageSlug, setFormPageSlug] = useState("");
+  const [formTargetGoal, setFormTargetGoal] = useState<number | "">(5000);
   const [formCreatePage, setFormCreatePage] = useState(false);
   const [isDeletingPage, setIsDeletingPage] = useState(false);
   const [formType, setFormType] = useState<"manual" | "smart">("manual");
@@ -360,6 +361,7 @@ export default function GroupsClientView() {
     setFormMainCampaignId("");
     setFormPageUrl("");
     setFormPageSlug("");
+    setFormTargetGoal(5000);
     if (mode === "community") {
       setGroupModalMode("community");
       setFormCreatePage(true);
@@ -394,6 +396,7 @@ export default function GroupsClientView() {
     setFormMainCampaignId(group.mainCampaignId || "");
     setFormPageUrl(group.pageUrl || "");
     setFormPageSlug(group.pageSlug || group.pageId || "");
+    setFormTargetGoal(group.targetGoal !== undefined && group.targetGoal !== null ? group.targetGoal : 5000);
     const isComm = Boolean(group.isCommunity || group.pageSlug || group.pageUrl || group.pageId);
     setFormCreatePage(isComm);
     setGroupModalMode(isComm ? "community" : "group");
@@ -449,6 +452,7 @@ export default function GroupsClientView() {
         vision: formVision.trim(),
         purpose: formPurpose.trim(),
         gallery: formGallery,
+        targetGoal: formTargetGoal === "" ? 5000 : Number(formTargetGoal),
         mainCampaignId: formCreatePage ? formMainCampaignId : "",
         campaignTitle: formCreatePage ? (chosenCampaign?.title || "") : "",
         pageSlug: formCreatePage ? (formPageSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || undefined) : undefined,
@@ -642,6 +646,16 @@ export default function GroupsClientView() {
                 <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{activeGroup.name}</span>
                   {!activeGroupId.startsWith("__") && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditGroup(activeGroup)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      title={`ערוך ${activeGroup.isCommunity ? "קהילה" : "קבוצה"} ויעד קמפיין`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!activeGroupId.startsWith("__") && (
                     activeGroup.isCommunity || activeGroup.pageUrl || activeGroup.pageSlug ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold flex items-center gap-1">
                         <Globe className="w-3 h-3 text-indigo-600" />
@@ -703,9 +717,15 @@ export default function GroupsClientView() {
                 </button>
               </div>
 
-              {/* Live Community Page Link if custom community */}
-              {!activeGroupId.startsWith("__") && (activeGroup.pageUrl || activeGroup.campaignTitle) && (
+              {/* Live Community Page Link & Target Goal Badge if custom community */}
+              {!activeGroupId.startsWith("__") && (activeGroup.pageUrl || activeGroup.campaignTitle || (activeGroup.targetGoal && activeGroup.targetGoal > 0)) && (
                 <div className="flex items-center gap-1.5 hidden md:flex">
+                  {activeGroup.targetGoal && activeGroup.targetGoal > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-900 font-bold rounded-lg text-xs border border-amber-200/80 shadow-2xs">
+                      <Target className="w-3 h-3 text-amber-600" />
+                      <span>יעד קמפיין: ₪{activeGroup.targetGoal.toLocaleString()}</span>
+                    </span>
+                  ) : null}
                   {activeGroup.pageUrl && (
                     <a
                       href={activeGroup.pageUrl}
@@ -2165,13 +2185,13 @@ export default function GroupsClientView() {
                   </div>
                 )}
 
-                {/* Campaign & Page Link Section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Campaign, Target Goal & Page Link Section */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   {/* Linked Main Campaign / Target Page */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                       <HeartHandshake className="w-3.5 h-3.5 text-rose-500" />
-                      <span>קמפיין ראשי / עמוד יעד מקושר:</span>
+                      <span>קמפיין ראשי / עמוד יעד:</span>
                     </label>
                     <select
                       value={formMainCampaignId}
@@ -2193,12 +2213,54 @@ export default function GroupsClientView() {
                     </select>
                   </div>
 
+                  {/* Campaign Target Goal in NIS */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Target className="w-3.5 h-3.5 text-amber-500" />
+                        <span>יעד הקמפיין לקהילה (₪):</span>
+                      </span>
+                      <span className="text-[10px] text-amber-700 font-bold font-mono">
+                        {formTargetGoal ? `₪${Number(formTargetGoal).toLocaleString()}` : "₪0"}
+                      </span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min={0}
+                        step={500}
+                        value={formTargetGoal}
+                        onChange={(e) => setFormTargetGoal(e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder="5000"
+                        className="w-full bg-white border border-slate-200 rounded-xl text-xs h-10 pr-3 pl-8 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                      />
+                      <span className="absolute left-3 text-xs font-bold text-slate-400">₪</span>
+                    </div>
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1 mt-1.5 overflow-x-auto pb-0.5">
+                      {[5000, 10000, 18000, 36000, 50000, 100000].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setFormTargetGoal(preset)}
+                          className={`px-1.5 py-0.5 rounded text-[9.5px] font-semibold transition-colors cursor-pointer border ${
+                            formTargetGoal === preset
+                              ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                              : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          {preset >= 1000 ? `${preset / 1000}k` : preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Community Page Slug (English Only) & Direct Link */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Globe className="w-3.5 h-3.5 text-blue-600" />
-                        <span>סלאג לעמוד הקהילה (באנגלית בלבד):</span>
+                        <span>סלאג לעמוד הקהילה:</span>
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">a-z, 0-9, -</span>
                     </label>
@@ -2228,7 +2290,7 @@ export default function GroupsClientView() {
                       )}
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">
-                      ✨ הכתובת יכולה להכיל אותיות באנגלית, מספרים ומקפים בלבד (לדוגמה: <span className="font-mono text-indigo-600">tanya-community</span>).
+                      אותיות ומספרים בלבד.
                     </p>
                   </div>
                 </div>

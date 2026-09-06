@@ -732,12 +732,13 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     <select
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
-                      className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                      style={{ colorScheme: "dark" }}
+                      className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 [color-scheme:dark]"
                     >
-                      <option value="">בחר מגדר...</option>
-                      <option value="זכר">זכר</option>
-                      <option value="נקבה">נקבה</option>
-                      <option value="אחר">אחר</option>
+                      <option value="" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>בחר מגדר...</option>
+                      <option value="זכר" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>זכר</option>
+                      <option value="נקבה" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>נקבה</option>
+                      <option value="אחר" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>אחר</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -1155,15 +1156,16 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     <select
                       value={leadSource}
                       onChange={(e) => setLeadSource(e.target.value)}
-                      className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                      style={{ colorScheme: "dark" }}
+                      className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 [color-scheme:dark]"
                     >
-                      <option value="">בחר מקור...</option>
-                      <option value="טופס מהאתר">טופס מהאתר</option>
-                      <option value="פייסבוק">פייסבוק</option>
-                      <option value="גוגל">גוגל</option>
-                      <option value="המלצה">המלצה</option>
-                      <option value="כנס">כנס</option>
-                      <option value="אחר">אחר</option>
+                      <option value="" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>בחר מקור...</option>
+                      <option value="טופס מהאתר" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>טופס מהאתר</option>
+                      <option value="פייסבוק" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>פייסבוק</option>
+                      <option value="גוגל" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>גוגל</option>
+                      <option value="המלצה" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>המלצה</option>
+                      <option value="כנס" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>כנס</option>
+                      <option value="אחר" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>אחר</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -1241,11 +1243,12 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                             const val = e.target.value;
                             setCampaignId(val);
                             const selectedCamp = availableCampaigns.find(c => c.id === val);
-                            if (selectedCamp) setCampaignTitle(selectedCamp.title);
+                            if (selectedCamp) setCampaignTitle(selectedCamp.title || selectedCamp.name || "");
                           }}
-                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium"
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium [color-scheme:dark]"
                         >
-                          <option value="">בחר עמוד / קמפיין מקושר...</option>
+                          <option value="" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>בחר עמוד / קמפיין מקושר...</option>
                           {Object.entries(
                             availableCampaigns.reduce((acc: Record<string, any[]>, item: any) => {
                               const cat = item.category || "קמפיינים";
@@ -1254,12 +1257,22 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                               return acc;
                             }, {})
                           ).map(([category, items]) => (
-                            <optgroup key={category} label={category} className="bg-[#181818] text-amber-400 font-bold">
-                              {(items as any[]).map((c: any) => (
-                                <option key={c.id} value={c.id} className="bg-[#0a0a0a] text-white font-normal">
-                                  {c.title} {c.id !== "home" ? `(${c.id})` : ""}
-                                </option>
-                              ))}
+                            <optgroup key={category} label={category} className="bg-[#222222] text-amber-400 font-bold" style={{ backgroundColor: "#222222", color: "#f59e0b" }}>
+                              {(items as any[]).map((c: any) => {
+                                let displayTitle = c.title || c.name || "";
+                                if (!displayTitle) {
+                                  try {
+                                    displayTitle = decodeURIComponent(c.id || "");
+                                  } catch {
+                                    displayTitle = c.id;
+                                  }
+                                }
+                                return (
+                                  <option key={c.id} value={c.id} className="bg-[#181818] text-white font-normal" style={{ backgroundColor: "#181818", color: "#ffffff" }}>
+                                    {displayTitle}
+                                  </option>
+                                );
+                              })}
                             </optgroup>
                           ))}
                         </select>
@@ -1271,11 +1284,12 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                         <select
                           value={campaignRole}
                           onChange={(e) => setCampaignRole(e.target.value)}
-                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 [color-scheme:dark]"
                         >
-                          <option value="donor">תורם</option>
-                          <option value="ambassador">שגריר / מוביל יעד</option>
-                          <option value="leader">ראש צוות / קבוצה</option>
+                          <option value="donor" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>תורם</option>
+                          <option value="ambassador" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>שגריר / מוביל יעד</option>
+                          <option value="leader" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>ראש צוות / קבוצה</option>
                         </select>
                       </div>
 
@@ -1284,11 +1298,12 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                         <select
                           value={campaignPaymentStatus}
                           onChange={(e) => setCampaignPaymentStatus(e.target.value as any)}
-                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-bold"
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-bold [color-scheme:dark]"
                         >
-                          <option value="completed">הושלם (Completed)</option>
-                          <option value="pending">ממתין לתשלום (Pending)</option>
-                          <option value="failed">נכשל / בוטל (Failed)</option>
+                          <option value="completed" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>הושלם (Completed)</option>
+                          <option value="pending" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>ממתין לתשלום (Pending)</option>
+                          <option value="failed" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>נכשל / בוטל (Failed)</option>
                         </select>
                       </div>
 
@@ -1313,10 +1328,11 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                         <select
                           value={campaignDonationMode}
                           onChange={(e) => setCampaignDonationMode(e.target.value as any)}
-                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 [color-scheme:dark]"
                         >
-                          <option value="recurring">הוראת קבע חודשית</option>
-                          <option value="one_time">תרומה חד פעמית</option>
+                          <option value="recurring" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>הוראת קבע חודשית</option>
+                          <option value="one_time" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>תרומה חד פעמית</option>
                         </select>
                       </div>
 
@@ -1408,14 +1424,15 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                         <select
                           value={campaignPaymentMethod}
                           onChange={(e) => setCampaignPaymentMethod(e.target.value)}
-                          className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 [color-scheme:dark]"
                         >
-                          <option value="kesher_credit_card">כרטיס אשראי (Kesher API)</option>
-                          <option value="kesher_standing_order">הוראת קבע אשראי (Kesher API)</option>
-                          <option value="bank_transfer">העברה בנקאית</option>
-                          <option value="bit">ביט / PayBox</option>
-                          <option value="cash">מזומן</option>
-                          <option value="check">צ'ק</option>
+                          <option value="kesher_credit_card" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>כרטיס אשראי (Kesher API)</option>
+                          <option value="kesher_standing_order" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>הוראת קבע אשראי (Kesher API)</option>
+                          <option value="bank_transfer" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>העברה בנקאית</option>
+                          <option value="bit" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>ביט / PayBox</option>
+                          <option value="cash" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>מזומן</option>
+                          <option value="check" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>צ'ק</option>
                         </select>
                       </div>
 

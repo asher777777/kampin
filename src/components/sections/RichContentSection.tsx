@@ -32,6 +32,8 @@ export const RichContentSection = ({
   onUpdate
 }: RichContentSectionProps) => {
 
+  const activeLayout = (layout === "two-column" || layout === "grid") ? layout : "center";
+
   const handleLayoutChange = (newLayout: "center" | "two-column" | "grid") => {
     onUpdate?.("layout", newLayout);
   };
@@ -63,7 +65,7 @@ export const RichContentSection = ({
                   onClick={() => handleLayoutChange(opt.id as any)}
                   className={cn(
                     "p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer",
-                    layout === opt.id
+                    activeLayout === opt.id
                       ? "bg-secondary border-secondary text-white shadow-lg"
                       : "bg-slate-100/50 border-slate-200 text-slate-700 hover:bg-slate-100"
                   )}
@@ -81,7 +83,7 @@ export const RichContentSection = ({
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          {layout === "center" && (
+          {activeLayout === "center" && (
             <div className="space-y-6 text-center">
               {isEditing ? (
                 <div className="max-w-3xl mx-auto space-y-4">
@@ -120,7 +122,7 @@ export const RichContentSection = ({
             </div>
           )}
 
-          {layout === "two-column" && (
+          {activeLayout === "two-column" && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 text-right items-start">
               <div className="lg:col-span-4 border-r-4 border-secondary pr-6 flex flex-col justify-center py-2">
                 {isEditing ? (
@@ -166,7 +168,7 @@ export const RichContentSection = ({
             </div>
           )}
 
-          {layout === "grid" && (
+          {activeLayout === "grid" && (
             <div className="space-y-12">
               {isEditing ? (
                 <div className="max-w-3xl mx-auto space-y-2">

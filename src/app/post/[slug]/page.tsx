@@ -74,7 +74,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
       ...config.richContent,
       heading: config.richContent?.heading || config.richContent?.title,
       body: config.richContent?.body || config.richContent?.content,
-      layout: config.richContent?.layout || config.richContent?.theme || "split"
+      layout: (config.richContent?.layout === "two-column" || config.richContent?.layout === "grid") ? config.richContent.layout : "center"
     },
     services: {
       ...config.services,
