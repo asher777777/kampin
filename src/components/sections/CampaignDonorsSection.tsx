@@ -107,16 +107,16 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
 
     // Listen for donations on primary campaign ID
     const donationsRef = collection(db, "campaigns", targetCampaignId, "donations");
-    const unsubscribeDonations = onSnapshot(donationsRef, (snapshot) => {
-      const liveDonations: Donation[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data() as Donation;
-        if (data.paymentStatus === "completed") {
-          liveDonations.push({ id: doc.id, ...data } as Donation);
+    const unsubscribeDonations = onSnapshot(donationsRef, () => {
+      // Re-fetch via server action so deduplication, contact filtering & purged docs remain 100% synchronized
+      getCampaignDonationsAction(targetCampaignId).then((res) => {
+        if (res.donations) {
+          setDonations(res.donations);
         }
-      });
-      liveDonations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setDonations(liveDonations);
+        if (res.ambassadors) {
+          setAmbassadors(res.ambassadors);
+        }
+      }).catch(err => console.warn("Failed to refresh donations on snapshot:", err));
     }, (err) => {
       console.warn("Firestore live donations listener fallback to initial:", err);
     });
@@ -181,25 +181,16 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
       const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
       const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
       const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
-      const dCampId = (d.campaignId || "").trim().toLowerCase();
 
-      const matchName = ambName && (
-        dAmbName === ambName ||
-        (dAmbName && ambName && (dAmbName.includes(ambName) || ambName.includes(dAmbName)))
-      );
-      const matchSlug = ambSlug && (
-        dAmbSlug === ambSlug ||
-        dAmbId === ambSlug ||
-        dAmbName === ambSlug ||
-        dCampId === ambSlug ||
-        dAmbName.includes(ambSlug)
-      );
-      const matchId = ambId && (
-        dAmbId === ambId ||
-        dAmbName === ambId
+      if (!dAmbName && !dAmbSlug && !dAmbId) return false;
+
+      const matchSlug = Boolean(ambSlug && (dAmbSlug === ambSlug || dAmbId === ambSlug || dAmbName === ambSlug));
+      const matchId = Boolean(ambId && (dAmbId === ambId || dAmbName === ambId));
+      const matchName = Boolean(
+        (ambName && dAmbName && (dAmbName === ambName || (dAmbName.length >= 3 && (dAmbName === ambName || ambName.includes(dAmbName)))))
       );
 
-      return Boolean(matchName || matchSlug || matchId);
+      return matchSlug || matchId || matchName;
     });
   }, [allCompletedDonations, isAmbassadorView, ambassadorId, activeSlug, ambassadorName]);
 
@@ -453,10 +444,15 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                         </p>
                       )}
 
-                      {/* Ambassador / Community Leader Attribution */}
+                      {/* Ambassador Attribution */}
                       {item.ambassadorName && 
                        !/^\d+$/.test(item.ambassadorName.trim()) && 
-                       !["באולם", "בחוץ", "באולם ", "בחוץ "].includes(item.ambassadorName.trim()) && (
+                       !["באולם", "בחוץ", "באולם ", "בחוץ "].includes(item.ambassadorName.trim()) &&
+                       (ambassadors.length === 0 || ambassadors.some(a => 
+                         a.name.trim().toLowerCase() === item.ambassadorName!.trim().toLowerCase() || 
+                         a.leaderName.trim().toLowerCase() === item.ambassadorName!.trim().toLowerCase() ||
+                         a.slug.trim().toLowerCase() === item.ambassadorName!.trim().toLowerCase()
+                       )) && (
                         <div className="text-xs text-amber-700 font-semibold flex items-center gap-1 self-end bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
                           <Sparkles className="w-3 h-3 text-amber-500" />
                           <span>ע"י {item.ambassadorName}</span>

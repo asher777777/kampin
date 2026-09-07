@@ -48,6 +48,7 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
   const [liveAmbassador, setLiveAmbassador] = useState<Ambassador | null>(null);
   const [calculatedAmbassadorRaised, setCalculatedAmbassadorRaised] = useState<number | null>(null);
   const [calculatedAmbassadorGoal, setCalculatedAmbassadorGoal] = useState<number | null>(null);
+  const [calculatedCampaignRaised, setCalculatedCampaignRaised] = useState<number | null>(null);
   const [donorsCount, setDonorsCount] = useState<number>(0);
 
   const isAmbassadorView = Boolean(
@@ -94,9 +95,11 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
             const dSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
             const dId = (d.ambassadorId || "").trim().toLowerCase();
 
-            const matchName = cleanName && (dAmb === cleanName || dAmb.includes(cleanName) || cleanName.includes(dAmb));
-            const matchSlug = cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug);
-            const matchId = cleanId && (dId === cleanId || dAmb === cleanId);
+            if (!dAmb && !dSlug && !dId) return false;
+
+            const matchSlug = Boolean(cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug));
+            const matchId = Boolean(cleanId && (dId === cleanId || dAmb === cleanId));
+            const matchName = Boolean(cleanName && dAmb && (dAmb === cleanName || (dAmb.length >= 3 && (dAmb === cleanName || cleanName.includes(dAmb)))));
             return Boolean(matchName || matchSlug || matchId);
           });
           const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -104,6 +107,8 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
           setDonorsCount(ambDonations.length);
         }
       } else {
+        const total = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+        setCalculatedCampaignRaised(total);
         setDonorsCount(donations.length);
       }
     }).catch(err => console.warn("Failed to fetch donations for header:", err));
@@ -162,50 +167,58 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
     }
   }, [targetCampaignId, ambassadorId, ambassadorSlug]);
 
-  // 4. Real-time Firestore Listener on Donations subcollection to keep community total live with deduplication
+  // 4. Real-time Firestore Listener on Donations subcollection to keep total raised & donor count live and 100% synchronized
   useEffect(() => {
-    if (!targetCampaignId || !isAmbassadorView) return;
+    if (!targetCampaignId) return;
 
     const donationsColl = collection(db, "campaigns", targetCampaignId, "donations");
-    const unsub = onSnapshot(donationsColl, (snap) => {
-      let sum = 0;
-      const cleanSlug = ambassadorSlug?.trim().toLowerCase();
-      const cleanName = ambassadorName?.trim().toLowerCase();
-      const cleanId = ambassadorId?.trim().toLowerCase();
-      const seenSigs = new Set<string>();
+    const unsub = onSnapshot(donationsColl, () => {
+      getCampaignDonationsAction(targetCampaignId).then(({ donations, ambassadors }) => {
+        if (isAmbassadorView) {
+          const cleanSlug = ambassadorSlug?.trim().toLowerCase();
+          const cleanName = ambassadorName?.trim().toLowerCase();
+          const cleanId = ambassadorId?.trim().toLowerCase();
 
-      snap.docs.forEach((dDoc) => {
-        const d = dDoc.data();
-        if (d.paymentStatus === "completed") {
-          const dAmb = (d.ambassadorName || "").trim().toLowerCase();
-          const dSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
-          const dId = (d.ambassadorId || "").trim().toLowerCase();
+          const matched = ambassadors.find(a => {
+            const aId = (a.id || "").toLowerCase();
+            const aSlug = (a.slug || "").toLowerCase();
+            const aName = (a.name || "").trim().toLowerCase();
+            const aLeader = (a.leaderName || "").trim().toLowerCase();
 
-          const matchName = cleanName && (dAmb === cleanName || dAmb.includes(cleanName) || cleanName.includes(dAmb));
-          const matchSlug = cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug);
-          const matchId = cleanId && (dId === cleanId || dAmb === cleanId);
-          if (matchName || matchSlug || matchId) {
-            const dName = (d.donorName || "").trim().toLowerCase();
-            const amt = Number(d.amount || 0);
-            const dPhone = (d.phone || "").replace(/\D/g, "");
+            return Boolean(
+              (cleanId && (aId === cleanId || aSlug === cleanId || aName === cleanId)) ||
+              (cleanSlug && (aSlug === cleanSlug || aId === cleanSlug || aName === cleanSlug)) ||
+              (cleanName && (aName === cleanName || aLeader === cleanName || aSlug === cleanName || cleanName.includes(aName) || aName.includes(cleanName)))
+            );
+          });
 
-            const keys = [];
-            if (dName && amt > 0) keys.push(`name_${dName}_${amt}`);
-            if (dPhone && amt > 0) keys.push(`phone_${dPhone}_${amt}`);
-            if (d.contactId) keys.push(`contact_${d.contactId}_${amt}`);
-            keys.push(`id_${dDoc.id}`);
+          if (matched) {
+            setCalculatedAmbassadorRaised(matched.totalRaised);
+            if (matched.targetGoal) setCalculatedAmbassadorGoal(matched.targetGoal);
+            if (matched.donorCount !== undefined) setDonorsCount(matched.donorCount);
+          } else {
+            const ambDonations = donations.filter(d => {
+              const dAmb = (d.ambassadorName || "").trim().toLowerCase();
+              const dSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+              const dId = (d.ambassadorId || "").trim().toLowerCase();
 
-            if (!keys.some(k => seenSigs.has(k))) {
-              keys.forEach(k => seenSigs.add(k));
-              sum += amt;
-            }
+              if (!dAmb && !dSlug && !dId) return false;
+
+              const matchSlug = Boolean(cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug));
+              const matchId = Boolean(cleanId && (dId === cleanId || dAmb === cleanId));
+              const matchName = Boolean(cleanName && dAmb && (dAmb === cleanName || (dAmb.length >= 3 && (dAmb === cleanName || cleanName.includes(dAmb)))));
+              return Boolean(matchName || matchSlug || matchId);
+            });
+            const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+            setCalculatedAmbassadorRaised(total);
+            setDonorsCount(ambDonations.length);
           }
+        } else {
+          const total = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+          setCalculatedCampaignRaised(total);
+          setDonorsCount(donations.length);
         }
-      });
-
-      if (sum > 0) {
-        setCalculatedAmbassadorRaised(sum);
-      }
+      }).catch(err => console.warn("Live donation refresh error in header:", err));
     }, (err) => {
       console.warn("Donations subcollection listener:", err);
     });
@@ -226,7 +239,7 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
 
   const currentRaised = isAmbassadorView
     ? currentAmbassadorRaised
-    : (liveCampaign?.totalRaised ?? config?.totalRaised ?? totalRaised ?? 0);
+    : (calculatedCampaignRaised !== null ? calculatedCampaignRaised : (liveCampaign?.totalRaised ?? config?.totalRaised ?? totalRaised ?? 0));
 
   const percentage = Math.round((currentRaised / (currentGoal || 1)) * 100);
   const remainingToGoal = Math.max(0, currentGoal - currentRaised);

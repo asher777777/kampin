@@ -18,8 +18,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     ]);
 
     // 1. Parallel fetch all required Firestore data concurrently for maximum performance
-    const [crmGroupsSnap, donationsSnap, ambSnap, contactsSnap] = await Promise.all([
-      adminDb.collectionGroup("crm_groups").get().catch(() => ({ docs: [] })),
+    const [donationsSnap, ambSnap, contactsSnap] = await Promise.all([
       adminDb.collection("campaigns").doc(targetCid).collection("donations").get().catch(() => ({ docs: [] })),
       adminDb.collection("campaigns").doc(targetCid).collection("ambassadors").get().catch(() => ({ docs: [] })),
       adminDb.collection("contacts").where("status", "!=", "trashed").get().catch(() => 
@@ -66,53 +65,40 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     });
 
-    // 3. Build linked groups set & ambassadors list
-    const linkedGroupNames = new Set<string>();
+    // 3. Build REAL ambassadors list ONLY from contacts with an active ambassador_slug
     const allAmbassadors: Ambassador[] = [];
+    const validAmbassadorSlugs = new Set<string>();
+    const validAmbassadorNames = new Set<string>();
 
-    crmGroupsSnap.docs.forEach((doc: any) => {
-      const gData = doc.data();
-      if (!gData.name || !gData.name.trim()) return;
-      const gName = gData.name.trim();
+    allLiveContacts.forEach((c) => {
+      if (c.ambassador_slug && c.ambassador_slug.trim()) {
+        const cleanSlug = c.ambassador_slug.trim().toLowerCase();
+        const aName = (c.ambassador_name || `${c.conta_name || ""} ${c.f_m || ""}`.trim() || c.conta_name || "שגריר").trim();
 
-      // Permanently purge deleted / test communities
-      if (DELETED_COMMUNITIES_FILTER.has(gName) || INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName) || gData.status === "trashed" || gData.isDeleted) {
-        doc.ref.delete().catch(() => {});
-        if (gData.pageSlug) adminDb.collection("pages").doc(gData.pageSlug).delete().catch(() => {});
-        return;
-      }
+        if (DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) return;
 
-      const isCommunity = Boolean(gData.isCommunity && (gData.pageSlug || gData.pageUrl) && gData.category !== "group");
-      if (!isCommunity) return;
+        validAmbassadorSlugs.add(cleanSlug);
+        validAmbassadorNames.add(aName.toLowerCase());
+        if (c.conta_name) validAmbassadorNames.add(c.conta_name.trim().toLowerCase());
 
-      const gMainCamp = (gData.mainCampaignId || "").trim();
-
-      // Strict campaign linkage: ONLY if explicitly assigned to this campaign
-      const isLinked =
-        (targetCid === "home")
-          ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
-          : (gMainCamp === targetCid || gMainCamp === `🎯 ${targetCid}` || gMainCamp === `/c/${targetCid}` || gMainCamp.includes(targetCid));
-
-      if (isLinked) {
-        linkedGroupNames.add(gName);
-        const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
         const ambObj: Ambassador = {
-          id: doc.id,
-          name: gName,
-          leaderName: gData.leaderName || gName,
-          slug: ambSlug,
-          targetGoal: Number(gData.targetGoal || 5000),
-          totalRaised: 0,
+          id: c.id,
+          name: aName,
+          leaderName: aName,
+          slug: cleanSlug,
+          targetGoal: Number(c.ambassador_target_goal || c.campaign_target_goal || 5000),
+          totalRaised: Number(c.ambassador_total_raised || 0),
           donorCount: 0,
-          message: gData.vision || gData.description || "",
-          gallery: gData.gallery || [],
+          message: "",
+          gallery: [],
           campaignId: targetCid,
-          pageUrl: gData.pageUrl || `/${ambSlug}`,
-          createdAt: gData.createdAt || new Date().toISOString()
+          pageUrl: `/${cleanSlug}`,
+          createdAt: c.createdAt || new Date().toISOString(),
+          isPersonalAmbassador: true
         };
 
         const existingIdx = allAmbassadors.findIndex(
-          a => a.id === doc.id || a.slug === ambSlug || a.name.trim().toLowerCase() === gName.toLowerCase()
+          a => a.id === c.id || a.slug === cleanSlug || a.name.trim().toLowerCase() === aName.toLowerCase()
         );
 
         if (existingIdx === -1) {
@@ -121,94 +107,24 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
           allAmbassadors[existingIdx] = {
             ...ambObj,
             ...allAmbassadors[existingIdx],
-            pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
+            slug: cleanSlug,
+            pageUrl: `/${cleanSlug}`
           };
         }
       }
     });
 
-    // Also validate ambassadors from campaign subcollection and clean up stale/orphan docs
+    // Also validate ambassadors in the campaign subcollection
     ambSnap.docs.forEach((doc: any) => {
       const ambData = doc.data() as Ambassador;
       const aName = (ambData.name || ambData.leaderName || "").trim();
+      const aSlug = (ambData.slug || "").trim().toLowerCase();
 
-      // Permanently purge deleted / test ambassadors
-      if (!aName || DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) {
+      // If doc does NOT match any active contact with ambassador_slug -> purge stale doc!
+      if (!aName || !aSlug || !validAmbassadorSlugs.has(aSlug) || DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) {
         doc.ref.delete().catch(() => {});
-        if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
         return;
       }
-
-      // Find if this doc corresponds to a known active CRM contact
-      const matchingContact = ambData.contactId 
-        ? contactByIdMap.get(ambData.contactId) 
-        : allLiveContacts.find(c => 
-            (ambData.slug && c.ambassador_slug === ambData.slug) || 
-            c.id === doc.id ||
-            (c.conta_name && c.conta_name.trim() === aName) ||
-            (c.ambassador_name && c.ambassador_name.trim() === aName)
-          );
-
-      // Find if this doc corresponds to a known active community group
-      const matchingGroup = crmGroupsSnap.docs.find((gDoc: any) => {
-        const gData = gDoc.data();
-        return (ambData.slug && gData.pageSlug === ambData.slug) || (gData.name && gData.name.trim() === aName);
-      });
-
-      if (matchingContact) {
-        const contactCampId = (matchingContact.ambassador_campaign_id || matchingContact.campaign_id || "").trim();
-        const isCampMatch = (targetCid === "home")
-          ? (contactCampId === "home" || contactCampId === "/" || contactCampId === "default-campaign" || contactCampId === "")
-          : (contactCampId === targetCid || contactCampId === `/c/${targetCid}` || contactCampId.toLowerCase() === targetCid.toLowerCase() || contactCampId.includes(targetCid));
-
-        if (!isCampMatch || !matchingContact.ambassador_slug || (ambData.slug && matchingContact.ambassador_slug !== ambData.slug)) {
-          // Stale / deleted copy in this campaign subcollection -> purge!
-          doc.ref.delete().catch(() => {});
-          return;
-        }
-
-        // Merge stats if already in allAmbassadors
-        const existingIdx = allAmbassadors.findIndex(
-          a => a.id === matchingContact.id || (matchingContact.ambassador_slug && a.slug === matchingContact.ambassador_slug) || a.name.trim().toLowerCase() === aName.toLowerCase()
-        );
-        if (existingIdx >= 0) {
-          allAmbassadors[existingIdx].totalRaised = Math.max(allAmbassadors[existingIdx].totalRaised || 0, Number(ambData.totalRaised || 0));
-          allAmbassadors[existingIdx].donorCount = Math.max(allAmbassadors[existingIdx].donorCount || 0, Number(ambData.donorCount || 0));
-        } else if (matchingContact.ambassador_slug) {
-          allAmbassadors.push({
-            id: matchingContact.id,
-            name: matchingContact.ambassador_name || matchingContact.conta_name || aName,
-            leaderName: matchingContact.ambassador_name || matchingContact.conta_name || aName,
-            slug: matchingContact.ambassador_slug,
-            targetGoal: Number(matchingContact.ambassador_target_goal || ambData.targetGoal || 5000),
-            totalRaised: Number(ambData.totalRaised || 0),
-            donorCount: Number(ambData.donorCount || 0),
-            message: "",
-            gallery: [],
-            campaignId: targetCid,
-            pageUrl: `/${matchingContact.ambassador_slug}`,
-            createdAt: ambData.createdAt || new Date().toISOString(),
-            isPersonalAmbassador: true
-          });
-        }
-        return;
-      }
-
-      if (matchingGroup) {
-        // Merge stats if already in allAmbassadors
-        const existingIdx = allAmbassadors.findIndex(
-          a => a.id === matchingGroup.id || a.name.trim().toLowerCase() === aName.toLowerCase()
-        );
-        if (existingIdx >= 0) {
-          allAmbassadors[existingIdx].totalRaised = Math.max(allAmbassadors[existingIdx].totalRaised || 0, Number(ambData.totalRaised || 0));
-          allAmbassadors[existingIdx].donorCount = Math.max(allAmbassadors[existingIdx].donorCount || 0, Number(ambData.donorCount || 0));
-        }
-        return;
-      }
-
-      // If doc does NOT match any active contact and does NOT match any group -> it is an orphan/test/deleted ambassador!
-      doc.ref.delete().catch(() => {});
-      if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
     });
 
     // 4. Process campaign subcollection donations with automatic duplicate cleanup
@@ -238,7 +154,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
           continue;
         }
 
-        // Find matching contact for community attribution & verification
+        // Find matching contact for verification
         let matchedContact = null;
         if (data.contactId && contactByIdMap.has(data.contactId)) {
           matchedContact = contactByIdMap.get(data.contactId);
@@ -282,39 +198,37 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         }
         docSigs.forEach(sig => seenFirestoreSignatures.add(sig));
 
-        // Clear unlinked ambassador name
-        if (data.ambassadorName && !linkedGroupNames.has(String(data.ambassadorName).trim())) {
+        // Clear unlinked or non-ambassador tag: ONLY valid ambassador names/slugs are allowed!
+        const curAmbName = (data.ambassadorName || "").trim().toLowerCase();
+        const curAmbSlug = ((data as any).ambassadorSlug || data.ambassadorId || "").trim().toLowerCase();
+        const isValidAmbassador = (curAmbSlug && validAmbassadorSlugs.has(curAmbSlug)) || (curAmbName && validAmbassadorNames.has(curAmbName));
+
+        if (!isValidAmbassador) {
           data.ambassadorName = "";
+          data.ambassadorSlug = "";
+          data.ambassadorId = "";
         }
 
-        // If it's a CRM-synced donation, ensure the contact still has this campaign linked in CRM
-        if (doc.id.startsWith("crm-") && matchedContact) {
+        // If it's a CRM-synced donation, ensure the contact still has this campaign linked and has campaign_amount > 0 in CRM
+        if (doc.id.startsWith("crm-") || doc.id.startsWith("don_")) {
+          if (!matchedContact) {
+            doc.ref.delete().catch(() => {});
+            continue;
+          }
+
           const contactCampId = (matchedContact.campaign_id || matchedContact.campaignId || "").trim();
           const isMatch = (targetCid === "home")
             ? (contactCampId === "home" || contactCampId === "default-campaign" || contactCampId === "/")
             : (contactCampId === targetCid || contactCampId.includes(targetCid));
           
           const campAmount = Number(matchedContact.campaign_amount || matchedContact.campaignAmount || 0);
-          if (!isMatch || campAmount <= 0) {
+          const isRecurring = matchedContact.campaign_donation_mode === "recurring" || matchedContact.campaign_donation_mode === "monthly";
+          const monthlyAmount = isRecurring ? Number(matchedContact.campaign_monthly_amount || 0) : 0;
+          const totalValidAmount = campAmount > 0 ? campAmount : (monthlyAmount > 0 ? monthlyAmount * Number(matchedContact.campaign_recurring_months || 12) : 0);
+
+          if (!isMatch || totalValidAmount <= 0) {
             doc.ref.delete().catch(() => {});
             continue;
-          }
-        }
-
-        if (matchedContact) {
-          const cTags = Array.isArray(matchedContact.tags) ? matchedContact.tags : [];
-          let commName = "";
-          if (matchedContact.community && linkedGroupNames.has(matchedContact.community.trim())) {
-            commName = matchedContact.community.trim();
-          } else if (matchedContact.mh_crm_community && linkedGroupNames.has(matchedContact.mh_crm_community.trim())) {
-            commName = matchedContact.mh_crm_community.trim();
-          } else {
-            const validTag = cTags.find((t: any) => typeof t === "string" && linkedGroupNames.has(t.trim()));
-            if (validTag) commName = validTag.trim();
-          }
-
-          if (commName && !data.ambassadorName) {
-            data.ambassadorName = commName;
           }
         }
 
@@ -322,84 +236,70 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     }
 
-    // 5. For CRM contacts: Include donation if assigned to campaign or ambassador
+    // 5. For CRM contacts: Include donation ONLY if explicitly assigned to THIS campaign with campaign_amount in CRM
     allLiveContacts.forEach((c) => {
       const contactCampId = (c.campaign_id || c.campaignId || c.campaign_page || "").trim();
 
+      // Must have explicit campaign donation amount in CRM campaigns tab
       const rawAmount = Number(c.campaign_amount || c.campaignAmount || 0);
-      const monthlyAmt = Number(c.campaign_monthly_amount || 0);
+      const isRecurring = c.campaign_donation_mode === "recurring" || c.campaign_donation_mode === "monthly";
+      const monthlyAmt = isRecurring ? Number(c.campaign_monthly_amount || 0) : 0;
       const months = Number(c.campaign_recurring_months || 12);
-      const calculatedRecurringTotal = (monthlyAmt > 0) ? (monthlyAmt * months) : 0;
-      const campAmount = rawAmount > 0 ? rawAmount : (calculatedRecurringTotal > 0 ? calculatedRecurringTotal : Number(c.total_donated || c.total_spent || 0));
+      const campAmount = rawAmount > 0 ? rawAmount : (monthlyAmt > 0 ? (monthlyAmt * months) : 0);
 
-      if (campAmount <= 0) return; // No donation amount in campaign tab -> DO NOT INCLUDE!
+      // STRICT: Never pull in general CRM contacts without explicit campaign donation!
+      if (campAmount <= 0) return;
 
       const paymentStatus = c.campaign_payment_status || c.campaignPaymentStatus || "completed";
       if (paymentStatus !== "completed" && paymentStatus !== "הושלם") return;
 
-      // Resolve ambassador name / slug: explicitly assigned or matched by community / tag
+      // Resolve ambassador name / slug: ONLY for real active ambassadors!
       let ambNameResolved = "";
       let ambSlugResolved = "";
       let ambIdResolved = "";
 
       const explicitAmb = (c.campaign_ambassador_name || c.campaignAmbassadorName || c.referred_by_ambassador || "").trim();
       if (explicitAmb) {
-        ambNameResolved = explicitAmb;
-      } else if (c.community) {
-        ambNameResolved = c.community.trim();
-      } else if (c.mh_crm_community) {
-        ambNameResolved = c.mh_crm_community.trim();
-      } else if (Array.isArray(c.tags)) {
-        const validTag = c.tags.find((t: any) => typeof t === "string" && t.trim());
-        if (validTag) ambNameResolved = validTag.trim();
+        const matchedAmb = allAmbassadors.find(a =>
+          a.slug.toLowerCase() === explicitAmb.toLowerCase() ||
+          a.name.toLowerCase() === explicitAmb.toLowerCase() ||
+          a.leaderName.toLowerCase() === explicitAmb.toLowerCase()
+        );
+        if (matchedAmb) {
+          ambNameResolved = matchedAmb.name;
+          ambSlugResolved = matchedAmb.slug;
+          ambIdResolved = matchedAmb.slug;
+        }
+      } else if (c.ambassador_slug) {
+        const cleanS = c.ambassador_slug.trim().toLowerCase();
+        if (validAmbassadorSlugs.has(cleanS)) {
+          ambNameResolved = c.ambassador_name || c.conta_name || "";
+          ambSlugResolved = cleanS;
+          ambIdResolved = cleanS;
+        }
       }
 
-      // Check if contact itself is an ambassador
-      if (c.ambassador_slug && !ambNameResolved) {
-        ambNameResolved = c.ambassador_name || c.conta_name || "";
-        ambSlugResolved = c.ambassador_slug;
+      // Campaign matching:
+      // STRICT: Contact MUST have explicit campaign_id matching targetCid OR matching the ambassador slug
+      if (!contactCampId && !ambSlugResolved) return; // No campaign or ambassador linked -> SKIP!
+
+      let isMatchingCampaign = false;
+      if (targetCid === "home") {
+        isMatchingCampaign = (
+          contactCampId === "home" ||
+          contactCampId === "/" ||
+          contactCampId === "default-campaign" ||
+          (Boolean(ambSlugResolved) && (contactCampId === ambSlugResolved || contactCampId === `/${ambSlugResolved}`))
+        );
+      } else {
+        // Specific campaign or personal ambassador page (e.g. "boko")
+        isMatchingCampaign = (
+          contactCampId === targetCid ||
+          contactCampId === `/c/${targetCid}` ||
+          contactCampId.toLowerCase() === targetCid.toLowerCase() ||
+          (Boolean(ambSlugResolved) && ambSlugResolved.toLowerCase() === targetCid.toLowerCase())
+        );
       }
-
-      // Match with known ambassadors in allAmbassadors
-      const matchedAmb = allAmbassadors.find(a =>
-        (ambNameResolved && (
-          a.name.trim().toLowerCase() === ambNameResolved.toLowerCase() ||
-          a.leaderName.trim().toLowerCase() === ambNameResolved.toLowerCase() ||
-          (a.slug && a.slug.trim().toLowerCase() === ambNameResolved.toLowerCase()) ||
-          (a.id && a.id.toLowerCase() === ambNameResolved.toLowerCase())
-        )) ||
-        (contactCampId && (
-          (a.slug && a.slug.trim().toLowerCase() === contactCampId.toLowerCase()) ||
-          a.id === contactCampId
-        ))
-      );
-
-      if (matchedAmb) {
-        ambNameResolved = matchedAmb.name;
-        ambSlugResolved = matchedAmb.slug;
-        ambIdResolved = matchedAmb.slug || matchedAmb.id;
-      } else if (ambNameResolved) {
-        ambIdResolved = ambNameResolved;
-      }
-
-      const isMatchingCampaign =
-        (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-          ? (
-              !contactCampId ||
-              contactCampId === "home" ||
-              contactCampId === "/" ||
-              contactCampId === "default-campaign" ||
-              Boolean(ambSlugResolved) ||
-              Boolean(ambNameResolved) ||
-              allAmbassadors.some(a => a.slug === contactCampId || a.id === contactCampId)
-            )
-          : (
-              contactCampId === rawId ||
-              contactCampId === `/c/${rawId}` ||
-              contactCampId.toLowerCase() === rawId.toLowerCase() ||
-              (ambSlugResolved && ambSlugResolved.toLowerCase() === rawId.toLowerCase()) ||
-              (ambNameResolved && ambNameResolved.toLowerCase() === rawId.toLowerCase())
-            );
 
       if (!isMatchingCampaign) return;
 
@@ -416,56 +316,11 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         ambassadorId: ambIdResolved,
         paymentStatus: "completed",
         paymentMethod: c.campaign_payment_method || "manual",
-        isRecurring: c.campaign_donation_mode === "monthly" || c.campaign_donation_mode === "recurring",
+        isRecurring: isRecurring,
         dedication: c.campaign_dedication || "",
         isAnonymous: Boolean(c.campaign_is_anonymous),
         createdAt: c.campaign_updated_at || c.last_order_date || c.createdAt || new Date().toISOString()
       });
-    });
-
-    // Also include personal ambassador contacts who configured a slug & personal goal
-    allLiveContacts.forEach((c) => {
-      if (c.ambassador_slug) {
-        const cCampId = (c.ambassador_campaign_id || c.campaign_id || "").trim();
-        const isCampMatch =
-          (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-            ? (!cCampId || cCampId === "home" || cCampId === "/" || cCampId === "default-campaign" || c.ambassador_slug === rawId)
-            : (cCampId === rawId || cCampId === `/c/${rawId}` || cCampId.toLowerCase() === rawId.toLowerCase() || cCampId.includes(rawId) || c.ambassador_slug === rawId);
-
-        if (isCampMatch) {
-          const aName = (c.ambassador_name || `${c.conta_name || ""} ${c.f_m || ""}`.trim() || c.conta_name || "שגריר").trim();
-          const ambObj: Ambassador = {
-            id: c.id,
-            name: aName,
-            leaderName: aName,
-            slug: c.ambassador_slug,
-            targetGoal: Number(c.ambassador_target_goal || c.campaign_target_goal || 5000),
-            totalRaised: Number(c.ambassador_total_raised || 0),
-            donorCount: 0,
-            message: "",
-            gallery: [],
-            campaignId: rawId,
-            pageUrl: `/${c.ambassador_slug}`,
-            createdAt: c.createdAt || new Date().toISOString(),
-            isPersonalAmbassador: true
-          };
-
-          const existingIdx = allAmbassadors.findIndex(
-            a => a.id === c.id || a.slug === c.ambassador_slug || a.name.trim().toLowerCase() === aName.toLowerCase()
-          );
-
-          if (existingIdx === -1) {
-            allAmbassadors.push(ambObj);
-          } else {
-            allAmbassadors[existingIdx] = {
-              ...ambObj,
-              ...allAmbassadors[existingIdx],
-              slug: c.ambassador_slug,
-              pageUrl: `/${c.ambassador_slug}`
-            };
-          }
-        }
-      }
     });
 
     // 6. Strict Multi-Key Deduplication of Donations
@@ -493,26 +348,8 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     });
 
-    // 7. Strict filter and deduplicate allAmbassadors so active CRM communities and personal ambassadors remain
-    const uniqueAmbassadors: Ambassador[] = [];
-    const seenAmbNames = new Set<string>();
-    const seenAmbSlugs = new Set<string>();
-
-    allAmbassadors.forEach(amb => {
-      const cleanN = (amb.name || "").trim().toLowerCase();
-      const cleanS = (amb.slug || "").trim().toLowerCase();
-      
-      if ((cleanS || amb.pageUrl) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
-        seenAmbNames.add(cleanN);
-        if (cleanS) seenAmbSlugs.add(cleanS);
-        uniqueAmbassadors.push(amb);
-      }
-    });
-
-    const filteredAmbassadors = uniqueAmbassadors;
-
-    // 8. Calculate totalRaised and donorCount for each linked community/ambassador from deduplicated allDonations
-    for (const amb of filteredAmbassadors) {
+    // 7. Calculate totalRaised and donorCount for each real ambassador from deduplicated allDonations
+    for (const amb of allAmbassadors) {
       const ambName = (amb.name || "").trim().toLowerCase();
       const ambLeader = (amb.leaderName || "").trim().toLowerCase();
       const ambSlug = (amb.slug || "").trim().toLowerCase();
@@ -522,25 +359,18 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
         const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
         const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
-        const dCampId = (d.campaignId || "").trim().toLowerCase();
 
-        const matchName = dAmbName && (
-          dAmbName === ambName ||
-          dAmbName === ambLeader ||
-          dAmbName === ambSlug ||
-          (ambName && dAmbName.includes(ambName)) ||
-          (ambName && ambName.includes(dAmbName))
-        );
-        const matchSlug = ambSlug && (
-          dAmbSlug === ambSlug ||
-          dAmbId === ambSlug ||
-          dAmbName === ambSlug ||
-          dCampId === ambSlug ||
-          dAmbName.includes(ambSlug)
-        );
-        const matchId = ambId && (dAmbId === ambId || dAmbName === ambId);
+        // If donation has no ambassador assigned, it does NOT belong to any ambassador!
+        if (!dAmbName && !dAmbSlug && !dAmbId) return false;
 
-        return Boolean(matchName || matchSlug || matchId);
+        const matchSlug = Boolean(ambSlug && (dAmbSlug === ambSlug || dAmbId === ambSlug || dAmbName === ambSlug));
+        const matchId = Boolean(ambId && (dAmbId === ambId || dAmbName === ambId));
+        const matchName = Boolean(
+          (ambName && dAmbName && (dAmbName === ambName || (dAmbName.length >= 3 && (dAmbName === ambName || ambName.includes(dAmbName))))) ||
+          (ambLeader && dAmbName && (dAmbName === ambLeader || (dAmbName.length >= 3 && (dAmbName === ambLeader || ambLeader.includes(dAmbName)))))
+        );
+
+        return matchSlug || matchId || matchName;
       });
 
       const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -557,7 +387,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       } catch (ambErr) {}
     }
 
-    // 9. Calculate accurate total campaign raised and donor count, and sync to campaign doc
+    // 8. Calculate accurate total campaign raised and donor count, and sync to campaign doc
     const totalRaisedSum = allDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const donorCountTotal = allDonations.length;
 
@@ -580,7 +410,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     // Sort newest first
     allDonations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return { donations: allDonations, ambassadors: filteredAmbassadors };
+    return { donations: allDonations, ambassadors: allAmbassadors };
   } catch (error) {
     console.error("Error in getCampaignDonationsAction:", error);
     return { donations: [], ambassadors: [] };
