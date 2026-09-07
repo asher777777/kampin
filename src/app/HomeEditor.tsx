@@ -361,7 +361,23 @@ export function HomeEditor({
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  const allAvailableSections = ["campaignHeader", "campaignTiers", "campaignDonors", "hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
+  const allAvailableSections = [
+    "videoGallery",
+    "campaignTiers",
+    "campaignHeader",
+    "campaignDonors",
+    "richContent",
+    "hero",
+    "mainContent",
+    "services",
+    "community",
+    "livePosts",
+    "landingSection",
+    "pricing",
+    "timer",
+    "imageListing",
+    "faq"
+  ];
   const currentSectionOrder = Array.from(new Set([...(config.sectionOrder || []), ...allAvailableSections]));
 
   const availableAnchors = [
@@ -3390,18 +3406,20 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 const isLast = index === currentSectionOrder.length - 1;
                 const isMobileHidden = config.mobileHiddenSections?.includes(sectionId) || false;
                 const sectionLabels: Record<string, string> = {
-                  campaignHeader: "קמפיין: מד התקדמות וגרף",
+                  videoGallery: "גלריית וידאו ומדיה",
                   campaignTiers: "קמפיין: אזור כפתורי סכומים (מדרגות)",
+                  campaignHeader: "קמפיין: מד התקדמות וגרף",
                   campaignDonors: "קמפיין: כרטיסיות תורמים ושגרירים (הוראות קבע)",
+                  richContent: "אודות / תוכן מעוצב",
                   hero: "אזור ראשי (Hero)",
                   mainContent: "תוכן מרכזי",
                   services: "שירותים",
                   community: "קהילה",
                   livePosts: "עדכונים ופוסטים",
                   timer: "טיימר",
-                  richContent: "אודות / תוכן מעוצב",
                   landingSection: "קמפיין נחיתה / טופס",
                   pricing: "חבילות ומחירונים",
+                  imageListing: "רשימת תמונות וכרטיסים",
                   faq: "שאלות ותשובות (FAQ)"
                 };
                 

@@ -46,6 +46,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
       };
     }
+
+    // Check contacts collection for ambassador_slug metadata fallback
+    for (const checkId of idsToCheck) {
+      const contactSnap = await adminDb.collection("contacts").where("ambassador_slug", "==", checkId).limit(1).get();
+      if (!contactSnap.empty) {
+        const cData = contactSnap.docs[0].data();
+        const ambName = cData?.ambassador_name || cData?.conta_name || "שגריר";
+        return {
+          title: `עמוד היעד האישי של ${ambName}`,
+          description: `עמוד היעד והתרומות של השגריר ${ambName}`,
+        };
+      }
+    }
   } catch (e) {}
   
   const fallback = staticLandingPages.find(p => idsToCheck.includes(p.id));
@@ -97,6 +110,24 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
       if (!querySnap.empty) {
         pageConfig = querySnap.docs[0].data();
         detectedCollection = "pages";
+      }
+    }
+
+    // If not found in pages, check contacts collection for ambassador_slug and sync on-the-fly
+    if (!pageConfig) {
+      for (const checkId of idsToCheck) {
+        const contactSnap = await adminDb.collection("contacts").where("ambassador_slug", "==", checkId).limit(1).get();
+        if (!contactSnap.empty) {
+          const cDoc = contactSnap.docs[0];
+          const { syncAmbassadorPage } = await import("@/features/crm/actions");
+          await syncAmbassadorPage(cDoc.id, { ...cDoc.data(), id: cDoc.id });
+          const newDocSnap = await adminDb.collection("pages").doc(checkId).get();
+          if (newDocSnap.exists) {
+            pageConfig = newDocSnap.data();
+            detectedCollection = "pages";
+            break;
+          }
+        }
       }
     }
   } catch (error) {

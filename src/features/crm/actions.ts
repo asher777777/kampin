@@ -302,6 +302,11 @@ export async function createContact(contactData: Partial<Contact>) {
       await syncContactToCampaign(docRef.id, { ...newContact, id: docRef.id });
     }
 
+    // Sync ambassador page if ambassador slug exists
+    if (newContact.ambassador_slug) {
+      await syncAmbassadorPage(docRef.id, { ...newContact, id: docRef.id });
+    }
+
     revalidatePath("/dashboard/crm");
     return { success: true, id: docRef.id };
   } catch (error: any) {
@@ -338,6 +343,12 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
     delete updatedFields.ownerId;
     delete updatedFields.id;
 
+    // Lock ambassador slug: If contact already had an ambassador_slug, do not allow changing it
+    const existingSlug = docSnap.data()?.ambassador_slug;
+    if (existingSlug && updatedFields.ambassador_slug && updatedFields.ambassador_slug !== existingSlug) {
+      updatedFields.ambassador_slug = existingSlug; // Keep existing locked slug
+    }
+
     // Remove general community if other communities are selected
     if (updatedFields.communityIds && updatedFields.communityIds.length > 0) {
       const generalCommQuery = await adminDb.collection("communities").where("ownerId", "==", ownerId).where("name", "==", "קהילה כללית").limit(1).get();
@@ -357,6 +368,11 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
       await syncContactToCampaign(id, mergedData);
     }
 
+    // Sync ambassador page if ambassador slug exists
+    if (mergedData.ambassador_slug) {
+      await syncAmbassadorPage(id, mergedData);
+    }
+
     revalidatePath("/dashboard/crm");
     return { success: true };
   } catch (error: any) {
@@ -365,6 +381,262 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
   }
 }
 
+const RESERVED_SLUGS = new Set([
+  "admin", "api", "builder", "checkout", "c", "lessons", "services", "contact",
+  "community", "home", "auth", "login", "register", "dashboard", "content-pages",
+  "agentonbord", "auth-redirect", "whatToGenerate", "favicon.ico", "robots.txt", "sitemap.xml"
+]);
+
+/**
+ * Check if an ambassador slug is available across the system
+ */
+export async function checkAmbassadorSlugAvailability(
+  slug: string,
+  currentContactId?: string
+): Promise<{ available: boolean; message?: string }> {
+  try {
+    if (!slug || !slug.trim()) {
+      return { available: false, message: "יש להזין סלאג באנגלית" };
+    }
+
+    const cleanSlug = slug.trim().toLowerCase();
+
+    // 1. Regex validation: English letters, numbers, and hyphens only
+    if (!/^[a-z0-9-]+$/.test(cleanSlug)) {
+      return { available: false, message: "הסלאג יכול להכיל רק אותיות באנגלית באותיות קטנות (a-z), מספרים (0-9) ומקפים (-)" };
+    }
+
+    if (cleanSlug.length < 2) {
+      return { available: false, message: "הסלאג חייב להכיל לפחות 2 תווים" };
+    }
+
+    // 2. Check reserved routes
+    if (RESERVED_SLUGS.has(cleanSlug)) {
+      return { available: false, message: "סלאג זה שמור על ידי המערכת. אנא בחר סלאג אחר." };
+    }
+
+    // 3. Check pages collection
+    const pageDoc = await adminDb.collection("pages").doc(cleanSlug).get();
+    if (pageDoc.exists) {
+      const pageData = pageDoc.data();
+      if (!currentContactId || pageData?.contactId !== currentContactId) {
+        return { available: false, message: "סלאג זה כבר קיים במערכת. אנא בחר סלאג אחר." };
+      }
+    }
+
+    const pageSlugQuery = await adminDb.collection("pages").where("slug", "==", cleanSlug).limit(1).get();
+    if (!pageSlugQuery.empty) {
+      const pData = pageSlugQuery.docs[0].data();
+      if (!currentContactId || pData?.contactId !== currentContactId) {
+        return { available: false, message: "סלאג זה כבר קיים במערכת. אנא בחר סלאג אחר." };
+      }
+    }
+
+    // 4. Check landing collection
+    const landingDoc = await adminDb.collection("landing").doc(cleanSlug).get();
+    if (landingDoc.exists) {
+      return { available: false, message: "סלאג זה כבר קיים במערכת. אנא בחר סלאג אחר." };
+    }
+
+    // 5. Check contacts collection
+    const contactSlugQuery = await adminDb.collection("contacts").where("ambassador_slug", "==", cleanSlug).limit(1).get();
+    if (!contactSlugQuery.empty) {
+      const cDoc = contactSlugQuery.docs[0];
+      if (!currentContactId || cDoc.id !== currentContactId) {
+        return { available: false, message: "סלאג זה כבר תפוס על ידי איש קשר אחר. יש להחליף סלאג." };
+      }
+    }
+
+    return { available: true };
+  } catch (error: any) {
+    console.error("Error in checkAmbassadorSlugAvailability:", error);
+    return { available: false, message: "שגיאה בבדיקת זמינות הסלאג: " + (error.message || error) };
+  }
+}
+
+/**
+ * Creates / syncs an Ambassador page in 'pages' collection and campaign ambassadors subcollection
+ */
+export async function syncAmbassadorPage(contactId: string, contactData: any) {
+  try {
+    const slug = (contactData.ambassador_slug || "").trim().toLowerCase();
+    if (!slug) return;
+
+    const campaignId = (contactData.ambassador_campaign_id || contactData.campaign_id || "home").trim();
+    const ownerId = contactData.ownerId || "1";
+    const ambassadorName = (contactData.ambassador_name || contactData.conta_name || "").trim();
+    const targetGoal = Number(contactData.ambassador_target_goal || contactData.campaign_target_goal || 10000);
+    const totalRaised = Number(contactData.ambassador_total_raised || contactData.campaign_total_raised || 0);
+
+    // Fetch parent campaign to inherit media and tiers
+    let inheritedVideoGallery: any = null;
+    let inheritedTiers: any = null;
+    let campaignTitle = campaignId === "home" ? "קמפיין ראשי" : campaignId;
+
+    try {
+      const campDoc = await adminDb.collection("campaigns").doc(campaignId).get();
+      if (campDoc.exists) {
+        const cData = campDoc.data();
+        campaignTitle = cData?.title || campaignTitle;
+        inheritedVideoGallery = cData?.videoGallery || null;
+        inheritedTiers = cData?.campaignTiers || null;
+      }
+      if (!inheritedVideoGallery) {
+        const homeDoc = await adminDb.collection("pages").doc(campaignId === "home" ? "home" : campaignId).get();
+        if (homeDoc.exists) {
+          const hData = homeDoc.data();
+          inheritedVideoGallery = hData?.videoGallery || null;
+          if (!inheritedTiers) inheritedTiers = hData?.campaignTiers || null;
+          if (!campaignTitle || campaignTitle === campaignId) campaignTitle = hData?.title || campaignTitle;
+        }
+      }
+      if (!inheritedVideoGallery) {
+        const fallbackHome = await adminDb.collection("pages").doc("home").get();
+        if (fallbackHome.exists) {
+          inheritedVideoGallery = fallbackHome.data()?.videoGallery || null;
+          if (!inheritedTiers) inheritedTiers = fallbackHome.data()?.campaignTiers || null;
+        }
+      }
+    } catch (e) {
+      console.warn("Error fetching parent campaign data for ambassador page:", e);
+    }
+
+    // 1. Create or update page doc in 'pages'
+    const pageDocRef = adminDb.collection("pages").doc(slug);
+    const existingPageSnap = await pageDocRef.get();
+    const existingPageData = existingPageSnap.exists ? existingPageSnap.data() : {};
+
+    const pageData: any = {
+      id: slug,
+      slug: slug,
+      title: ambassadorName,
+      ownerId: ownerId,
+      contactId: contactId,
+      collectionName: "pages",
+      createdAt: existingPageData?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      seo: {
+        title: `${ambassadorName} | ${campaignTitle}`,
+        description: `עמוד היעד האישי של ${ambassadorName} בקמפיין ${campaignTitle}`,
+        ...(existingPageData?.seo || {})
+      },
+      sectionOrder: existingPageData?.sectionOrder || [
+        "videoGallery",
+        "campaignTiers",
+        "campaignHeader",
+        "campaignDonors",
+        "richContent",
+        "hero",
+        "mainContent",
+        "services",
+        "community",
+        "pricing",
+        "livePosts",
+        "faq",
+        "timer",
+        "landingSection",
+        "contact"
+      ],
+      videoGallery: {
+        visible: true,
+        anchorId: "videoGallery",
+        images: (existingPageData?.videoGallery?.images && existingPageData.videoGallery.images.length > 0)
+          ? existingPageData.videoGallery.images
+          : (inheritedVideoGallery?.images || []),
+        videoUrl: existingPageData?.videoGallery?.videoUrl || inheritedVideoGallery?.videoUrl || "",
+        videoType: existingPageData?.videoGallery?.videoType || inheritedVideoGallery?.videoType || "youtube",
+        effect: existingPageData?.videoGallery?.effect || inheritedVideoGallery?.effect || "fade",
+        objectFit: existingPageData?.videoGallery?.objectFit || inheritedVideoGallery?.objectFit || "cover",
+        desktopHeight: existingPageData?.videoGallery?.desktopHeight || inheritedVideoGallery?.desktopHeight || "500px",
+        ...(existingPageData?.videoGallery || {})
+      },
+      campaignTiers: {
+        visible: true,
+        anchorId: "campaignTiers",
+        campaignId: campaignId,
+        donationType: inheritedTiers?.donationType || "both",
+        tiers: inheritedTiers?.tiers || [
+          { id: "tier-1", name: "שותף", amount: 180, description: "השתתפות בפעילות" },
+          { id: "tier-2", name: "תומך", amount: 360, description: "תמיכה שנתית" },
+          { id: "tier-3", name: "ידיד", amount: 770, description: "זכות שותפות מורחבת" },
+          { id: "tier-4", name: "פטרון", amount: 1800, description: "פטרון הקמפיין" }
+        ],
+        ...(existingPageData?.campaignTiers || {})
+      },
+      campaignHeader: {
+        visible: true,
+        anchorId: "campaignHeader",
+        campaignId: campaignId,
+        ambassadorSlug: slug,
+        ambassadorName: ambassadorName,
+        targetGoal: targetGoal,
+        totalRaised: totalRaised,
+        svgTrendPreset: "curve_up",
+        ...(existingPageData?.campaignHeader || {})
+      },
+      campaignDonors: {
+        visible: true,
+        anchorId: "campaignDonors",
+        campaignId: campaignId,
+        ambassadorSlug: slug,
+        ambassadorName: ambassadorName,
+        showDonorsTab: true,
+        showAmbassadorsTab: true,
+        showTeamsTab: false,
+        showCommunitiesTab: false,
+        showAboutTab: true,
+        defaultTab: "donors",
+        ...(existingPageData?.campaignDonors || {})
+      },
+      richContent: {
+        visible: true,
+        anchorId: "richContent",
+        heading: ambassadorName,
+        title: ambassadorName,
+        body: existingPageData?.richContent?.body || `ברוכים הבאים לעמוד היעד האישי של ${ambassadorName} עבור קמפיין ${campaignTitle}`,
+        layout: "center",
+        ...(existingPageData?.richContent || {})
+      },
+      hero: { visible: false, ...(existingPageData?.hero || {}) },
+      mainContent: { visible: false, ...(existingPageData?.mainContent || {}) },
+      services: { visible: false, items: [], ...(existingPageData?.services || {}) },
+      community: { visible: false, ...(existingPageData?.community || {}) },
+      pricing: { visible: false, packages: [], ...(existingPageData?.pricing || {}) },
+      livePosts: { visible: false, ...(existingPageData?.livePosts || {}) },
+      faq: { visible: false, items: [], ...(existingPageData?.faq || {}) },
+      timer: { visible: false, ...(existingPageData?.timer || {}) },
+      landingSection: { visible: false, ...(existingPageData?.landingSection || {}) },
+      contact: { visible: false, ...(existingPageData?.contact || {}) }
+    };
+
+    await pageDocRef.set(pageData, { merge: true });
+
+    // 2. Save ambassador subcollection doc under campaign
+    try {
+      const ambSubDocRef = adminDb.collection("campaigns").doc(campaignId).collection("ambassadors").doc(slug);
+      const ambData = {
+        id: slug,
+        campaignId: campaignId,
+        name: ambassadorName,
+        leaderName: ambassadorName,
+        slug: slug,
+        targetGoal: targetGoal,
+        totalRaised: totalRaised,
+        phone: contactData.conta_phone || "",
+        email: contactData.email || "",
+        contactId: contactId,
+        pageUrl: `/${slug}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await ambSubDocRef.set(ambData, { merge: true });
+    } catch (ambErr) {
+      console.warn("Could not set campaign ambassador subcollection doc:", ambErr);
+    }
+  } catch (err) {
+    console.error("Error in syncAmbassadorPage:", err);
+  }
+}
 
 /**
  * Cascade-delete or remove campaign donations associated with a contact

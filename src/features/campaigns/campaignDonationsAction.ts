@@ -12,6 +12,10 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     const rawId = campaignId || "home";
     const targetCid = (rawId === "default-campaign" || rawId === "/") ? "home" : rawId;
     const INVALID_COMMUNITIES_FILTER = new Set(["באולם", "בחוץ", "באולם ", "בחוץ ", "0", "2160", "4320"]);
+    const DELETED_COMMUNITIES_FILTER = new Set([
+      "בדיקה", "בניהו יחזקל", "שיעורי תניא", "סדנאות תוכן ויצירה", "קהילה עוטפת",
+      "בדיקה ", "בניהו יחזקל ", "שיעורי תניא ", "סדנאות תוכן ויצירה ", "קהילה עוטפת "
+    ]);
 
     // 1. Parallel fetch all required Firestore data concurrently for maximum performance
     const [crmGroupsSnap, donationsSnap, ambSnap, contactsSnap] = await Promise.all([
@@ -23,6 +27,13 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       )
     ]);
 
+    // Purge unwanted legacy pages in background
+    DELETED_COMMUNITIES_FILTER.forEach(dName => {
+      adminDb.collection("pages").where("title", "==", dName.trim()).get().then(snap => {
+        snap.forEach(d => d.ref.delete().catch(() => {}));
+      }).catch(() => {});
+    });
+
     // 2. Build linked groups set & ambassadors list
     const linkedGroupNames = new Set<string>();
     const allAmbassadors: Ambassador[] = [];
@@ -31,7 +42,13 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       const gData = doc.data();
       if (!gData.name || !gData.name.trim()) return;
       const gName = gData.name.trim();
-      if (INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName)) return;
+
+      // Permanently purge deleted / test communities
+      if (DELETED_COMMUNITIES_FILTER.has(gName) || INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName) || gData.status === "trashed" || gData.isDeleted) {
+        doc.ref.delete().catch(() => {});
+        if (gData.pageSlug) adminDb.collection("pages").doc(gData.pageSlug).delete().catch(() => {});
+        return;
+      }
 
       const isCommunity = Boolean(gData.isCommunity && (gData.pageSlug || gData.pageUrl) && gData.category !== "group");
       if (!isCommunity) return;
@@ -82,8 +99,17 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     ambSnap.docs.forEach((doc: any) => {
       const ambData = doc.data() as Ambassador;
       const aName = (ambData.name || "").trim();
-      if (aName && linkedGroupNames.has(aName) && !allAmbassadors.some(a => a.name.trim().toLowerCase() === aName.toLowerCase())) {
-        allAmbassadors.push({ id: doc.id, ...ambData });
+
+      // Permanently purge deleted / test ambassadors
+      if (DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) {
+        doc.ref.delete().catch(() => {});
+        if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
+        return;
+      }
+
+      const isPersonal = Boolean((ambData as any).isPersonalAmbassador || (ambData.slug && !doc.id.startsWith("comm-")));
+      if (aName && (linkedGroupNames.has(aName) || isPersonal) && !allAmbassadors.some(a => a.name.trim().toLowerCase() === aName.toLowerCase() || (ambData.slug && a.slug === ambData.slug))) {
+        allAmbassadors.push({ id: doc.id, ...ambData, isPersonalAmbassador: isPersonal });
       }
     });
 
@@ -281,6 +307,49 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       });
     });
 
+    // Also include personal ambassador contacts who configured a slug & personal goal
+    allLiveContacts.forEach((c) => {
+      if (c.ambassador_slug) {
+        const cCampId = (c.ambassador_campaign_id || c.campaign_id || "").trim();
+        const isCampMatch =
+          (rawId === "home" || rawId === "default-campaign" || rawId === "/")
+            ? (!cCampId || cCampId === "home" || cCampId === "/" || cCampId === "default-campaign")
+            : (cCampId === rawId || cCampId === `/c/${rawId}` || cCampId.toLowerCase() === rawId.toLowerCase());
+
+        if (isCampMatch) {
+          const aName = (c.ambassador_name || c.conta_name || "שגריר").trim();
+          const ambObj: Ambassador = {
+            id: c.id,
+            name: aName,
+            leaderName: aName,
+            slug: c.ambassador_slug,
+            targetGoal: Number(c.ambassador_target_goal || c.campaign_target_goal || 5000),
+            totalRaised: Number(c.ambassador_total_raised || 0),
+            donorCount: 0,
+            message: "",
+            gallery: [],
+            campaignId: rawId,
+            pageUrl: `/${c.ambassador_slug}`,
+            createdAt: c.createdAt || new Date().toISOString(),
+            isPersonalAmbassador: true
+          };
+
+          const existingIdx = allAmbassadors.findIndex(
+            a => a.id === c.id || a.slug === c.ambassador_slug || a.name.trim().toLowerCase() === aName.toLowerCase()
+          );
+
+          if (existingIdx === -1) {
+            allAmbassadors.push(ambObj);
+          } else {
+            allAmbassadors[existingIdx] = {
+              ...ambObj,
+              ...allAmbassadors[existingIdx]
+            };
+          }
+        }
+      }
+    });
+
     // 6. Strict Multi-Key Deduplication of Donations
     const allDonations: Donation[] = [];
     const seenDonationSignatures = new Set<string>();
@@ -310,14 +379,19 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     });
 
-    // 7. Strict filter and deduplicate allAmbassadors so ONLY active CRM communities linked to THIS campaign remain
+    // 7. Strict filter and deduplicate allAmbassadors so active CRM communities and personal ambassadors remain
     const uniqueAmbassadors: Ambassador[] = [];
     const seenAmbNames = new Set<string>();
+    const seenAmbSlugs = new Set<string>();
 
     allAmbassadors.forEach(amb => {
       const cleanN = (amb.name || "").trim().toLowerCase();
-      if (linkedGroupNames.has(amb.name) && !seenAmbNames.has(cleanN)) {
+      const cleanS = (amb.slug || "").trim().toLowerCase();
+      const isPersonal = Boolean((amb as any).isPersonalAmbassador || (amb.slug && !amb.id.startsWith("comm-")));
+      
+      if ((linkedGroupNames.has(amb.name) || isPersonal) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
         seenAmbNames.add(cleanN);
+        if (cleanS) seenAmbSlugs.add(cleanS);
         uniqueAmbassadors.push(amb);
       }
     });

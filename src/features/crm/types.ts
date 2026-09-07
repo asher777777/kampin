@@ -131,7 +131,7 @@ export interface Contact {
     imageUrl?: string;
   }[];
 
-  // Campaign Fields
+  // Campaign & Ambassador Personal Goal Fields
   campaign_id?: string;
   campaign_title?: string;
   campaign_role?: "donor" | "ambassador" | "leader" | string;
@@ -167,6 +167,16 @@ export interface Contact {
     receiptUrl?: string;
     date: string;
   }[];
+
+  // Ambassador Page Specific Fields
+  ambassador_name?: string;
+  ambassador_slug?: string;
+  ambassador_campaign_id?: string;
+  ambassador_campaign_title?: string;
+  ambassador_target_goal?: number;
+  ambassador_total_raised?: number;
+  ambassador_page_url?: string;
+  ambassador_page_created?: boolean;
 
   // Timestamps
   createdAt?: string;

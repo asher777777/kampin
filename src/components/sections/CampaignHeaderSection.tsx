@@ -202,11 +202,11 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
   const currentAmbassadorRaised = calculatedAmbassadorRaised ?? liveAmbassador?.totalRaised ?? ambassadorRaised ?? 0;
   const currentAmbassadorGoal = calculatedAmbassadorGoal ?? liveAmbassador?.targetGoal ?? ambassadorGoal ?? 5000;
 
-  // In Ambassador/Community view, the target goal is strictly the community's goal (e.g. 5,000)
-  const currentGoal = isAmbassadorView
-    ? currentAmbassadorGoal
-    : ((config?.targetGoal !== undefined && config?.targetGoal !== null && Number(config.targetGoal) > 0)
-        ? Number(config.targetGoal)
+  // Target goal resolution: If explicitly set on section config (e.g. from editor), use that. Otherwise use ambassador's goal if in ambassador view, or campaign goal.
+  const currentGoal = (config?.targetGoal !== undefined && config?.targetGoal !== null && Number(config.targetGoal) > 0)
+    ? Number(config.targetGoal)
+    : (isAmbassadorView
+        ? currentAmbassadorGoal
         : (liveCampaign?.targetGoal ?? targetGoal ?? 100000));
 
   const currentRaised = isAmbassadorView

@@ -246,7 +246,7 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
             </select>
           </div>
 
-          {/* Default Active Tab Selection */}
+            {/* Default Active Tab Selection */}
           <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-2">
             <label className="block text-xs font-semibold text-slate-300">טאב מציג ברירת מחדל</label>
             <select
@@ -255,7 +255,8 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs font-semibold"
             >
               <option value="donors">טאב תורמים</option>
-              <option value="teams">טאב קבוצות / שגרירים</option>
+              <option value="ambassadors">טאב שגרירים ויעדים אישיים</option>
+              <option value="teams">טאב קהילות / קבוצות</option>
               <option value="about">טאב אודות הקמפיין</option>
             </select>
           </div>
@@ -321,13 +322,36 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
           {/* Checkboxes for Features & Tabs */}
           <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-3">
             <div className="text-xs font-bold text-amber-400">הצגת לשוניות (טאבים) ואפשרויות</div>
+
+            {/* Show / Hide Ambassadors Tab */}
+            <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-700/80">
+              <input
+                type="checkbox"
+                id="showAmbassadorsTab"
+                checked={config.showAmbassadorsTab !== false}
+                onChange={(e) => onChange({ 
+                  ...config, 
+                  showAmbassadorsTab: e.target.checked,
+                  defaultTab: !e.target.checked && config.defaultTab === "ambassadors" ? "donors" : config.defaultTab
+                })}
+                className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="showAmbassadorsTab" className="text-xs text-white font-bold cursor-pointer flex items-center justify-between w-full">
+                <span>הצג טאב שגרירים ויעדים אישיים (Ambassadors)</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  config.showAmbassadorsTab !== false ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                }`}>
+                  {config.showAmbassadorsTab !== false ? "מוצג" : "מוסתר"}
+                </span>
+              </label>
+            </div>
             
             {/* Show / Hide Communities Tab */}
             <div className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-700/80">
               <input
                 type="checkbox"
                 id="showTeamsTab"
-                checked={config.showTeamsTab !== false && config.showCommunitiesTab !== false}
+                checked={Boolean(config.showTeamsTab === true || config.showCommunitiesTab === true)}
                 onChange={(e) => onChange({ 
                   ...config, 
                   showTeamsTab: e.target.checked, 
@@ -337,11 +361,11 @@ export const CampaignDonorsEditor: React.FC<CampaignDonorsEditorProps> = ({
                 className="rounded text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
               />
               <label htmlFor="showTeamsTab" className="text-xs text-white font-bold cursor-pointer flex items-center justify-between w-full">
-                <span>הצג טאב קהילות / שגרירים (Teams)</span>
+                <span>הצג טאב קהילות / קבוצות (Teams)</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                  config.showTeamsTab !== false && config.showCommunitiesTab !== false ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                  config.showTeamsTab === true || config.showCommunitiesTab === true ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
                 }`}>
-                  {config.showTeamsTab !== false && config.showCommunitiesTab !== false ? "מוצג" : "מוסתר"}
+                  {config.showTeamsTab === true || config.showCommunitiesTab === true ? "מוצג" : "מוסתר"}
                 </span>
               </label>
             </div>

@@ -43,21 +43,36 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     activeSlug?.trim() ||
     (ambassadorName && ambassadorName.trim() !== "")
   );
-  const showTeamsTab = config?.showTeamsTab !== false && config?.showCommunitiesTab !== false;
+  const showAmbassadorsTab = config?.showAmbassadorsTab !== false;
+  const showTeamsTab = Boolean(config?.showTeamsTab === true || config?.showCommunitiesTab === true);
   const showAboutTab = config?.showAboutTab !== false;
   const showDonorsTab = config?.showDonorsTab !== false;
 
-  const initialTab = config?.defaultTab === "teams" && !showTeamsTab
-    ? (showDonorsTab ? "donors" : "about")
-    : (config?.defaultTab || "donors");
+  const initialTab: "donors" | "ambassadors" | "teams" | "about" = (() => {
+    const def = config?.defaultTab;
+    if (def === "ambassadors" && showAmbassadorsTab) return "ambassadors";
+    if (def === "teams" && showTeamsTab) return "teams";
+    if (def === "about" && showAboutTab) return "about";
+    if (def === "donors" && showDonorsTab) return "donors";
+    if (showDonorsTab) return "donors";
+    if (showAmbassadorsTab) return "ambassadors";
+    if (showTeamsTab) return "teams";
+    if (showAboutTab) return "about";
+    return "donors";
+  })();
 
-  const [activeTab, setActiveTab] = useState<"donors" | "teams" | "about">(initialTab);
+  const [activeTab, setActiveTab] = useState<"donors" | "ambassadors" | "teams" | "about">(initialTab);
 
   useEffect(() => {
-    if (activeTab === "teams" && !showTeamsTab) {
-      setActiveTab(showDonorsTab ? "donors" : "about");
+    if (activeTab === "ambassadors" && !showAmbassadorsTab) {
+      setActiveTab(showDonorsTab ? "donors" : showTeamsTab ? "teams" : "about");
+    } else if (activeTab === "teams" && !showTeamsTab) {
+      setActiveTab(showDonorsTab ? "donors" : showAmbassadorsTab ? "ambassadors" : "about");
+    } else if (activeTab === "donors" && !showDonorsTab) {
+      setActiveTab(showAmbassadorsTab ? "ambassadors" : showTeamsTab ? "teams" : "about");
     }
-  }, [showTeamsTab, showDonorsTab, activeTab]);
+  }, [showAmbassadorsTab, showTeamsTab, showDonorsTab, showAboutTab, activeTab]);
+
   const [donorFilterMode, setDonorFilterMode] = useState<"ambassador_only" | "all">(
     isAmbassadorView ? "ambassador_only" : "all"
   );
@@ -251,7 +266,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
       <div className="max-w-5xl mx-auto flex flex-col gap-6">
 
         {/* Tab Navigation Header */}
-        <div className="flex items-center justify-center border-b border-slate-200 gap-8 text-base md:text-lg font-bold">
+        <div className="flex flex-wrap items-center justify-center border-b border-slate-200 gap-4 sm:gap-8 text-sm sm:text-base md:text-lg font-bold">
           {showDonorsTab && (
             <button
               onClick={() => setActiveTab("donors")}
@@ -262,6 +277,23 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
               <span>{displayDonations.length} תורמים</span>
               {activeTab === "donors" && (
                 <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700 rounded-full" />
+              )}
+            </button>
+          )}
+
+          {showAmbassadorsTab && (
+            <button
+              onClick={() => setActiveTab("ambassadors")}
+              className={`pb-3 relative transition-colors cursor-pointer ${
+                activeTab === "ambassadors" ? "text-emerald-800" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-amber-600 inline" />
+                <span>{displayAmbassadors.length} שגרירים ויעדים אישיים</span>
+              </span>
+              {activeTab === "ambassadors" && (
+                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-1 bg-amber-600 rounded-full" />
               )}
             </button>
           )}
@@ -407,22 +439,108 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
           </div>
         )}
 
+        {/* Ambassadors / Personal Goals Tab Content */}
+        {activeTab === "ambassadors" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-amber-500/10 border border-amber-500/20 p-4 sm:p-5 rounded-2xl shadow-xs">
+              <div className="text-right space-y-0.5">
+                <h3 className="font-extrabold text-amber-900 text-base sm:text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-amber-600" />
+                  <span>שגרירים ויעדים אישיים בקמפיין</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-amber-800/80 font-medium">
+                  צפו בעמודי היעד האישיים של השגרירים המובילים ותמכו בהם להשגת היעד
+                </p>
+              </div>
+            </div>
+
+            {displayAmbassadors.length === 0 ? (
+              <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+                <Target className="w-12 h-12 text-slate-300" />
+                <h4 className="text-base font-bold text-slate-700">עדיין לא נפתחו עמודי יעדים אישיים בקמפיין</h4>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  עמודי שגרירים ויעדים אישיים מנוהלים ומתווספים דרך מערכת הניהול (CRM).
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {displayAmbassadors.map((amb) => {
+                  const ambGoal = Number(amb.targetGoal || 5000);
+                  const ambRaised = Number(amb.totalRaised || 0);
+                  const ambPercentage = Math.min(100, Math.round((ambRaised / (ambGoal || 1)) * 100));
+                  const isCurrentAmbassador = Boolean(
+                    (ambassadorId && amb.id === ambassadorId) ||
+                    (activeSlug && (amb.slug === activeSlug || amb.id === activeSlug)) ||
+                    (ambassadorName && amb.name.trim().toLowerCase() === ambassadorName.trim().toLowerCase())
+                  );
+
+                  return (
+                    <div 
+                      key={amb.id} 
+                      className={`bg-white p-5 rounded-2xl border transition-all flex flex-col justify-between gap-4 ${
+                        isCurrentAmbassador 
+                          ? "border-amber-400 ring-2 ring-amber-300/50 shadow-md bg-amber-50/20" 
+                          : "border-slate-200 shadow-sm hover:shadow-md"
+                      }`}
+                    >
+                      <div>
+                        {isCurrentAmbassador && (
+                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-2">
+                            <Sparkles className="w-3 h-3 text-amber-600" />
+                            <span>זה עמוד היעד האישי שלך</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full">
+                            {ambPercentage}% הושגו
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-lg">{amb.leaderName || amb.name}</h4>
+                        </div>
+
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden my-3">
+                          <div
+                            className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${ambPercentage}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                          <span>יעד: ₪{ambGoal.toLocaleString()}</span>
+                          <span className="font-bold text-emerald-800">גויס: ₪{ambRaised.toLocaleString()}</span>
+                        </div>
+                        {amb.donorCount !== undefined && amb.donorCount > 0 && (
+                          <div className="text-[11px] text-slate-400 text-right mt-1">
+                            {amb.donorCount} תורמים
+                          </div>
+                        )}
+                      </div>
+
+                      <a
+                        href={amb.slug ? `/${amb.slug}` : (amb.pageUrl || `/c/${targetCampaignId}/${amb.slug || amb.id}`)}
+                        className={`w-full py-2 text-xs font-bold rounded-lg transition-colors text-center border ${
+                          isCurrentAmbassador
+                            ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600"
+                            : "bg-slate-100 hover:bg-amber-50 text-slate-800 hover:text-amber-900 border-slate-200"
+                        }`}
+                      >
+                        {isCurrentAmbassador ? "אתה נמצא כאן" : "צפה בעמוד היעד האישי"}
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Teams / Community Leaders Tab Content */}
         {activeTab === "teams" && (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-emerald-50 border border-emerald-200 p-4 sm:p-5 rounded-2xl shadow-xs">
               <div className="text-right space-y-0.5">
-                <h3 className="font-extrabold text-emerald-950 text-base sm:text-lg">אמרו לך שאת המובילה של הפעילות</h3>
-                <p className="text-xs sm:text-sm text-emerald-800 font-medium">פתחי עמוד מיוחד להגדיל את המשתתפים</p>
+                <h3 className="font-extrabold text-emerald-950 text-base sm:text-lg">קהילות וקבוצות בקמפיין</h3>
+                <p className="text-xs sm:text-sm text-emerald-800 font-medium">עמודי הקהילות והקבוצות המובילות את הפעילות</p>
               </div>
-              
-              <button
-                onClick={onOpenAmbassadorModal}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-full text-sm transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>צרי קהילה</span>
-              </button>
             </div>
 
             {displayAmbassadors.length === 0 ? (
@@ -430,7 +548,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                 <Users className="w-12 h-12 text-slate-300" />
                 <h4 className="text-base font-bold text-slate-700">עדיין לא נפתחו קהילות בקמפיין</h4>
                 <p className="text-xs text-slate-500 max-w-sm">
-                  רוצה לפתוח עמוד מיוחד ולהגדיל את המשתתפים? לחצי על "צרי קהילה" והצטרפי!
+                  קהילות מנוהלות ומתווספות דרך מערכת הניהול (CRM).
                 </p>
               </div>
             ) : (

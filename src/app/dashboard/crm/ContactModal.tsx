@@ -5,13 +5,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
-import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField } from "@/features/crm/actions";
+import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField, checkAmbassadorSlugAvailability } from "@/features/crm/actions";
 import { getAllCampaigns } from "@/features/campaigns/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
-import { impersonateUser } from "@/features/users/impersonate";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle, FileText } from "lucide-react";
-import { InteractionsList } from "@/components/ui/InteractionsList";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap, Heart, Target, ExternalLink, Sparkles, CheckCircle, FileText, Lock, Copy, Check, AlertCircle, Globe, Info } from "lucide-react";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -47,7 +45,7 @@ interface ContactModalProps {
   onSuccess: () => void;
 }
 
-type TabType = "details" | "camp" | "tags" | "company" | "events" | "timeline" | "payments" | "userDetails" | "aistats";
+type TabType = "details" | "camp" | "ambassador" | "tags" | "company" | "events" | "timeline" | "payments" | "userDetails" | "aistats";
 
 const EditableLabel = ({ label, fieldId, isCustom, onSave, canEdit = true }: { label: string, fieldId: string, isCustom: boolean, onSave: (id: string, newLabel: string, isCustom: boolean) => Promise<void>, canEdit?: boolean }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -230,6 +228,54 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   const [campaignDonationsHistory, setCampaignDonationsHistory] = useState<any[]>([]);
   const [availableCampaigns, setAvailableCampaigns] = useState<any[]>([]);
 
+  // Ambassador & Personal Goal State
+  const [ambassadorName, setAmbassadorName] = useState("");
+  const [ambassadorCampaignId, setAmbassadorCampaignId] = useState("");
+  const [ambassadorCampaignTitle, setAmbassadorCampaignTitle] = useState("");
+  const [ambassadorTargetGoal, setAmbassadorTargetGoal] = useState<number | "">("");
+  const [ambassadorSlug, setAmbassadorSlug] = useState("");
+  const [isSlugLocked, setIsSlugLocked] = useState(false);
+  const [slugChecking, setSlugChecking] = useState(false);
+  const [slugError, setSlugError] = useState("");
+  const [slugAvailable, setSlugAvailable] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const validateAndCheckSlug = async (rawSlug: string) => {
+    // Format to lowercase English characters, numbers, and hyphens only
+    const cleaned = rawSlug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "");
+    setAmbassadorSlug(cleaned);
+
+    if (!cleaned) {
+      setSlugError("");
+      setSlugAvailable(false);
+      return;
+    }
+
+    if (isSlugLocked) {
+      return;
+    }
+
+    setSlugChecking(true);
+    setSlugError("");
+    setSlugAvailable(false);
+
+    try {
+      const res = await checkAmbassadorSlugAvailability(cleaned, contact?.id);
+      if (res.available) {
+        setSlugAvailable(true);
+        setSlugError("");
+      } else {
+        setSlugAvailable(false);
+        setSlugError(res.message || "הסלאג שבחרת כבר קיים במערכת. יש להחליף סלאג.");
+      }
+    } catch (e: any) {
+      setSlugError("שגיאה בבדיקת הסלאג");
+      setSlugAvailable(false);
+    } finally {
+      setSlugChecking(false);
+    }
+  };
+
   // Repeater states
   const [events, setEvents] = useState<ContactEvent[]>([]);
   const [eventSubTab, setEventSubTab] = useState<"events" | "timeline">("events");
@@ -355,6 +401,18 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setCampaignTotalRaised(contact.campaign_total_raised ?? "");
         setCampaignDonationsHistory(contact.campaign_donations_history || []);
 
+        // Initialize Ambassador Fields
+        const existingAmbSlug = contact.ambassador_slug || "";
+        setAmbassadorName(contact.ambassador_name || (contact.conta_name ? `${contact.conta_name} ${contact.f_m || ""}`.trim() : ""));
+        setAmbassadorCampaignId(contact.ambassador_campaign_id || contact.campaign_id || "");
+        setAmbassadorCampaignTitle(contact.ambassador_campaign_title || contact.campaign_title || "");
+        setAmbassadorTargetGoal(contact.ambassador_target_goal ?? contact.campaign_target_goal ?? "");
+        setAmbassadorSlug(existingAmbSlug);
+        setIsSlugLocked(Boolean(existingAmbSlug));
+        setSlugError("");
+        setSlugAvailable(Boolean(existingAmbSlug));
+        setCopiedLink(false);
+
         setEvents(contact.events || []);
 
         const dynamicValues: Record<string, any> = {};
@@ -404,6 +462,17 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setCampaignTotalRaised("");
         setCampaignDonationsHistory([]);
 
+        // Reset Ambassador Fields
+        setAmbassadorName("");
+        setAmbassadorCampaignId("");
+        setAmbassadorCampaignTitle("");
+        setAmbassadorTargetGoal("");
+        setAmbassadorSlug("");
+        setIsSlugLocked(false);
+        setSlugError("");
+        setSlugAvailable(false);
+        setCopiedLink(false);
+
         setEvents([]);
         setCustomFieldsValues({});
       }
@@ -414,6 +483,11 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
     e.preventDefault();
     if (!contaName || !contaPhone) {
       setError("שם פרטי וטלפון הם שדות חובה");
+      return;
+    }
+
+    if (ambassadorSlug && !isSlugLocked && slugError) {
+      setError("הסלאג שנבחר אינו זמין. יש להחליף סלאג תקין באנגלית.");
       return;
     }
 
@@ -441,9 +515,9 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       website: website,
       events,
       // Campaign Fields
-      campaign_id: campaignId || undefined,
-      campaign_title: campaignTitle || (availableCampaigns.find(c => c.id === campaignId)?.title || undefined),
-      campaign_role: campaignRole,
+      campaign_id: (ambassadorCampaignId || campaignId) || undefined,
+      campaign_title: (ambassadorCampaignTitle || campaignTitle) || (availableCampaigns.find(c => c.id === (ambassadorCampaignId || campaignId))?.title || undefined),
+      campaign_role: ambassadorSlug ? "ambassador" : campaignRole,
       campaign_donation_mode: campaignDonationMode,
       campaign_amount: campaignAmount !== "" ? Number(campaignAmount) : undefined,
       campaign_monthly_amount: campaignMonthlyAmount !== "" ? Number(campaignMonthlyAmount) : undefined,
@@ -456,12 +530,18 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       campaign_payment_method: campaignPaymentMethod,
       campaign_transaction_id: campaignTransactionId,
       campaign_receipt_url: campaignReceiptUrl,
-      campaign_target_goal: campaignTargetGoal !== "" ? Number(campaignTargetGoal) : undefined,
+      campaign_target_goal: (ambassadorTargetGoal !== "" ? Number(ambassadorTargetGoal) : (campaignTargetGoal !== "" ? Number(campaignTargetGoal) : undefined)),
       campaign_total_raised: campaignTotalRaised !== "" ? Number(campaignTotalRaised) : undefined,
       campaign_donations_history: campaignDonationsHistory,
+      // Ambassador Fields
+      ambassador_name: ambassadorName || (contaName ? `${contaName} ${fM || ""}`.trim() : undefined),
+      ambassador_campaign_id: (ambassadorCampaignId || campaignId) || undefined,
+      ambassador_campaign_title: (ambassadorCampaignTitle || campaignTitle) || undefined,
+      ambassador_target_goal: ambassadorTargetGoal !== "" ? Number(ambassadorTargetGoal) : undefined,
+      ambassador_slug: ambassadorSlug || undefined,
+      ambassador_page_url: ambassadorSlug ? `/${ambassadorSlug}` : undefined,
       ...customFieldsValues,
     };
-
 
     try {
       if (isEdit && contact?.id) {
@@ -1204,6 +1284,236 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
                 <InteractionsList contactId={contact?.id || ""} contactName={contact?.conta_name || ""} />
                 {renderCustomFields("events")}
+              </div>
+            )}
+          </div>
+
+          {/* Tab Content: Ambassador & Personal Goal */}
+          <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+            <button
+              type="button"
+              id="tab-ambassador"
+              onClick={() => handleTabClick("ambassador")}
+              className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "ambassador" ? "ring-1 ring-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] z-10 relative" : "border-b border-white/5"}`}
+            >
+              <div className="flex items-center gap-3 text-white">
+                <Target className="w-4 h-4 text-amber-400 fill-amber-500/20" />
+                <span className="font-bold">שגריר ויעד אישי (עמוד פרטי)</span>
+                {ambassadorSlug && (
+                  <span className="text-[11px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1 font-mono" dir="ltr">
+                    /{ambassadorSlug} {ambassadorTargetGoal !== "" && `• ₪${Number(ambassadorTargetGoal).toLocaleString()}`}
+                  </span>
+                )}
+              </div>
+              {activeTab === "ambassador" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+            </button>
+            {activeTab === "ambassador" && (
+              <div className="p-6 bg-[#111] animate-in fade-in duration-200">
+                <div className="space-y-6 animate-in fade-in">
+                  
+                  {/* Banner Description */}
+                  <div className="p-4 bg-gradient-to-r from-amber-500/10 via-zinc-900 to-amber-500/5 rounded-2xl border border-amber-500/20 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-right">
+                      <h4 className="text-sm font-bold text-amber-400">הקמת עמוד יעד אישי לשגריר</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        פתיחת עמוד יעד אישי מאפשרת לאיש הקשר להוביל יעד גיוס עצמאי המקושר לקמפיין הראשי. העמוד יוקם תחת כתובת ישירה בשורש האתר (<code className="text-amber-300 font-mono text-xs px-1 py-0.5 bg-black/40 rounded" dir="ltr">/:slug</code>).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Form Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* 1. Ambassador Name on Page */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-amber-500">השם שיופיע בעמוד</label>
+                      <Input
+                        value={ambassadorName}
+                        onChange={(e) => setAmbassadorName(e.target.value)}
+                        placeholder={contaName ? `${contaName} ${fM || ""}`.trim() : "למשל: משפחת כהן / יעד אישי דוד"}
+                        className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                      />
+                    </div>
+
+                    {/* 2. Linked Campaign Selection */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-amber-500">קמפיין מקושר (שידוך נתונים)</label>
+                      <select
+                        value={ambassadorCampaignId || campaignId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAmbassadorCampaignId(val);
+                          setCampaignId(val);
+                          const selectedCamp = availableCampaigns.find(c => c.id === val);
+                          if (selectedCamp) {
+                            const title = selectedCamp.title || selectedCamp.name || "";
+                            setAmbassadorCampaignTitle(title);
+                            setCampaignTitle(title);
+                          }
+                        }}
+                        style={{ colorScheme: "dark" }}
+                        className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium [color-scheme:dark]"
+                      >
+                        <option value="" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>בחר קמפיין מקושר...</option>
+                        {Object.entries(
+                          availableCampaigns.reduce((acc: Record<string, any[]>, item: any) => {
+                            const cat = item.category || "קמפיינים";
+                            if (!acc[cat]) acc[cat] = [];
+                            acc[cat].push(item);
+                            return acc;
+                          }, {})
+                        ).map(([category, items]) => (
+                          <optgroup key={category} label={category} className="bg-[#222222] text-amber-400 font-bold" style={{ backgroundColor: "#222222", color: "#f59e0b" }}>
+                            {(items as any[]).map((c: any) => {
+                              let displayTitle = c.title || c.name || "";
+                              if (!displayTitle) {
+                                try {
+                                  displayTitle = decodeURIComponent(c.id || "");
+                                } catch {
+                                  displayTitle = c.id;
+                                }
+                              }
+                              return (
+                                <option key={c.id} value={c.id} className="bg-[#181818] text-white font-normal" style={{ backgroundColor: "#181818", color: "#ffffff" }}>
+                                  {displayTitle}
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. Personal Target Goal */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-amber-500">היעד שאיש הקשר לוקח עליו (₪)</label>
+                      <Input
+                        type="number"
+                        value={ambassadorTargetGoal}
+                        onChange={(e) => setAmbassadorTargetGoal(e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder="למשל: 10000"
+                        className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500 font-bold"
+                      />
+                    </div>
+
+                    {/* 4. Slug selection (English only, unique, locked once saved) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-amber-500 flex items-center gap-1.5">
+                          <span>סלאג לבחירה (באנגלית בלבד)</span>
+                          {isSlugLocked && <Lock className="w-3.5 h-3.5 text-amber-400" />}
+                        </label>
+                        {isSlugLocked && (
+                          <span className="text-[10px] text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded font-bold">
+                            סלאג נעול לאחר שמירה
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="relative">
+                        <Input
+                          value={ambassadorSlug}
+                          onChange={(e) => validateAndCheckSlug(e.target.value)}
+                          disabled={isSlugLocked}
+                          placeholder="my-goal"
+                          className={`bg-transparent border ${slugError ? "border-rose-500" : slugAvailable ? "border-emerald-500" : "border-amber-500"} text-white rounded-xl placeholder:text-white/30 font-mono text-sm pl-8 disabled:opacity-60 disabled:cursor-not-allowed`}
+                          dir="ltr"
+                        />
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2">
+                          {slugChecking && <Loader2 className="w-4 h-4 animate-spin text-amber-400" />}
+                          {!slugChecking && slugAvailable && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                          {!slugChecking && slugError && <AlertCircle className="w-4 h-4 text-rose-400" />}
+                          {!slugChecking && isSlugLocked && <Lock className="w-4 h-4 text-amber-400" />}
+                        </div>
+                      </div>
+
+                      {/* Slug Feedback messages */}
+                      {slugError && (
+                        <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-1 font-semibold">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>{slugError}</span>
+                        </p>
+                      )}
+                      {!slugError && slugAvailable && !isSlugLocked && (
+                        <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1 font-semibold">
+                          <CheckCircle className="w-3 h-3 shrink-0" />
+                          <span>סלאג פנוי וזמין לשימוש במערכת!</span>
+                        </p>
+                      )}
+                      {isSlugLocked && (
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          לא ניתן לשנות את הסלאג מרגע שנבחר ונשמר במערכת.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 5. Private Link Display Box (Visible when slug exists) */}
+                  {ambassadorSlug && (
+                    <div className="p-4 bg-zinc-900 border border-amber-500/30 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
+                          <Globe className="w-4 h-4" />
+                          <span>קישור לעמוד היעד האישי</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono" dir="ltr">
+                          /{ambassadorSlug}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <div className="w-full sm:flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-200 font-mono truncate text-left" dir="ltr">
+                          {typeof window !== "undefined" ? `${window.location.origin}/${ambassadorSlug}` : `/${ambassadorSlug}`}
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const fullUrl = `${window.location.origin}/${ambassadorSlug}`;
+                              navigator.clipboard.writeText(fullUrl);
+                              setCopiedLink(true);
+                              setTimeout(() => setCopiedLink(false), 2000);
+                            }}
+                            className="flex-1 sm:flex-initial bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs h-9 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedLink ? "הועתק!" : "העתק קישור"}</span>
+                          </Button>
+
+                          <a
+                            href={`/${ambassadorSlug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 sm:flex-initial bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs h-9 px-3 rounded-xl border border-white/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>פתח עמוד</span>
+                          </a>
+
+                          <a
+                            href={`https://wa.me/?text=${encodeURIComponent(`שלום, אני מזמין אתכם לתמוך ביעד האישי שלי: ${typeof window !== "undefined" ? window.location.origin : ""}/${ambassadorSlug}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-xl border border-emerald-500/30 flex items-center justify-center transition-colors shrink-0"
+                            title="שתף בוואטסאפ"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {!isSlugLocked && (
+                        <div className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 flex items-center gap-2">
+                          <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>שימו לב: יש ללחוץ על <strong>"שמור שינויים"</strong> בתחתית הטופס כדי להקים ולהפעיל את העמוד בכתובת זו.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
               </div>
             )}
           </div>

@@ -88,10 +88,12 @@ export interface CampaignDonorsConfig {
   title?: string;
   showSearch?: boolean;
   showSort?: boolean;
+  showDonorsTab?: boolean;
+  showAmbassadorsTab?: boolean;
   showTeamsTab?: boolean;
   showCommunitiesTab?: boolean;
   showAboutTab?: boolean;
-  defaultTab?: "donors" | "teams" | "about";
+  defaultTab?: "donors" | "ambassadors" | "teams" | "about";
   cardLayout?: "grid-2" | "grid-3" | "list" | "compact";
   cardBgColor?: string;
   cardTextColor?: string;
