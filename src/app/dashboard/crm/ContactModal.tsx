@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
-import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField, checkAmbassadorSlugAvailability } from "@/features/crm/actions";
+import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField, checkAmbassadorSlugAvailability, deleteAmbassadorPage } from "@/features/crm/actions";
 import { getAllCampaigns } from "@/features/campaigns/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
@@ -276,6 +276,47 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
     }
   };
 
+  const [isDeletingPage, setIsDeletingPage] = useState(false);
+
+  const handleDeleteAmbassadorPage = async () => {
+    if (!contact?.id && !ambassadorSlug) return;
+    if (!confirm("האם אתה בטוח שברצונך למחוק את עמוד היעד האישי? פעולה זו תמחק את העמוד מהמערכת ותאפשר להגדיר סלאג חדש.")) return;
+
+    setIsDeletingPage(true);
+    try {
+      if (contact?.id) {
+        const res = await deleteAmbassadorPage(contact.id);
+        if (!res.success) {
+          alert("שגיאה במחיקת העמוד: " + (res.error || ""));
+          setIsDeletingPage(false);
+          return;
+        }
+      }
+      if (contact) {
+        contact.ambassador_slug = undefined;
+        contact.ambassador_name = undefined;
+        contact.ambassador_target_goal = undefined;
+        contact.ambassador_campaign_id = undefined;
+        contact.ambassador_campaign_title = undefined;
+        contact.ambassador_total_raised = undefined;
+      }
+      setAmbassadorSlug("");
+      setIsSlugLocked(false);
+      setSlugAvailable(false);
+      setSlugError("");
+      setAmbassadorName("");
+      setAmbassadorTargetGoal("");
+      setAmbassadorCampaignId("");
+      setAmbassadorCampaignTitle("");
+      alert("עמוד היעד האישי נמחק בהצלחה!");
+      onSuccess();
+    } catch (err: any) {
+      alert("שגיאה במחיקת העמוד: " + (err.message || err));
+    } finally {
+      setIsDeletingPage(false);
+    }
+  };
+
   // Repeater states
   const [events, setEvents] = useState<ContactEvent[]>([]);
   const [eventSubTab, setEventSubTab] = useState<"events" | "timeline">("events");
@@ -534,10 +575,10 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       campaign_total_raised: campaignTotalRaised !== "" ? Number(campaignTotalRaised) : undefined,
       campaign_donations_history: campaignDonationsHistory,
       // Ambassador Fields
-      ambassador_name: ambassadorName || (contaName ? `${contaName} ${fM || ""}`.trim() : undefined),
-      ambassador_campaign_id: (ambassadorCampaignId || campaignId) || undefined,
-      ambassador_campaign_title: (ambassadorCampaignTitle || campaignTitle) || undefined,
-      ambassador_target_goal: ambassadorTargetGoal !== "" ? Number(ambassadorTargetGoal) : undefined,
+      ambassador_name: ambassadorSlug ? (ambassadorName || (contaName ? `${contaName} ${fM || ""}`.trim() : undefined)) : undefined,
+      ambassador_campaign_id: ambassadorSlug ? ((ambassadorCampaignId || campaignId) || undefined) : undefined,
+      ambassador_campaign_title: ambassadorSlug ? ((ambassadorCampaignTitle || campaignTitle) || undefined) : undefined,
+      ambassador_target_goal: (ambassadorSlug && ambassadorTargetGoal !== "") ? Number(ambassadorTargetGoal) : undefined,
       ambassador_slug: ambassadorSlug || undefined,
       ambassador_page_url: ambassadorSlug ? `/${ambassadorSlug}` : undefined,
       ...customFieldsValues,
@@ -1510,6 +1551,21 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                           <span>שימו לב: יש ללחוץ על <strong>"שמור שינויים"</strong> בתחתית הטופס כדי להקים ולהפעיל את העמוד בכתובת זו.</span>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Delete Ambassador Page Option */}
+                  {Boolean(isSlugLocked || ambassadorSlug) && (
+                    <div className="pt-2 flex justify-end border-t border-white/5">
+                      <Button
+                        type="button"
+                        onClick={handleDeleteAmbassadorPage}
+                        disabled={isDeletingPage}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/30 font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        {isDeletingPage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        <span>מחק עמוד יעד אישי</span>
+                      </Button>
                     </div>
                   )}
 

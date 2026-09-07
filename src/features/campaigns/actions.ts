@@ -292,11 +292,11 @@ export async function createAmbassadorAction(data: {
         },
         // 2. Rich Content / About Section: כותרת הקהילה והחזון
         richContent: {
-          visible: true,
+          visible: false,
           anchorId: "richContent",
-          heading: name.trim(),
-          title: name.trim(),
-          body: message || `ברוכים הבאים לעמוד קהילת ${name.trim()} בקמפיין ${campaignTitle}`,
+          heading: "",
+          title: "",
+          body: message || "",
           layout: "center"
         },
         // 3. Campaign Tiers

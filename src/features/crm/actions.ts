@@ -589,13 +589,14 @@ export async function syncAmbassadorPage(contactId: string, contactData: any) {
         ...(existingPageData?.campaignDonors || {})
       },
       richContent: {
-        visible: true,
+        visible: existingPageData?.richContent?.visible === true ? true : false,
         anchorId: "richContent",
-        heading: ambassadorName,
-        title: ambassadorName,
-        body: existingPageData?.richContent?.body || `ברוכים הבאים לעמוד היעד האישי של ${ambassadorName} עבור קמפיין ${campaignTitle}`,
+        heading: "",
+        title: "",
+        body: existingPageData?.richContent?.body || "",
         layout: "center",
-        ...(existingPageData?.richContent || {})
+        ...(existingPageData?.richContent || {}),
+        visible: existingPageData?.richContent?.visible === true ? true : false,
       },
       hero: { visible: false, ...(existingPageData?.hero || {}) },
       mainContent: { visible: false, ...(existingPageData?.mainContent || {}) },
@@ -611,7 +612,7 @@ export async function syncAmbassadorPage(contactId: string, contactData: any) {
 
     await pageDocRef.set(pageData, { merge: true });
 
-    // 2. Save ambassador subcollection doc under campaign
+    // 2. Save ambassador subcollection doc under campaign and clean up other campaigns
     try {
       const ambSubDocRef = adminDb.collection("campaigns").doc(campaignId).collection("ambassadors").doc(slug);
       const ambData = {
@@ -630,11 +631,113 @@ export async function syncAmbassadorPage(contactId: string, contactData: any) {
         updatedAt: new Date().toISOString()
       };
       await ambSubDocRef.set(ambData, { merge: true });
+
+      // Clean up ambassador doc from all other campaigns if campaignId changed
+      const allCampsSnap = await adminDb.collection("campaigns").get();
+      for (const cDoc of allCampsSnap.docs) {
+        if (cDoc.id !== campaignId) {
+          await cDoc.ref.collection("ambassadors").doc(slug).delete().catch(() => {});
+        }
+      }
     } catch (ambErr) {
       console.warn("Could not set campaign ambassador subcollection doc:", ambErr);
     }
   } catch (err) {
     console.error("Error in syncAmbassadorPage:", err);
+  }
+}
+
+/**
+ * Permanently delete an ambassador page and unbind the slug from the contact
+ */
+export async function deleteAmbassadorPage(contactId: string) {
+  try {
+    const ownerId = await getUserId();
+    const contactRef = adminDb.collection("contacts").doc(contactId);
+    const contactSnap = await contactRef.get();
+
+    if (!contactSnap.exists) {
+      return { success: false, error: "איש הקשר לא נמצא" };
+    }
+
+    const cData = contactSnap.data() || {};
+    const slug = (cData.ambassador_slug || "").trim().toLowerCase();
+    const ambName = (cData.ambassador_name || cData.conta_name || "").trim();
+    const fullName = `${cData.conta_name || ""} ${cData.f_m || ""}`.trim();
+
+    // 1. Delete page from 'pages' collection
+    if (slug) {
+      await adminDb.collection("pages").doc(slug).delete().catch(() => {});
+    }
+
+    // 2. Delete ambassador from ALL campaigns
+    const campsSnap = await adminDb.collection("campaigns").get();
+    for (const cDoc of campsSnap.docs) {
+      try {
+        const ambSubCol = cDoc.ref.collection("ambassadors");
+        const ambSubSnap = await ambSubCol.get();
+        for (const aDoc of ambSubSnap.docs) {
+          const aData = aDoc.data() || {};
+          const aDocName = (aData.name || aData.leaderName || "").trim();
+          const isMatch =
+            aDoc.id === slug ||
+            aDoc.id === contactId ||
+            (slug && aData.slug === slug) ||
+            (aData.contactId && aData.contactId === contactId) ||
+            (ambName && aDocName === ambName) ||
+            (fullName && aDocName === fullName) ||
+            (cData.conta_name && aDocName === cData.conta_name.trim());
+
+          if (isMatch) {
+            await aDoc.ref.delete().catch(() => {});
+          }
+        }
+      } catch (cErr) {
+        console.warn(`Error deleting ambassador doc in campaign ${cDoc.id}:`, cErr);
+      }
+    }
+
+    // 3. Delete any matching group in 'groups' collection
+    try {
+      const groupsSnap = await adminDb.collection("groups").get();
+      for (const gDoc of groupsSnap.docs) {
+        const gData = gDoc.data() || {};
+        const gDocName = (gData.name || gData.leaderName || "").trim();
+        if (
+          (gData.leaderContactId && gData.leaderContactId === contactId) ||
+          (slug && gData.pageSlug === slug) ||
+          (ambName && gDocName === ambName) ||
+          (fullName && gDocName === fullName)
+        ) {
+          await gDoc.ref.delete().catch(() => {});
+        }
+      }
+    } catch (gErr) {
+      console.warn("Error deleting ambassador groups:", gErr);
+    }
+
+    // 4. Clear ambassador fields from contact
+    await contactRef.update({
+      ambassador_slug: FieldValue.delete(),
+      ambassador_name: FieldValue.delete(),
+      ambassador_campaign_id: FieldValue.delete(),
+      ambassador_campaign_title: FieldValue.delete(),
+      ambassador_target_goal: FieldValue.delete(),
+      ambassador_total_raised: FieldValue.delete(),
+      ambassador_page_url: FieldValue.delete(),
+      ambassador_page_created: FieldValue.delete(),
+      campaign_role: cData.campaign_role === "ambassador" ? "donor" : (cData.campaign_role || "donor"),
+      updatedAt: new Date().toISOString()
+    });
+
+    revalidatePath("/dashboard/crm");
+    revalidatePath("/[id]", "layout");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in deleteAmbassadorPage:", error);
+    return { success: false, error: error.message || String(error) };
   }
 }
 

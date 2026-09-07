@@ -205,11 +205,20 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
   const displayAmbassadors = useMemo(() => {
     const unique: Ambassador[] = [];
     const seenNames = new Set<string>();
+    const seenSlugs = new Set<string>();
 
     ambassadors.forEach(amb => {
+      if (amb.isCommunity) return;
+      const cleanSlug = (amb.slug || "").trim().toLowerCase();
+      const pageUrl = (amb.pageUrl || "").trim();
+      if (!cleanSlug && !pageUrl) return;
+
       const cleanN = (amb.name || "").trim().toLowerCase();
-      if (!seenNames.has(cleanN)) {
+      if (!cleanN) return;
+
+      if (!seenNames.has(cleanN) && (!cleanSlug || !seenSlugs.has(cleanSlug))) {
         seenNames.add(cleanN);
+        if (cleanSlug) seenSlugs.add(cleanSlug);
         unique.push(amb);
       }
     });
@@ -516,7 +525,7 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
                       </div>
 
                       <a
-                        href={amb.slug ? `/${amb.slug}` : (amb.pageUrl || `/c/${targetCampaignId}/${amb.slug || amb.id}`)}
+                        href={amb.slug ? `/${amb.slug}` : (amb.pageUrl || "#")}
                         className={`w-full py-2 text-xs font-bold rounded-lg transition-colors text-center border ${
                           isCurrentAmbassador
                             ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600"

@@ -34,86 +34,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }).catch(() => {});
     });
 
-    // 2. Build linked groups set & ambassadors list
-    const linkedGroupNames = new Set<string>();
-    const allAmbassadors: Ambassador[] = [];
-
-    crmGroupsSnap.docs.forEach((doc: any) => {
-      const gData = doc.data();
-      if (!gData.name || !gData.name.trim()) return;
-      const gName = gData.name.trim();
-
-      // Permanently purge deleted / test communities
-      if (DELETED_COMMUNITIES_FILTER.has(gName) || INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName) || gData.status === "trashed" || gData.isDeleted) {
-        doc.ref.delete().catch(() => {});
-        if (gData.pageSlug) adminDb.collection("pages").doc(gData.pageSlug).delete().catch(() => {});
-        return;
-      }
-
-      const isCommunity = Boolean(gData.isCommunity && (gData.pageSlug || gData.pageUrl) && gData.category !== "group");
-      if (!isCommunity) return;
-
-      const gMainCamp = (gData.mainCampaignId || "").trim();
-
-      // Strict campaign linkage: ONLY if explicitly assigned to this campaign
-      const isLinked =
-        (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-          ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
-          : (gMainCamp === rawId || gMainCamp === `🎯 ${rawId}` || gMainCamp === `/c/${rawId}` || gMainCamp.includes(rawId));
-
-      if (isLinked) {
-        linkedGroupNames.add(gName);
-        const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
-        const ambObj: Ambassador = {
-          id: doc.id,
-          name: gName,
-          leaderName: gData.leaderName || gName,
-          slug: ambSlug,
-          targetGoal: Number(gData.targetGoal || 5000),
-          totalRaised: 0,
-          donorCount: 0,
-          message: gData.vision || gData.description || "",
-          gallery: gData.gallery || [],
-          campaignId: rawId,
-          pageUrl: gData.pageUrl || `/${ambSlug}`,
-          createdAt: gData.createdAt || new Date().toISOString()
-        };
-
-        const existingIdx = allAmbassadors.findIndex(
-          a => a.id === doc.id || a.slug === ambSlug || a.name.trim().toLowerCase() === gName.toLowerCase()
-        );
-
-        if (existingIdx === -1) {
-          allAmbassadors.push(ambObj);
-        } else {
-          allAmbassadors[existingIdx] = {
-            ...ambObj,
-            ...allAmbassadors[existingIdx],
-            pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
-          };
-        }
-      }
-    });
-
-    // Also include ambassadors from campaign subcollection if valid
-    ambSnap.docs.forEach((doc: any) => {
-      const ambData = doc.data() as Ambassador;
-      const aName = (ambData.name || "").trim();
-
-      // Permanently purge deleted / test ambassadors
-      if (DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) {
-        doc.ref.delete().catch(() => {});
-        if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
-        return;
-      }
-
-      const isPersonal = Boolean((ambData as any).isPersonalAmbassador || (ambData.slug && !doc.id.startsWith("comm-")));
-      if (aName && (linkedGroupNames.has(aName) || isPersonal) && !allAmbassadors.some(a => a.name.trim().toLowerCase() === aName.toLowerCase() || (ambData.slug && a.slug === ambData.slug))) {
-        allAmbassadors.push({ id: doc.id, ...ambData, isPersonalAmbassador: isPersonal });
-      }
-    });
-
-    // 3. Build contact lookup maps
+    // 2. Build contact lookup maps
     const activeContactsMap = new Map<string, boolean>();
     const contactByPhoneMap = new Map<string, any>();
     const contactByEmailMap = new Map<string, any>();
@@ -143,6 +64,151 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
           contactByNameMap.set(String(cData.conta_name).trim().toLowerCase(), cData);
         }
       }
+    });
+
+    // 3. Build linked groups set & ambassadors list
+    const linkedGroupNames = new Set<string>();
+    const allAmbassadors: Ambassador[] = [];
+
+    crmGroupsSnap.docs.forEach((doc: any) => {
+      const gData = doc.data();
+      if (!gData.name || !gData.name.trim()) return;
+      const gName = gData.name.trim();
+
+      // Permanently purge deleted / test communities
+      if (DELETED_COMMUNITIES_FILTER.has(gName) || INVALID_COMMUNITIES_FILTER.has(gName) || /^\d+$/.test(gName) || gData.status === "trashed" || gData.isDeleted) {
+        doc.ref.delete().catch(() => {});
+        if (gData.pageSlug) adminDb.collection("pages").doc(gData.pageSlug).delete().catch(() => {});
+        return;
+      }
+
+      const isCommunity = Boolean(gData.isCommunity && (gData.pageSlug || gData.pageUrl) && gData.category !== "group");
+      if (!isCommunity) return;
+
+      const gMainCamp = (gData.mainCampaignId || "").trim();
+
+      // Strict campaign linkage: ONLY if explicitly assigned to this campaign
+      const isLinked =
+        (targetCid === "home")
+          ? (gMainCamp === "home" || gMainCamp === "/" || gMainCamp === "default-campaign")
+          : (gMainCamp === targetCid || gMainCamp === `🎯 ${targetCid}` || gMainCamp === `/c/${targetCid}` || gMainCamp.includes(targetCid));
+
+      if (isLinked) {
+        linkedGroupNames.add(gName);
+        const ambSlug = gData.pageSlug || gData.pageId || `comm-${doc.id}`;
+        const ambObj: Ambassador = {
+          id: doc.id,
+          name: gName,
+          leaderName: gData.leaderName || gName,
+          slug: ambSlug,
+          targetGoal: Number(gData.targetGoal || 5000),
+          totalRaised: 0,
+          donorCount: 0,
+          message: gData.vision || gData.description || "",
+          gallery: gData.gallery || [],
+          campaignId: targetCid,
+          pageUrl: gData.pageUrl || `/${ambSlug}`,
+          createdAt: gData.createdAt || new Date().toISOString()
+        };
+
+        const existingIdx = allAmbassadors.findIndex(
+          a => a.id === doc.id || a.slug === ambSlug || a.name.trim().toLowerCase() === gName.toLowerCase()
+        );
+
+        if (existingIdx === -1) {
+          allAmbassadors.push(ambObj);
+        } else {
+          allAmbassadors[existingIdx] = {
+            ...ambObj,
+            ...allAmbassadors[existingIdx],
+            pageUrl: gData.pageUrl || allAmbassadors[existingIdx].pageUrl
+          };
+        }
+      }
+    });
+
+    // Also validate ambassadors from campaign subcollection and clean up stale/orphan docs
+    ambSnap.docs.forEach((doc: any) => {
+      const ambData = doc.data() as Ambassador;
+      const aName = (ambData.name || ambData.leaderName || "").trim();
+
+      // Permanently purge deleted / test ambassadors
+      if (!aName || DELETED_COMMUNITIES_FILTER.has(aName) || INVALID_COMMUNITIES_FILTER.has(aName)) {
+        doc.ref.delete().catch(() => {});
+        if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
+        return;
+      }
+
+      // Find if this doc corresponds to a known active CRM contact
+      const matchingContact = ambData.contactId 
+        ? contactByIdMap.get(ambData.contactId) 
+        : allLiveContacts.find(c => 
+            (ambData.slug && c.ambassador_slug === ambData.slug) || 
+            c.id === doc.id ||
+            (c.conta_name && c.conta_name.trim() === aName) ||
+            (c.ambassador_name && c.ambassador_name.trim() === aName)
+          );
+
+      // Find if this doc corresponds to a known active community group
+      const matchingGroup = crmGroupsSnap.docs.find((gDoc: any) => {
+        const gData = gDoc.data();
+        return (ambData.slug && gData.pageSlug === ambData.slug) || (gData.name && gData.name.trim() === aName);
+      });
+
+      if (matchingContact) {
+        const contactCampId = (matchingContact.ambassador_campaign_id || matchingContact.campaign_id || "").trim();
+        const isCampMatch = (targetCid === "home")
+          ? (contactCampId === "home" || contactCampId === "/" || contactCampId === "default-campaign" || contactCampId === "")
+          : (contactCampId === targetCid || contactCampId === `/c/${targetCid}` || contactCampId.toLowerCase() === targetCid.toLowerCase() || contactCampId.includes(targetCid));
+
+        if (!isCampMatch || !matchingContact.ambassador_slug || (ambData.slug && matchingContact.ambassador_slug !== ambData.slug)) {
+          // Stale / deleted copy in this campaign subcollection -> purge!
+          doc.ref.delete().catch(() => {});
+          return;
+        }
+
+        // Merge stats if already in allAmbassadors
+        const existingIdx = allAmbassadors.findIndex(
+          a => a.id === matchingContact.id || (matchingContact.ambassador_slug && a.slug === matchingContact.ambassador_slug) || a.name.trim().toLowerCase() === aName.toLowerCase()
+        );
+        if (existingIdx >= 0) {
+          allAmbassadors[existingIdx].totalRaised = Math.max(allAmbassadors[existingIdx].totalRaised || 0, Number(ambData.totalRaised || 0));
+          allAmbassadors[existingIdx].donorCount = Math.max(allAmbassadors[existingIdx].donorCount || 0, Number(ambData.donorCount || 0));
+        } else if (matchingContact.ambassador_slug) {
+          allAmbassadors.push({
+            id: matchingContact.id,
+            name: matchingContact.ambassador_name || matchingContact.conta_name || aName,
+            leaderName: matchingContact.ambassador_name || matchingContact.conta_name || aName,
+            slug: matchingContact.ambassador_slug,
+            targetGoal: Number(matchingContact.ambassador_target_goal || ambData.targetGoal || 5000),
+            totalRaised: Number(ambData.totalRaised || 0),
+            donorCount: Number(ambData.donorCount || 0),
+            message: "",
+            gallery: [],
+            campaignId: targetCid,
+            pageUrl: `/${matchingContact.ambassador_slug}`,
+            createdAt: ambData.createdAt || new Date().toISOString(),
+            isPersonalAmbassador: true
+          });
+        }
+        return;
+      }
+
+      if (matchingGroup) {
+        // Merge stats if already in allAmbassadors
+        const existingIdx = allAmbassadors.findIndex(
+          a => a.id === matchingGroup.id || a.name.trim().toLowerCase() === aName.toLowerCase()
+        );
+        if (existingIdx >= 0) {
+          allAmbassadors[existingIdx].totalRaised = Math.max(allAmbassadors[existingIdx].totalRaised || 0, Number(ambData.totalRaised || 0));
+          allAmbassadors[existingIdx].donorCount = Math.max(allAmbassadors[existingIdx].donorCount || 0, Number(ambData.donorCount || 0));
+        }
+        return;
+      }
+
+      // If doc does NOT match any active contact and does NOT match any group -> it is an orphan/test/deleted ambassador!
+      doc.ref.delete().catch(() => {});
+      if (ambData.slug) adminDb.collection("pages").doc(ambData.slug).delete().catch(() => {});
     });
 
     // 4. Process campaign subcollection donations with automatic duplicate cleanup
@@ -389,7 +455,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       const cleanS = (amb.slug || "").trim().toLowerCase();
       const isPersonal = Boolean((amb as any).isPersonalAmbassador || (amb.slug && !amb.id.startsWith("comm-")));
       
-      if ((linkedGroupNames.has(amb.name) || isPersonal) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
+      if ((linkedGroupNames.has(amb.name) || isPersonal) && (cleanS || amb.pageUrl) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
         seenAmbNames.add(cleanN);
         if (cleanS) seenAmbSlugs.add(cleanS);
         uniqueAmbassadors.push(amb);
