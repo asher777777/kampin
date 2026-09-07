@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
-import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField, checkAmbassadorSlugAvailability, deleteAmbassadorPage } from "@/features/crm/actions";
+import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField, checkAmbassadorSlugAvailability, deleteAmbassadorPage, getAllActiveAmbassadors } from "@/features/crm/actions";
 import { getAllCampaigns } from "@/features/campaigns/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
@@ -227,6 +227,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   const [campaignTotalRaised, setCampaignTotalRaised] = useState<number | "">("");
   const [campaignDonationsHistory, setCampaignDonationsHistory] = useState<any[]>([]);
   const [availableCampaigns, setAvailableCampaigns] = useState<any[]>([]);
+  const [availableAmbassadorsList, setAvailableAmbassadorsList] = useState<any[]>([]);
 
   // Ambassador & Personal Goal State
   const [ambassadorName, setAmbassadorName] = useState("");
@@ -346,6 +347,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
     getCustomFields().then(setCustomFieldsConfig);
     checkIsSuperAdmin().then(setIsSuperAdmin).catch(() => setIsSuperAdmin(false));
     getSystemFieldLabels().then(setSystemLabels);
+    getAllActiveAmbassadors().then(setAvailableAmbassadorsList);
     
     // Fetch all system pages and campaigns via GET API
     fetch("/api/campaigns")
@@ -560,7 +562,11 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       campaign_title: (ambassadorCampaignTitle || campaignTitle) || (availableCampaigns.find(c => c.id === (ambassadorCampaignId || campaignId))?.title || undefined),
       campaign_role: ambassadorSlug ? "ambassador" : campaignRole,
       campaign_donation_mode: campaignDonationMode,
-      campaign_amount: campaignAmount !== "" ? Number(campaignAmount) : undefined,
+      campaign_amount: (campaignAmount !== "" && Number(campaignAmount) > 0)
+        ? Number(campaignAmount)
+        : (campaignDonationMode === "recurring" && campaignMonthlyAmount !== "")
+        ? (Number(campaignMonthlyAmount) * (Number(campaignRecurringMonths) || 12))
+        : undefined,
       campaign_monthly_amount: campaignMonthlyAmount !== "" ? Number(campaignMonthlyAmount) : undefined,
       campaign_recurring_months: campaignRecurringMonths !== "" ? Number(campaignRecurringMonths) : undefined,
       campaign_tier: campaignTier || undefined,
@@ -1675,12 +1681,26 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-amber-500">שגריר מיוחס / מפנה</label>
-                        <Input
+                        <select
                           value={campaignAmbassadorName}
                           onChange={(e) => setCampaignAmbassadorName(e.target.value)}
-                          placeholder="שם השגריר שהביא את התרומה..."
-                          className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
-                        />
+                          style={{ colorScheme: "dark" }}
+                          className="flex h-10 w-full bg-[#181818] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium [color-scheme:dark]"
+                        >
+                          <option value="" className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>
+                            ללא שגריר (תרומה כללית לקמפיין)
+                          </option>
+                          {campaignAmbassadorName && !availableAmbassadorsList.some(a => a.name === campaignAmbassadorName || a.slug === campaignAmbassadorName) && (
+                            <option value={campaignAmbassadorName} className="bg-[#181818] text-amber-300 font-bold" style={{ backgroundColor: "#181818", color: "#fcd34d" }}>
+                              {campaignAmbassadorName} (שגריר שמור)
+                            </option>
+                          )}
+                          {availableAmbassadorsList.map((amb) => (
+                            <option key={amb.id || amb.slug || amb.name} value={amb.name} className="bg-[#181818] text-white" style={{ backgroundColor: "#181818", color: "#ffffff" }}>
+                              {amb.name} {amb.slug ? `(/${amb.slug})` : ""} {amb.campaignTitle ? `• ${amb.campaignTitle}` : ""}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -1720,7 +1740,14 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                             <Input
                               type="number"
                               value={campaignMonthlyAmount}
-                              onChange={(e) => setCampaignMonthlyAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value === "" ? "" : Number(e.target.value);
+                                setCampaignMonthlyAmount(val);
+                                if (val !== "") {
+                                  const months = campaignRecurringMonths !== "" ? Number(campaignRecurringMonths) : 12;
+                                  setCampaignAmount(Number(val) * months);
+                                }
+                              }}
                               placeholder="למשל: 180"
                               className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                             />
@@ -1731,7 +1758,14 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                             <Input
                               type="number"
                               value={campaignRecurringMonths}
-                              onChange={(e) => setCampaignRecurringMonths(e.target.value === "" ? "" : Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value === "" ? "" : Number(e.target.value);
+                                setCampaignRecurringMonths(val);
+                                if (campaignMonthlyAmount !== "") {
+                                  const months = val !== "" ? Number(val) : 12;
+                                  setCampaignAmount(Number(campaignMonthlyAmount) * months);
+                                }
+                              }}
                               placeholder="12"
                               className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                             />

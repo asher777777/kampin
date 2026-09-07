@@ -322,37 +322,86 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
       }
     }
 
-    // 5. For CRM contacts: Include donation ONLY if explicitly assigned to THIS campaign in the contact's campaigns tab
+    // 5. For CRM contacts: Include donation if assigned to campaign or ambassador
     allLiveContacts.forEach((c) => {
       const contactCampId = (c.campaign_id || c.campaignId || c.campaign_page || "").trim();
-      if (!contactCampId) return; // No campaign linked -> DO NOT INCLUDE!
 
-      const isMatchingCampaign =
-        (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-          ? (contactCampId === "home" || contactCampId === "/" || contactCampId === "default-campaign")
-          : (contactCampId === rawId || contactCampId === `/c/${rawId}` || contactCampId.toLowerCase() === rawId.toLowerCase());
+      const rawAmount = Number(c.campaign_amount || c.campaignAmount || 0);
+      const monthlyAmt = Number(c.campaign_monthly_amount || 0);
+      const months = Number(c.campaign_recurring_months || 12);
+      const calculatedRecurringTotal = (monthlyAmt > 0) ? (monthlyAmt * months) : 0;
+      const campAmount = rawAmount > 0 ? rawAmount : (calculatedRecurringTotal > 0 ? calculatedRecurringTotal : Number(c.total_donated || c.total_spent || 0));
 
-      if (!isMatchingCampaign) return; // Linked to a different campaign -> DO NOT INCLUDE!
-
-      const campAmount = Number(c.campaign_amount || c.campaignAmount || 0);
       if (campAmount <= 0) return; // No donation amount in campaign tab -> DO NOT INCLUDE!
 
       const paymentStatus = c.campaign_payment_status || c.campaignPaymentStatus || "completed";
       if (paymentStatus !== "completed" && paymentStatus !== "הושלם") return;
 
-      // Resolve ambassador name ONLY if explicitly assigned or in a linked group
-      let commName = "";
-      const explicitAmb = (c.campaign_ambassador_name || c.campaignAmbassadorName || "").trim();
-      if (explicitAmb && linkedGroupNames.has(explicitAmb)) {
-        commName = explicitAmb;
-      } else if (c.community && linkedGroupNames.has(c.community.trim())) {
-        commName = c.community.trim();
-      } else if (c.mh_crm_community && linkedGroupNames.has(c.mh_crm_community.trim())) {
-        commName = c.mh_crm_community.trim();
+      // Resolve ambassador name / slug: explicitly assigned or matched by community / tag
+      let ambNameResolved = "";
+      let ambSlugResolved = "";
+      let ambIdResolved = "";
+
+      const explicitAmb = (c.campaign_ambassador_name || c.campaignAmbassadorName || c.referred_by_ambassador || "").trim();
+      if (explicitAmb) {
+        ambNameResolved = explicitAmb;
+      } else if (c.community) {
+        ambNameResolved = c.community.trim();
+      } else if (c.mh_crm_community) {
+        ambNameResolved = c.mh_crm_community.trim();
       } else if (Array.isArray(c.tags)) {
-        const validTag = c.tags.find((t: any) => typeof t === "string" && linkedGroupNames.has(t.trim()));
-        if (validTag) commName = validTag.trim();
+        const validTag = c.tags.find((t: any) => typeof t === "string" && t.trim());
+        if (validTag) ambNameResolved = validTag.trim();
       }
+
+      // Check if contact itself is an ambassador
+      if (c.ambassador_slug && !ambNameResolved) {
+        ambNameResolved = c.ambassador_name || c.conta_name || "";
+        ambSlugResolved = c.ambassador_slug;
+      }
+
+      // Match with known ambassadors in allAmbassadors
+      const matchedAmb = allAmbassadors.find(a =>
+        (ambNameResolved && (
+          a.name.trim().toLowerCase() === ambNameResolved.toLowerCase() ||
+          a.leaderName.trim().toLowerCase() === ambNameResolved.toLowerCase() ||
+          (a.slug && a.slug.trim().toLowerCase() === ambNameResolved.toLowerCase()) ||
+          (a.id && a.id.toLowerCase() === ambNameResolved.toLowerCase())
+        )) ||
+        (contactCampId && (
+          (a.slug && a.slug.trim().toLowerCase() === contactCampId.toLowerCase()) ||
+          a.id === contactCampId
+        ))
+      );
+
+      if (matchedAmb) {
+        ambNameResolved = matchedAmb.name;
+        ambSlugResolved = matchedAmb.slug;
+        ambIdResolved = matchedAmb.slug || matchedAmb.id;
+      } else if (ambNameResolved) {
+        ambIdResolved = ambNameResolved;
+      }
+
+      const isMatchingCampaign =
+        (rawId === "home" || rawId === "default-campaign" || rawId === "/")
+          ? (
+              !contactCampId ||
+              contactCampId === "home" ||
+              contactCampId === "/" ||
+              contactCampId === "default-campaign" ||
+              Boolean(ambSlugResolved) ||
+              Boolean(ambNameResolved) ||
+              allAmbassadors.some(a => a.slug === contactCampId || a.id === contactCampId)
+            )
+          : (
+              contactCampId === rawId ||
+              contactCampId === `/c/${rawId}` ||
+              contactCampId.toLowerCase() === rawId.toLowerCase() ||
+              (ambSlugResolved && ambSlugResolved.toLowerCase() === rawId.toLowerCase()) ||
+              (ambNameResolved && ambNameResolved.toLowerCase() === rawId.toLowerCase())
+            );
+
+      if (!isMatchingCampaign) return;
 
       rawDonations.push({
         id: `crm-${c.id}`,
@@ -362,8 +411,9 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         phone: c.conta_phone || "",
         email: c.email || "",
         amount: campAmount,
-        ambassadorName: commName,
-        ambassadorId: commName,
+        ambassadorName: ambNameResolved,
+        ambassadorSlug: ambSlugResolved,
+        ambassadorId: ambIdResolved,
         paymentStatus: "completed",
         paymentMethod: c.campaign_payment_method || "manual",
         isRecurring: c.campaign_donation_mode === "monthly" || c.campaign_donation_mode === "recurring",
@@ -379,11 +429,11 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         const cCampId = (c.ambassador_campaign_id || c.campaign_id || "").trim();
         const isCampMatch =
           (rawId === "home" || rawId === "default-campaign" || rawId === "/")
-            ? (!cCampId || cCampId === "home" || cCampId === "/" || cCampId === "default-campaign")
-            : (cCampId === rawId || cCampId === `/c/${rawId}` || cCampId.toLowerCase() === rawId.toLowerCase());
+            ? (!cCampId || cCampId === "home" || cCampId === "/" || cCampId === "default-campaign" || c.ambassador_slug === rawId)
+            : (cCampId === rawId || cCampId === `/c/${rawId}` || cCampId.toLowerCase() === rawId.toLowerCase() || cCampId.includes(rawId) || c.ambassador_slug === rawId);
 
         if (isCampMatch) {
-          const aName = (c.ambassador_name || c.conta_name || "שגריר").trim();
+          const aName = (c.ambassador_name || `${c.conta_name || ""} ${c.f_m || ""}`.trim() || c.conta_name || "שגריר").trim();
           const ambObj: Ambassador = {
             id: c.id,
             name: aName,
@@ -409,7 +459,9 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
           } else {
             allAmbassadors[existingIdx] = {
               ...ambObj,
-              ...allAmbassadors[existingIdx]
+              ...allAmbassadors[existingIdx],
+              slug: c.ambassador_slug,
+              pageUrl: `/${c.ambassador_slug}`
             };
           }
         }
@@ -437,10 +489,6 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
 
       if (!isDuplicate) {
         keysToCheck.forEach(k => seenDonationSignatures.add(k));
-
-        if (d.ambassadorName && !linkedGroupNames.has(String(d.ambassadorName).trim())) {
-          d.ambassadorName = "";
-        }
         allDonations.push(d);
       }
     });
@@ -453,9 +501,8 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
     allAmbassadors.forEach(amb => {
       const cleanN = (amb.name || "").trim().toLowerCase();
       const cleanS = (amb.slug || "").trim().toLowerCase();
-      const isPersonal = Boolean((amb as any).isPersonalAmbassador || (amb.slug && !amb.id.startsWith("comm-")));
       
-      if ((linkedGroupNames.has(amb.name) || isPersonal) && (cleanS || amb.pageUrl) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
+      if ((cleanS || amb.pageUrl) && !seenAmbNames.has(cleanN) && (!cleanS || !seenAmbSlugs.has(cleanS))) {
         seenAmbNames.add(cleanN);
         if (cleanS) seenAmbSlugs.add(cleanS);
         uniqueAmbassadors.push(amb);
@@ -464,12 +511,35 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
 
     const filteredAmbassadors = uniqueAmbassadors;
 
-    // 8. Calculate totalRaised and donorCount for each linked community from deduplicated allDonations
+    // 8. Calculate totalRaised and donorCount for each linked community/ambassador from deduplicated allDonations
     for (const amb of filteredAmbassadors) {
+      const ambName = (amb.name || "").trim().toLowerCase();
+      const ambLeader = (amb.leaderName || "").trim().toLowerCase();
+      const ambSlug = (amb.slug || "").trim().toLowerCase();
+      const ambId = (amb.id || "").trim().toLowerCase();
+
       const ambDonations = allDonations.filter(d => {
-        const matchName = d.ambassadorName && d.ambassadorName.trim().toLowerCase() === amb.name.trim().toLowerCase();
-        const matchSlug = (d as any).ambassadorSlug && ((d as any).ambassadorSlug === amb.slug || d.ambassadorId === amb.slug);
-        const matchId = d.ambassadorId && d.ambassadorId === amb.id;
+        const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
+        const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
+        const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+        const dCampId = (d.campaignId || "").trim().toLowerCase();
+
+        const matchName = dAmbName && (
+          dAmbName === ambName ||
+          dAmbName === ambLeader ||
+          dAmbName === ambSlug ||
+          (ambName && dAmbName.includes(ambName)) ||
+          (ambName && ambName.includes(dAmbName))
+        );
+        const matchSlug = ambSlug && (
+          dAmbSlug === ambSlug ||
+          dAmbId === ambSlug ||
+          dAmbName === ambSlug ||
+          dCampId === ambSlug ||
+          dAmbName.includes(ambSlug)
+        );
+        const matchId = ambId && (dAmbId === ambId || dAmbName === ambId);
+
         return Boolean(matchName || matchSlug || matchId);
       });
 

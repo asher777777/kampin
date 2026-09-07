@@ -173,11 +173,33 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
 
   const ambassadorDonations = useMemo(() => {
     if (!isAmbassadorView) return allCompletedDonations;
+    const ambName = (ambassadorName || "").trim().toLowerCase();
+    const ambSlug = (activeSlug || "").trim().toLowerCase();
+    const ambId = (ambassadorId || "").trim().toLowerCase();
+
     return allCompletedDonations.filter(d => {
-      const matchId = ambassadorId && d.ambassadorId === ambassadorId;
-      const matchSlug = activeSlug && (d.ambassadorId === activeSlug || (d as any).ambassadorSlug === activeSlug);
-      const matchName = ambassadorName && d.ambassadorName && d.ambassadorName.trim().toLowerCase() === ambassadorName.trim().toLowerCase();
-      return Boolean(matchId || matchSlug || matchName);
+      const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
+      const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
+      const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+      const dCampId = (d.campaignId || "").trim().toLowerCase();
+
+      const matchName = ambName && (
+        dAmbName === ambName ||
+        (dAmbName && ambName && (dAmbName.includes(ambName) || ambName.includes(dAmbName)))
+      );
+      const matchSlug = ambSlug && (
+        dAmbSlug === ambSlug ||
+        dAmbId === ambSlug ||
+        dAmbName === ambSlug ||
+        dCampId === ambSlug ||
+        dAmbName.includes(ambSlug)
+      );
+      const matchId = ambId && (
+        dAmbId === ambId ||
+        dAmbName === ambId
+      );
+
+      return Boolean(matchName || matchSlug || matchId);
     });
   }, [allCompletedDonations, isAmbassadorView, ambassadorId, activeSlug, ambassadorName]);
 

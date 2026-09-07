@@ -66,15 +66,22 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
     getCampaignDonationsAction(targetCampaignId).then(({ donations, ambassadors }) => {
       if (isAmbassadorView) {
         // Find matching ambassador
-        const cleanSlug = ambassadorSlug?.trim();
+        const cleanSlug = ambassadorSlug?.trim().toLowerCase();
         const cleanName = ambassadorName?.trim().toLowerCase();
-        const cleanId = ambassadorId?.trim();
+        const cleanId = ambassadorId?.trim().toLowerCase();
 
-        const matched = ambassadors.find(a => 
-          (cleanId && a.id === cleanId) ||
-          (cleanSlug && (a.slug === cleanSlug || a.id === cleanSlug)) ||
-          (cleanName && a.name.trim().toLowerCase() === cleanName)
-        );
+        const matched = ambassadors.find(a => {
+          const aId = (a.id || "").toLowerCase();
+          const aSlug = (a.slug || "").toLowerCase();
+          const aName = (a.name || "").trim().toLowerCase();
+          const aLeader = (a.leaderName || "").trim().toLowerCase();
+
+          return Boolean(
+            (cleanId && (aId === cleanId || aSlug === cleanId || aName === cleanId)) ||
+            (cleanSlug && (aSlug === cleanSlug || aId === cleanSlug || aName === cleanSlug)) ||
+            (cleanName && (aName === cleanName || aLeader === cleanName || aSlug === cleanName || cleanName.includes(aName) || aName.includes(cleanName)))
+          );
+        });
 
         if (matched) {
           setCalculatedAmbassadorRaised(matched.totalRaised);
@@ -83,9 +90,13 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
         } else {
           // Sum donations directly matching the ambassador name or slug
           const ambDonations = donations.filter(d => {
-            const matchName = cleanName && d.ambassadorName && d.ambassadorName.trim().toLowerCase() === cleanName;
-            const matchSlug = cleanSlug && ((d as any).ambassadorSlug === cleanSlug || d.ambassadorId === cleanSlug);
-            const matchId = cleanId && d.ambassadorId === cleanId;
+            const dAmb = (d.ambassadorName || "").trim().toLowerCase();
+            const dSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+            const dId = (d.ambassadorId || "").trim().toLowerCase();
+
+            const matchName = cleanName && (dAmb === cleanName || dAmb.includes(cleanName) || cleanName.includes(dAmb));
+            const matchSlug = cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug);
+            const matchId = cleanId && (dId === cleanId || dAmb === cleanId);
             return Boolean(matchName || matchSlug || matchId);
           });
           const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -158,17 +169,21 @@ export const CampaignHeaderSection: React.FC<CampaignHeaderSectionProps> = ({
     const donationsColl = collection(db, "campaigns", targetCampaignId, "donations");
     const unsub = onSnapshot(donationsColl, (snap) => {
       let sum = 0;
-      const cleanSlug = ambassadorSlug?.trim();
+      const cleanSlug = ambassadorSlug?.trim().toLowerCase();
       const cleanName = ambassadorName?.trim().toLowerCase();
-      const cleanId = ambassadorId?.trim();
+      const cleanId = ambassadorId?.trim().toLowerCase();
       const seenSigs = new Set<string>();
 
       snap.docs.forEach((dDoc) => {
         const d = dDoc.data();
         if (d.paymentStatus === "completed") {
-          const matchName = cleanName && d.ambassadorName && d.ambassadorName.trim().toLowerCase() === cleanName;
-          const matchSlug = cleanSlug && ((d as any).ambassadorSlug === cleanSlug || d.ambassadorId === cleanSlug);
-          const matchId = cleanId && d.ambassadorId === cleanId;
+          const dAmb = (d.ambassadorName || "").trim().toLowerCase();
+          const dSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+          const dId = (d.ambassadorId || "").trim().toLowerCase();
+
+          const matchName = cleanName && (dAmb === cleanName || dAmb.includes(cleanName) || cleanName.includes(dAmb));
+          const matchSlug = cleanSlug && (dSlug === cleanSlug || dId === cleanSlug || dAmb === cleanSlug);
+          const matchId = cleanId && (dId === cleanId || dAmb === cleanId);
           if (matchName || matchSlug || matchId) {
             const dName = (d.donorName || "").trim().toLowerCase();
             const amt = Number(d.amount || 0);

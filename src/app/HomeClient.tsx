@@ -185,8 +185,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             config={config.campaignHeader}
             campaignId={activeCampaignId}
             ambassadorId={config.campaignHeader?.ambassadorId || config.campaignDonors?.ambassadorId}
-            ambassadorSlug={config.campaignHeader?.ambassadorSlug || config.campaignDonors?.ambassadorSlug}
-            ambassadorName={config.campaignHeader?.ambassadorName || config.campaignDonors?.ambassadorName}
+            ambassadorSlug={config.campaignHeader?.ambassadorSlug || config.campaignDonors?.ambassadorSlug || (pageId && pageId !== "home" ? pageId : undefined)}
+            ambassadorName={config.campaignHeader?.ambassadorName || config.campaignDonors?.ambassadorName || (pageId && pageId !== "home" ? config.title : undefined)}
           />
         );
       case "campaignTiers":
@@ -211,8 +211,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             config={config.campaignDonors}
             campaignId={activeCampaignId}
             ambassadorId={config.campaignDonors?.ambassadorId || config.campaignHeader?.ambassadorId}
-            ambassadorSlug={config.campaignDonors?.ambassadorSlug || config.campaignHeader?.ambassadorSlug}
-            ambassadorName={config.campaignDonors?.ambassadorName || config.campaignHeader?.ambassadorName}
+            ambassadorSlug={config.campaignDonors?.ambassadorSlug || config.campaignHeader?.ambassadorSlug || (pageId && pageId !== "home" ? pageId : undefined)}
+            ambassadorName={config.campaignDonors?.ambassadorName || config.campaignHeader?.ambassadorName || (pageId && pageId !== "home" ? config.title : undefined)}
             onOpenAmbassadorModal={() => setIsAmbassadorModalOpen(true)}
           />
         );

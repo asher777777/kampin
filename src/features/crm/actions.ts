@@ -2120,3 +2120,71 @@ export async function logAiInteraction(userId: string, inputTokens: number, outp
   }
 }
 
+/**
+ * Fetch all active ambassadors (from contacts and groups) for ambassador selection dropdowns
+ */
+export async function getAllActiveAmbassadors() {
+  try {
+    const list: Array<{
+      id: string;
+      name: string;
+      slug?: string;
+      campaignId?: string;
+      campaignTitle?: string;
+      targetGoal?: number;
+    }> = [];
+    const seenSlugs = new Set<string>();
+    const seenNames = new Set<string>();
+
+    // 1. From contacts who have ambassador_slug or are assigned as ambassador
+    const contactsSnap = await adminDb.collection("contacts").get();
+    contactsSnap.docs.forEach((doc: any) => {
+      const c = doc.data();
+      if (c.ambassador_slug || (c.campaign_role === "ambassador" && c.conta_name)) {
+        const ambName = (c.ambassador_name || `${c.conta_name || ""} ${c.f_m || ""}`.trim() || c.conta_name || "").trim();
+        const slug = (c.ambassador_slug || "").trim().toLowerCase();
+        if (ambName && (!slug || !seenSlugs.has(slug)) && !seenNames.has(ambName.toLowerCase())) {
+          if (slug) seenSlugs.add(slug);
+          seenNames.add(ambName.toLowerCase());
+          list.push({
+            id: doc.id,
+            name: ambName,
+            slug: slug,
+            campaignId: c.ambassador_campaign_id || c.campaign_id || "",
+            campaignTitle: c.ambassador_campaign_title || c.campaign_title || "",
+            targetGoal: c.ambassador_target_goal || c.campaign_target_goal || 0
+          });
+        }
+      }
+    });
+
+    // 2. From groups (communities)
+    const groupsSnap = await adminDb.collection("groups").get();
+    groupsSnap.docs.forEach((doc: any) => {
+      const g = doc.data();
+      if (g.name && g.isCommunity && g.status !== "trashed" && !g.isDeleted) {
+        const gName = g.name.trim();
+        const slug = (g.pageSlug || "").trim().toLowerCase();
+        if (gName && (!slug || !seenSlugs.has(slug)) && !seenNames.has(gName.toLowerCase())) {
+          if (slug) seenSlugs.add(slug);
+          seenNames.add(gName.toLowerCase());
+          list.push({
+            id: doc.id,
+            name: gName,
+            slug: slug,
+            campaignId: g.mainCampaignId || "",
+            campaignTitle: g.campaignTitle || "",
+            targetGoal: g.targetGoal || 0
+          });
+        }
+      }
+    });
+
+    return list;
+  } catch (err) {
+    console.warn("getAllActiveAmbassadors error:", err);
+    return [];
+  }
+}
+
+
