@@ -7,6 +7,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Ambassador, Donation, CampaignDonorsConfig } from "@/lib/types/campaign";
 import { getCampaignDonationsAction } from "@/features/campaigns/campaignDonationsAction";
+import { isAmbassadorNameMatch, isDonationMatchingAmbassador } from "@/lib/ambassadorUtils";
 import { formatDistanceToNow } from "date-fns";
 import { he } from "date-fns/locale";
 
@@ -171,28 +172,37 @@ export const CampaignDonorsSection: React.FC<CampaignDonorsSectionProps> = ({
     return unique;
   }, [donations]);
 
-  const ambassadorDonations = useMemo(() => {
-    if (!isAmbassadorView) return allCompletedDonations;
-    const ambName = (ambassadorName || "").trim().toLowerCase();
-    const ambSlug = (activeSlug || "").trim().toLowerCase();
-    const ambId = (ambassadorId || "").trim().toLowerCase();
+  const currentAmbassador = useMemo(() => {
+    if (!isAmbassadorView) return null;
+    const cleanSlug = (activeSlug || "").trim().toLowerCase();
+    const cleanId = (ambassadorId || "").trim().toLowerCase();
+    const cleanName = (ambassadorName || "").trim();
 
-    return allCompletedDonations.filter(d => {
-      const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
-      const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
-      const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
+    const matched = ambassadors.find(a => {
+      const aId = (a.id || "").toLowerCase();
+      const aSlug = (a.slug || "").toLowerCase();
+      const aName = (a.name || "").trim();
+      const aLeader = (a.leaderName || "").trim();
 
-      if (!dAmbName && !dAmbSlug && !dAmbId) return false;
-
-      const matchSlug = Boolean(ambSlug && (dAmbSlug === ambSlug || dAmbId === ambSlug || dAmbName === ambSlug));
-      const matchId = Boolean(ambId && (dAmbId === ambId || dAmbName === ambId));
-      const matchName = Boolean(
-        (ambName && dAmbName && (dAmbName === ambName || (dAmbName.length >= 3 && (dAmbName === ambName || ambName.includes(dAmbName)))))
+      return Boolean(
+        (cleanId && (aId === cleanId || aSlug === cleanId)) ||
+        (cleanSlug && (aSlug === cleanSlug || aId === cleanSlug)) ||
+        (cleanName && (isAmbassadorNameMatch(aName, cleanName) || isAmbassadorNameMatch(aLeader, cleanName) || cleanName.toLowerCase() === aSlug))
       );
-
-      return matchSlug || matchId || matchName;
     });
-  }, [allCompletedDonations, isAmbassadorView, ambassadorId, activeSlug, ambassadorName]);
+
+    return matched || {
+      id: ambassadorId,
+      slug: activeSlug,
+      name: ambassadorName,
+      leaderName: ambassadorName
+    };
+  }, [ambassadors, isAmbassadorView, activeSlug, ambassadorId, ambassadorName]);
+
+  const ambassadorDonations = useMemo(() => {
+    if (!isAmbassadorView || !currentAmbassador) return allCompletedDonations;
+    return allCompletedDonations.filter(d => isDonationMatchingAmbassador(d, currentAmbassador));
+  }, [allCompletedDonations, isAmbassadorView, currentAmbassador]);
 
   const displayDonations = useMemo(() => {
     let list: Donation[] = isAmbassadorView

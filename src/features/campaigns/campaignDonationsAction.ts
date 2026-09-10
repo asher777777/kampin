@@ -2,6 +2,7 @@
 
 import { adminDb } from "@/lib/firebase-admin";
 import { Ambassador, Donation } from "@/lib/types/campaign";
+import { isAmbassadorNameMatch, isDonationMatchingAmbassador } from "@/lib/ambassadorUtils";
 
 /**
  * Get all completed donations and ambassadors for a campaign
@@ -199,11 +200,28 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
         docSigs.forEach(sig => seenFirestoreSignatures.add(sig));
 
         // Clear unlinked or non-ambassador tag: ONLY valid ambassador names/slugs are allowed!
-        const curAmbName = (data.ambassadorName || "").trim().toLowerCase();
+        const curAmbName = (data.ambassadorName || "").trim();
         const curAmbSlug = ((data as any).ambassadorSlug || data.ambassadorId || "").trim().toLowerCase();
-        const isValidAmbassador = (curAmbSlug && validAmbassadorSlugs.has(curAmbSlug)) || (curAmbName && validAmbassadorNames.has(curAmbName));
+        
+        let matchedAmb = null;
+        if (curAmbSlug || curAmbName) {
+          matchedAmb = allAmbassadors.find(a => {
+            const aSlug = (a.slug || "").toLowerCase();
+            const aId = (a.id || "").toLowerCase();
+            const aName = (a.name || "").trim();
+            const aLeader = (a.leaderName || "").trim();
+            return Boolean(
+              (curAmbSlug && (aSlug === curAmbSlug || aId === curAmbSlug)) ||
+              (curAmbName && (isAmbassadorNameMatch(aName, curAmbName) || isAmbassadorNameMatch(aLeader, curAmbName) || curAmbName.toLowerCase() === aSlug))
+            );
+          });
+        }
 
-        if (!isValidAmbassador) {
+        if (matchedAmb) {
+          data.ambassadorName = matchedAmb.name;
+          data.ambassadorSlug = matchedAmb.slug;
+          data.ambassadorId = matchedAmb.id;
+        } else {
           data.ambassadorName = "";
           data.ambassadorSlug = "";
           data.ambassadorId = "";
@@ -260,15 +278,22 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
 
       const explicitAmb = (c.campaign_ambassador_name || c.campaignAmbassadorName || c.referred_by_ambassador || "").trim();
       if (explicitAmb) {
-        const matchedAmb = allAmbassadors.find(a =>
-          a.slug.toLowerCase() === explicitAmb.toLowerCase() ||
-          a.name.toLowerCase() === explicitAmb.toLowerCase() ||
-          a.leaderName.toLowerCase() === explicitAmb.toLowerCase()
-        );
+        const matchedAmb = allAmbassadors.find(a => {
+          const aSlug = (a.slug || "").toLowerCase();
+          const aId = (a.id || "").toLowerCase();
+          const aName = (a.name || "").trim();
+          const aLeader = (a.leaderName || "").trim();
+          return Boolean(
+            aSlug === explicitAmb.toLowerCase() ||
+            aId === explicitAmb.toLowerCase() ||
+            isAmbassadorNameMatch(aName, explicitAmb) ||
+            isAmbassadorNameMatch(aLeader, explicitAmb)
+          );
+        });
         if (matchedAmb) {
           ambNameResolved = matchedAmb.name;
           ambSlugResolved = matchedAmb.slug;
-          ambIdResolved = matchedAmb.slug;
+          ambIdResolved = matchedAmb.id;
         }
       } else if (c.ambassador_slug) {
         const cleanS = c.ambassador_slug.trim().toLowerCase();
@@ -350,28 +375,7 @@ export async function getCampaignDonationsAction(campaignId: string): Promise<{ 
 
     // 7. Calculate totalRaised and donorCount for each real ambassador from deduplicated allDonations
     for (const amb of allAmbassadors) {
-      const ambName = (amb.name || "").trim().toLowerCase();
-      const ambLeader = (amb.leaderName || "").trim().toLowerCase();
-      const ambSlug = (amb.slug || "").trim().toLowerCase();
-      const ambId = (amb.id || "").trim().toLowerCase();
-
-      const ambDonations = allDonations.filter(d => {
-        const dAmbName = (d.ambassadorName || "").trim().toLowerCase();
-        const dAmbId = (d.ambassadorId || "").trim().toLowerCase();
-        const dAmbSlug = ((d as any).ambassadorSlug || "").trim().toLowerCase();
-
-        // If donation has no ambassador assigned, it does NOT belong to any ambassador!
-        if (!dAmbName && !dAmbSlug && !dAmbId) return false;
-
-        const matchSlug = Boolean(ambSlug && (dAmbSlug === ambSlug || dAmbId === ambSlug || dAmbName === ambSlug));
-        const matchId = Boolean(ambId && (dAmbId === ambId || dAmbName === ambId));
-        const matchName = Boolean(
-          (ambName && dAmbName && (dAmbName === ambName || (dAmbName.length >= 3 && (dAmbName === ambName || ambName.includes(dAmbName))))) ||
-          (ambLeader && dAmbName && (dAmbName === ambLeader || (dAmbName.length >= 3 && (dAmbName === ambLeader || ambLeader.includes(dAmbName)))))
-        );
-
-        return matchSlug || matchId || matchName;
-      });
+      const ambDonations = allDonations.filter(d => isDonationMatchingAmbassador(d, amb));
 
       const total = ambDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
       amb.totalRaised = total;
