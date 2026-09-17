@@ -1393,10 +1393,29 @@ export async function submitCRMForm(params: {
       });
       resolvedMsg = resolvedMsg.replace(/{סכום}/g, String(amountPaid || formConfig.payment_amount || 0));
       resolvedMsg = resolvedMsg.replace(/{עמוד}/g, embeddingPostTitle || "");
-      resolvedMsg = resolvedMsg.replace(/{link_kabala}/g, "https://hakel.club/receipt/mock");
+      resolvedMsg = resolvedMsg.replace(/{link_kabala}/g, params.transactionId ? `https://hakel.club/receipt/${params.transactionId}` : "https://hakel.club/receipt/mock");
+      resolvedMsg = resolvedMsg.replace(/{שם מלא}/g, contactData.conta_name || "");
+      resolvedMsg = resolvedMsg.replace(/{שם}/g, contactData.conta_name || "");
+      resolvedMsg = resolvedMsg.replace(/{טלפון}/g, phone || "");
+      resolvedMsg = resolvedMsg.replace(/{מזהה עסקה}/g, params.transactionId || "");
 
       finalWhatsAppMessage = resolvedMsg;
       whatsappSent = true;
+
+      // Actually deliver the message via Green API
+      if (phone) {
+        try {
+          const { sendWhatsAppMessage, sendWhatsAppFileByUrl } = await import("@/features/whatsapp/actions");
+          if (whatsappImageUrl) {
+            await sendWhatsAppFileByUrl(phone, whatsappImageUrl, "receipt.png", finalWhatsAppMessage, finalOwnerId);
+          } else {
+            await sendWhatsAppMessage(phone, finalWhatsAppMessage, finalOwnerId);
+          }
+          console.log(`[WhatsApp Success] Sent WhatsApp message to ${phone} for form ${formTitle}`);
+        } catch (waErr: any) {
+          console.error(`[WhatsApp Error] Failed to send WhatsApp to ${phone}:`, waErr?.message || waErr);
+        }
+      }
 
       const updatedSnapshot = await contactsRef
         .where("ownerId", "==", finalOwnerId)

@@ -296,9 +296,9 @@ export async function logoutWhatsApp() {
 }
 
 // 6. Send Single WhatsApp Message
-export async function sendWhatsAppMessage(phone: string, message: string) {
+export async function sendWhatsAppMessage(phone: string, message: string, specificUserId?: string) {
   try {
-    const settings = await getWhatsAppSettings();
+    const settings = await getWhatsAppSettings(specificUserId);
     if (!settings.idInstance || !settings.apiToken) {
       throw new Error("חיבור וואטסאפ לא מוגדר");
     }
@@ -376,9 +376,9 @@ export async function sendWhatsAppFile(formData: FormData) {
 }
 
 // 7.1 Send Single WhatsApp File by URL (for automated receipts, thank-you banners)
-export async function sendWhatsAppFileByUrl(phone: string, urlFile: string, fileName = "image.png", caption = "") {
+export async function sendWhatsAppFileByUrl(phone: string, urlFile: string, fileName = "image.png", caption = "", specificUserId?: string) {
   try {
-    const settings = await getWhatsAppSettings();
+    const settings = await getWhatsAppSettings(specificUserId);
     if (!settings.idInstance || !settings.apiToken) {
       throw new Error("חיבור וואטסאפ לא מוגדר");
     }
@@ -407,7 +407,7 @@ export async function sendWhatsAppFileByUrl(phone: string, urlFile: string, file
       console.warn("Green API sendFileByUrl warning:", errText);
       // Fallback to text message if file fails
       if (caption) {
-        return await sendWhatsAppMessage(phone, caption);
+        return await sendWhatsAppMessage(phone, caption, specificUserId);
       }
       throw new Error(`שגיאת שליחת קובץ ב-URL: ${response.status}`);
     }
@@ -417,7 +417,7 @@ export async function sendWhatsAppFileByUrl(phone: string, urlFile: string, file
     console.error("Error in sendWhatsAppFileByUrl server action:", error);
     if (caption) {
       try {
-        return await sendWhatsAppMessage(phone, caption);
+        return await sendWhatsAppMessage(phone, caption, specificUserId);
       } catch (e) {}
     }
     throw error;

@@ -114,6 +114,7 @@ export interface FormConfig {
   templateId?: string;
   templateName?: string;
   communityId?: string;
+  hide_step_titles?: boolean;
 }
 
 interface CRMFormBuilderProps {
@@ -1869,8 +1870,18 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               {/* Left Column: Settings */}
               <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs">
 
-
-                {/* save_to_crm toggle removed per user request */}
+                <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                  <input
+                    id="hide-step-titles-check"
+                    type="checkbox"
+                    checked={value.hide_step_titles || false}
+                    onChange={(e) => updateConfig({ hide_step_titles: e.target.checked })}
+                    className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800 cursor-pointer"
+                  />
+                  <label htmlFor="hide-step-titles-check" className="font-bold text-white cursor-pointer select-none">
+                    הסתר כותרות שלבים (הסתרת "שלב 1" / כותרות השלבים בראש הטופס)
+                  </label>
+                </div>
 
                 {value.save_to_crm && (
                   <div className="animate-in slide-in-from-top-2 duration-300">
