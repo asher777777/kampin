@@ -112,6 +112,71 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   const [isRecurringChecked, setIsRecurringChecked] = useState(config.payment_frequency === "recurring");
   const [paymentGateway, setPaymentGateway] = useState<"credit_card" | "bit">("credit_card");
   const [bitStatus, setBitStatus] = useState<{ message: string; bitUrl?: string; phone?: string; transactionId?: string } | null>(null);
+  const [customBitPhone, setCustomBitPhone] = useState("");
+
+  // Helper to robustly extract contact info from any form field naming conventions
+  const getContactInfo = () => {
+    let clientName = "";
+    let phone = "";
+    let mail = "";
+
+    // 1. Search via mapped field definitions & types
+    visibleFields.forEach((f) => {
+      const val = (formData[f.label] || "").trim();
+      if (!val) return;
+      if (f.map_to === "conta_name") clientName = val;
+      if (f.map_to === "conta_phone" || f.type === "tel") phone = val;
+      if (f.map_to === "email" || f.type === "email") mail = val;
+    });
+
+    // 2. Search by key names (case-insensitive & substrings)
+    Object.entries(formData).forEach(([key, val]) => {
+      const strVal = typeof val === "string" ? val.trim() : "";
+      if (!strVal) return;
+
+      // Phone
+      if (!phone && (/טל|נייד|סלולר|phone|mobile|cell/i.test(key))) {
+        phone = strVal;
+      }
+      // Full name or client name
+      if (!clientName && (/שם מלא|השם המלא|שם פרטי|שם לקוח|name/i.test(key))) {
+        clientName = strVal;
+      } else if (!clientName && key.includes("שם") && !key.includes("האם") && !key.includes("משפחה")) {
+        clientName = strVal;
+      }
+      // Email
+      if (!mail && (/מייל|אימייל|דוא|email/i.test(key))) {
+        mail = strVal;
+      }
+    });
+
+    // 3. Fallback: scan all values for Israeli mobile phone pattern (05X-XXXXXXX)
+    if (!phone) {
+      for (const val of Object.values(formData)) {
+        if (typeof val === "string") {
+          const digits = val.replace(/\D/g, "");
+          if (digits.startsWith("05") && digits.length >= 9 && digits.length <= 10) {
+            phone = val.trim();
+            break;
+          }
+        }
+      }
+    }
+
+    // 4. Fallback: scan all values for email pattern
+    if (!mail) {
+      for (const val of Object.values(formData)) {
+        if (typeof val === "string" && val.includes("@") && /\S+@\S+\.\S+/.test(val)) {
+          mail = val.trim();
+          break;
+        }
+      }
+    }
+
+    if (!clientName) clientName = "תורם";
+
+    return { clientName, phone, mail };
+  };
 
   const handlePayWithBit = async () => {
     setSubmitting(true);
@@ -119,9 +184,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
 
     try {
       const amount = getPaymentAmount();
-      const rawName = formData["conta_name"] || formData["שם"] || formData["שם מלא"] || formData["שם פרטי"] || "תורם";
-      const rawPhone = formData["conta_phone"] || formData["טלפון"] || formData["נייד"] || formData["טלפון נייד"] || formData["טלפון/נייד"] || "";
-      const mail = formData["email"] || formData["דוא״ל"] || formData["אימייל"] || formData["מייל"] || "";
+      const { clientName: rawName, phone: detectedPhone, mail } = getContactInfo();
+      const rawPhone = (customBitPhone || detectedPhone || "").trim();
 
       const cleanPhone = (rawPhone || "").replace(/[^0-9]/g, "");
       if (cleanPhone.length < 9 || !cleanPhone.startsWith("05")) {
@@ -134,18 +198,17 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         Object.entries(formData).filter(([_, v]) => v !== undefined && v !== null && v !== "")
       );
 
-      // Record lead in CRM as waiting for Bit payment
+      // Record lead in CRM as waiting for Bit payment (WITHOUT amountPaid so it won't mark paid or send success receipt yet)
       await submitCRMForm({
         formId,
         formTitle,
-        formType: effectiveFormType === "register" ? "register" : "payment",
+        formType: config.form_type === "register" ? "register" : "payment",
         formData: cleanFormData,
         embeddingPostId: formId,
         embeddingPostTitle: formTitle,
         embeddingCollection,
         formConfig: config,
-        status: "ממתין לתשלום (Bit)",
-        amountPaid: amount
+        status: "ממתין לתשלום (Bit)"
       });
 
       const response = await fetch("/api/kesher/get-token", {
@@ -572,17 +635,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           setSubmissionError(res.error || "שגיאה בשליחת הטופס. אנא נסה שנית.");
         }
       } else {
-        let clientName = "";
-        let phone = "";
-        let mail = "";
-
-        visibleFields.forEach((f) => {
-          const val = formData[f.label] || "";
-          if (f.map_to === "conta_name") clientName = val;
-          if (f.map_to === "conta_phone" || f.type === "tel") phone = val;
-          if (f.map_to === "email" || f.type === "email") mail = val;
-        });
-
+        const { clientName, phone, mail } = getContactInfo();
         const amount = getPaymentAmount();
         
         if (amount < 0) {
@@ -1228,37 +1281,39 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                     {paymentGateway === "bit" ? (
                       <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {bitStatus ? (
-                          <div className="p-4 bg-zinc-900/90 border border-[#00D2D2]/40 rounded-2xl text-center space-y-4 shadow-xl">
+                          <div className="p-5 bg-zinc-900/95 border-2 border-[#00D2D2]/50 rounded-2xl text-center space-y-4 shadow-2xl">
                             <div className="flex items-center justify-center gap-2 text-[#00D2D2]">
-                              <span className="font-black text-sm">📱 בקשת התשלום ב-Bit נשלחה!</span>
+                              <span className="font-black text-base">📱 בקשת התשלום ב-Bit נשלחה בהצלחה!</span>
                             </div>
 
                             <p className="text-xs text-slate-300">
                               {bitStatus.message}
                             </p>
 
-                            {bitStatus.bitUrl && (
-                              <div className="flex flex-col items-center gap-3 pt-2">
-                                <div className="p-2 bg-white rounded-xl shadow-md">
+                            {bitStatus.bitUrl ? (
+                              <div className="flex flex-col items-center gap-2.5 pt-2 pb-1">
+                                <div className="p-3 bg-white rounded-2xl shadow-xl inline-block border-2 border-[#00D2D2]">
                                   <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(bitStatus.bitUrl)}`} 
-                                    alt="QR Code לסריקה"
-                                    className="w-32 h-32"
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(bitStatus.bitUrl)}`} 
+                                    alt="QR Code לסריקה ב-Bit"
+                                    className="w-40 h-40 block"
                                   />
                                 </div>
-                                <p className="text-[11px] text-slate-400">סרוק את הברקוד בנייד או לחץ על הכפתור למטה</p>
+                                <p className="text-xs font-bold text-[#00D2D2]">
+                                  📷 סרוק את הברקוד באמצעות מצלמת הנייד לתשלום מהיר
+                                </p>
                               </div>
-                            )}
+                            ) : null}
 
-                            <div className="flex flex-col gap-2 pt-2">
+                            <div className="flex flex-col gap-2.5 pt-2">
                               {bitStatus.bitUrl && (
                                 <a
                                   href={bitStatus.bitUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="w-full py-3 px-4 bg-[#00D2D2] text-black font-black rounded-xl text-xs hover:bg-[#00D2D2]/90 flex items-center justify-center gap-2 shadow-md"
+                                  className="w-full py-3 px-4 bg-[#00D2D2] text-black font-black rounded-xl text-xs hover:bg-[#00D2D2]/90 flex items-center justify-center gap-2 shadow-md transition-transform hover:scale-[1.01]"
                                 >
-                                  פתח את אפליקציית Bit 📱
+                                  פתח את אפליקציית Bit ישירות 📱
                                 </a>
                               )}
                               {bitStatus.phone && bitStatus.bitUrl && (() => {
@@ -1272,23 +1327,33 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                     rel="noreferrer"
                                     className="w-full py-2.5 px-4 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-bold rounded-xl text-xs hover:bg-emerald-600/30 flex items-center justify-center gap-2"
                                   >
-                                    שלח קישור לוואטסאפ של {bitStatus.phone}
+                                    שלח קישור לתשלום בוואטסאפ ל-{bitStatus.phone} 💬
                                   </a>
                                 );
                               })()}
-                              <button
-                                type="button"
-                                onClick={handleBitPaymentConfirmed}
-                                disabled={submitting}
-                                className="w-full mt-2 py-3 px-4 bg-emerald-500 text-black font-black rounded-xl text-xs hover:bg-emerald-400 flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                              >
-                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                                אישרתי את התשלום ב-Bit
-                              </button>
+
+                              <div className="flex gap-2 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setBitStatus(null)}
+                                  className="flex-1 py-2.5 px-3 bg-white/5 hover:bg-white/10 text-slate-300 font-medium rounded-xl text-xs border border-white/10 cursor-pointer"
+                                >
+                                  ערוך פרטים / נסה שוב
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleBitPaymentConfirmed}
+                                  disabled={submitting}
+                                  className="flex-1 py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                                >
+                                  {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                  אישרתי תשלום
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          <div className="p-5 bg-black/40 border border-white/10 rounded-2xl text-center space-y-4">
+                          <div className="p-5 bg-black/40 border border-[#00D2D2]/30 rounded-2xl text-center space-y-4">
                             <div className="w-14 h-14 mx-auto rounded-full bg-[#00D2D2]/10 text-[#00D2D2] flex items-center justify-center border border-[#00D2D2]/30">
                               <span className="font-black text-xl">bit</span>
                             </div>
@@ -1298,6 +1363,26 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                 בלחיצה על הכפתור תועבר לאפליקציית Bit או שתקבל מסרון עם קישור לתשלום על סך <strong className="text-white font-mono">₪{getPaymentAmount().toLocaleString()}</strong>
                               </p>
                             </div>
+
+                            <div className="space-y-1.5 text-right bg-zinc-900/80 p-3.5 rounded-xl border border-white/10">
+                              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                                <span>📱</span> מספר טלפון נייד לחיוב ב-Bit (חובה):
+                              </label>
+                              <input
+                                type="tel"
+                                dir="ltr"
+                                placeholder="050-0000000"
+                                value={customBitPhone !== "" ? customBitPhone : (getContactInfo().phone || "")}
+                                onChange={(e) => setCustomBitPhone(e.target.value)}
+                                className="w-full bg-black/60 text-white border border-[#00D2D2]/40 focus:border-[#00D2D2] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left"
+                              />
+                              <p className="text-[11px] text-slate-400">
+                                {getContactInfo().phone 
+                                  ? "המספר נמשך אוטומטית מטופס הפרטים. ניתן לערוך במידת הצורך."
+                                  : "אנא הזן מספר נייד ישראלי תקין שאליו מחוברת אפליקציית Bit."}
+                              </p>
+                            </div>
+
                             <button
                               type="button"
                               onClick={handlePayWithBit}

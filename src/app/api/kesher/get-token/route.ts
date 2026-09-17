@@ -85,16 +85,69 @@ export async function POST(request: Request) {
                      bitResult?.Url || 
                      null;
 
+        let finalBitUrl = bUrl;
+        if (!finalBitUrl && paymentPageId && paymentPageId !== "000") {
+          try {
+            const reqData: any = {
+              PaymentPageId: paymentPageId,
+              Currency: 1,
+              Total: Number(amount),
+              FirstName: firstName,
+              LastName: lastName,
+              Mail: validEmail,
+              Tel: validPhone,
+              CreditType: "1",
+              Date: new Date().toISOString().split("T")[0],
+              Comment: details || "תשלום ב-Bit",
+              AddData: transactionId || `TXN_${Date.now()}`,
+              NumPayment: 1,
+              MaxPayments: 1,
+              Moked: "CommunityGenerator"
+            };
+            const tokenPayload = {
+              Json: {
+                userName: settings.userName,
+                password: settings.apiKey,
+                func: "GetLinkToken",
+                format: "json",
+                request: reqData
+              },
+              format: "json"
+            };
+            const tokenRes = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(tokenPayload)
+            });
+            const tokenResText = await tokenRes.text();
+            const tokenResData = JSON.parse(tokenResText);
+            if (tokenResData?.Token) {
+              const p = new URLSearchParams();
+              p.append("token", tokenResData.Token);
+              p.append("total", String(amount));
+              p.append("currency", "1");
+              p.append("tel", validPhone);
+              p.append("firstname", firstName);
+              p.append("lastname", lastName);
+              p.append("mail", validEmail);
+              p.append("wallet", "bit");
+              finalBitUrl = `https://ultra.kesherhk.info/external/paymentPage/${paymentPageId}?${p.toString()}`;
+            }
+          } catch (tokenErr) {
+            console.error("Fallback GetLinkToken error for Bit:", tokenErr);
+          }
+        }
+
         const isSuccess = bitResult?.RequestResult?.Status === true || 
                           bitResult?.RequestResult?.Code === 30001087 || 
                           bitResult?.RequestResult?.Code === 0 || 
-                          Boolean(bUrl);
+                          Boolean(finalBitUrl);
 
         if (isSuccess) {
           return NextResponse.json({
             success: true,
-            bitUrl: bUrl,
-            message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
+            bitUrl: finalBitUrl,
+            message: bitResult?.RequestResult?.Description || (finalBitUrl ? "סרוק את הברקוד בנייד או לחץ על הכפתור לפתיחת Bit" : "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום"),
             transactionId: bitResult?.NumTransaction || bitResult?.CompanyTranId || "",
             isDirectBit: true
           });

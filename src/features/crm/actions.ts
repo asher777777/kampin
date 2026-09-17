@@ -1316,7 +1316,10 @@ export async function submitCRMForm(params: {
       dbData[repeaterId] = [...existingArray, repeaterAppends[repeaterId]];
     });
 
-    if (amountPaid) {
+    const isPendingPayment = typeof finalStatus === "string" && finalStatus.includes("ממתין לתשלום");
+    const isPaymentCompleted = Boolean(amountPaid && !isPendingPayment);
+
+    if (isPaymentCompleted) {
       const numericAmount = Number(amountPaid);
       if (!isNaN(numericAmount) && numericAmount > 0) {
         dbData.total_spent = (existingData?.total_spent || 0) + numericAmount;
@@ -1347,7 +1350,7 @@ export async function submitCRMForm(params: {
     const newEvent = {
       time: new Date().toISOString(),
       title: `טופס: ${formTitle}`,
-      text: `${amountPaid ? `סכום: ${amountPaid} ש"ח. ` : ""}${params.transactionId ? `מספר עסקה (קשר): ${params.transactionId}. ` : ""}סטטוס: ${finalStatus}. ערכי שדות: ${JSON.stringify(formData)}`
+      text: `${isPaymentCompleted && amountPaid ? `סכום: ${amountPaid} ש"ח. ` : ""}${params.transactionId ? `מספר עסקה (קשר): ${params.transactionId}. ` : ""}סטטוס: ${finalStatus}. ערכי שדות: ${JSON.stringify(formData)}`
     };
 
     if (contactId) {
@@ -1356,7 +1359,7 @@ export async function submitCRMForm(params: {
         updatedAt: new Date().toISOString(),
         updatedBy: `Form: ${formTitle}`,
         submission: formData,
-        amountPaid: amountPaid || 0,
+        amountPaid: isPaymentCompleted ? (amountPaid || 0) : 0,
         createdAt: new Date().toISOString()
       };
 
@@ -1379,11 +1382,11 @@ export async function submitCRMForm(params: {
     let finalWhatsAppMessage = "";
 
     const whatsappTemplate = formConfig.form_type === "payment" 
-      ? (amountPaid ? formConfig.payment_success_message : formConfig.payment_pending_message)
+      ? (isPaymentCompleted ? formConfig.payment_success_message : formConfig.payment_pending_message)
       : formConfig.standard_whatsapp_message;
 
     const whatsappImageUrl = formConfig.form_type === "payment"
-      ? (amountPaid ? formConfig.payment_success_image_url : formConfig.payment_pending_image_url)
+      ? (isPaymentCompleted ? formConfig.payment_success_image_url : formConfig.payment_pending_image_url)
       : formConfig.standard_whatsapp_image_url;
 
     if (whatsappTemplate) {
