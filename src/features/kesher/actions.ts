@@ -10,11 +10,21 @@ export async function getEffectiveKesherSettings(userId?: string, campaignId?: s
       if (userDoc.exists) {
         const userData = userDoc.data();
         if (userData?.kesherSettings?.userName && userData?.kesherSettings?.apiKey) {
+          let ppId = userData.kesherSettings.paymentPageId || "";
+          let ezToken = userData.kesherSettings.ezCountToken || "";
+          if (!ppId) {
+            try {
+              const gDoc = await adminDb.collection("configs").doc("global").get();
+              if (gDoc.exists) {
+                ppId = gDoc.data()?.kesherPaymentPageId || gDoc.data()?.paymentPageId || "";
+              }
+            } catch (e) {}
+          }
           return {
             userName: userData.kesherSettings.userName,
             apiKey: userData.kesherSettings.apiKey,
-            paymentPageId: userData.kesherSettings.paymentPageId || "",
-            ezCountToken: userData.kesherSettings.ezCountToken || "",
+            paymentPageId: ppId || process.env.KESHER_PAYMENT_PAGE_ID || "",
+            ezCountToken: ezToken || process.env.KESHER_EZCOUNT_TOKEN || "",
             isActive: true,
           };
         }
@@ -23,11 +33,20 @@ export async function getEffectiveKesherSettings(userId?: string, campaignId?: s
           if (userKesherDoc.exists) {
             const uData = userKesherDoc.data();
             if (uData?.userName && uData?.apiKey) {
+              let ppId = uData.paymentPageId || "";
+              if (!ppId) {
+                try {
+                  const gDoc = await adminDb.collection("configs").doc("global").get();
+                  if (gDoc.exists) {
+                    ppId = gDoc.data()?.kesherPaymentPageId || gDoc.data()?.paymentPageId || "";
+                  }
+                } catch (e) {}
+              }
               return {
                 userName: uData.userName,
                 apiKey: uData.apiKey,
-                paymentPageId: uData.paymentPageId || "",
-                ezCountToken: uData.ezCountToken || "",
+                paymentPageId: ppId || process.env.KESHER_PAYMENT_PAGE_ID || "",
+                ezCountToken: uData.ezCountToken || process.env.KESHER_EZCOUNT_TOKEN || "",
                 isActive: true,
               };
             }
@@ -861,16 +880,70 @@ export async function initiateKesherDigitalWalletAction(params: {
                    bitResult?.Url || 
                    null;
 
+      let finalBitUrl = bUrl;
+      const paymentPageId = (settings.paymentPageId || process.env.KESHER_PAYMENT_PAGE_ID || "").trim();
+      if (!finalBitUrl && paymentPageId && paymentPageId !== "000") {
+        try {
+          const reqData: any = {
+            PaymentPageId: paymentPageId,
+            Currency: 1,
+            Total: Number(amount),
+            FirstName: firstName,
+            LastName: lastName,
+            Mail: validEmail,
+            Tel: validPhone,
+            CreditType: "1",
+            Date: new Date().toISOString().split("T")[0],
+            Comment: details || "תשלום ב-Bit",
+            AddData: transactionId || `TXN_${Date.now()}`,
+            NumPayment: 1,
+            MaxPayments: 1,
+            Moked: "CommunityGenerator"
+          };
+          const tokenPayload = {
+            Json: {
+              userName: settings.userName,
+              password: settings.apiKey,
+              func: "GetLinkToken",
+              format: "json",
+              request: reqData
+            },
+            format: "json"
+          };
+          const tokenRes = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(tokenPayload)
+          });
+          const tokenResText = await tokenRes.text();
+          const tokenResData = JSON.parse(tokenResText);
+          if (tokenResData?.Token) {
+            const p = new URLSearchParams();
+            p.append("token", tokenResData.Token);
+            p.append("total", String(amount));
+            p.append("currency", "1");
+            p.append("tel", validPhone);
+            p.append("firstname", firstName);
+            p.append("lastname", lastName);
+            p.append("mail", validEmail);
+            p.append("wallet", "bit");
+            finalBitUrl = `https://ultra.kesherhk.info/external/paymentPage/${paymentPageId}?${p.toString()}`;
+          }
+        } catch (tokenErr) {
+          console.error("Fallback GetLinkToken error for Bit in initiateKesherDigitalWalletAction:", tokenErr);
+        }
+      }
+
       const isSuccess = bitResult?.RequestResult?.Status === true || 
                         bitResult?.RequestResult?.Code === 30001087 || 
                         bitResult?.RequestResult?.Code === 0 || 
-                        Boolean(bUrl);
+                        Boolean(finalBitUrl);
 
       if (isSuccess) {
         return {
           success: true,
-          bitUrl: bUrl,
-          message: bitResult?.RequestResult?.Description || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
+          bitUrl: finalBitUrl,
+          message: bitResult?.RequestResult?.Description || (finalBitUrl ? "סרוק את הברקוד בנייד או לחץ על הכפתור לפתיחת Bit" : "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום"),
           transactionId: bitResult?.NumTransaction || bitResult?.CompanyTranId || "",
           isDirectBit: true
         };

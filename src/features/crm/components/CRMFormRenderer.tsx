@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FormConfig, FormField, LogicAction } from "./CRMFormBuilder";
 import { submitCRMForm } from "@/features/crm/actions";
+import { initiateKesherDigitalWalletAction } from "@/features/kesher/actions";
 import { KesherCheckout } from "@/features/kesher/KesherCheckout";
 import { cn } from "@/lib/utils";
 
@@ -184,55 +185,32 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
 
     try {
       const amount = getPaymentAmount();
-      const { clientName: rawName, phone: detectedPhone, mail } = getContactInfo();
-      const rawPhone = (customBitPhone || detectedPhone || "").trim();
+      const { clientName, phone, mail } = getContactInfo();
+      const cleanPhone = (phone || "").replace(/[^0-9]/g, "");
 
-      const cleanPhone = (rawPhone || "").replace(/[^0-9]/g, "");
       if (cleanPhone.length < 9 || !cleanPhone.startsWith("05")) {
-        setSubmissionError("לתשלום ישיר באפליקציית Bit יש להזין מספר טלפון נייד ישראלי תקין (המתחיל ב-05).");
+        setSubmissionError("לתשלום ישיר באפליקציית Bit יש להזין מספר טלפון נייד ישראלי תקין (המתחיל ב-05) בשלב הפרטים.");
         setSubmitting(false);
         return;
       }
 
-      const cleanFormData = Object.fromEntries(
-        Object.entries(formData).filter(([_, v]) => v !== undefined && v !== null && v !== "")
-      );
-
-      // Record lead in CRM as waiting for Bit payment (WITHOUT amountPaid so it won't mark paid or send success receipt yet)
-      await submitCRMForm({
-        formId,
-        formTitle,
-        formType: config.form_type === "register" ? "register" : "payment",
-        formData: cleanFormData,
-        embeddingPostId: formId,
-        embeddingPostTitle: formTitle,
-        embeddingCollection,
-        formConfig: config,
-        status: "ממתין לתשלום (Bit)"
+      const data = await initiateKesherDigitalWalletAction({
+        amount,
+        clientName: clientName || "תורם",
+        phone,
+        email: mail,
+        walletType: "bit",
+        details: `תשלום בטופס - ${formTitle}`,
+        transactionId: `Form-${formId}-${Date.now()}`,
+        userId: config.crm_owner_id || undefined,
+        installments: 1
       });
 
-      const response = await fetch("/api/kesher/get-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          clientName: rawName,
-          phone: rawPhone,
-          email: mail,
-          walletType: "bit",
-          details: `תשלום בטופס: ${formTitle}`,
-          transactionId: `Form-${formId}-${Date.now()}`,
-          userId: config.crm_owner_id || undefined
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success && (data.bitUrl || data.isDirectBit)) {
+      if (data.success && (data.bitUrl || (data as any).isDirectBit)) {
         setBitStatus({
-          message: data.message || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום באפליקציית Bit",
+          message: data.message || "נשלח אליך כעת מסרון לטלפון, נא אשר את התשלום",
           bitUrl: data.bitUrl,
-          phone: rawPhone,
+          phone,
           transactionId: data.transactionId
         });
 
@@ -246,7 +224,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           } catch (e) {}
         }
       } else {
-        setSubmissionError(data.error || "שגיאה בחיבור לממשק Bit של קשר. ודא כי פרטי מסוף קשר מוגדרים במערכת.");
+        setSubmissionError(data.error || "שגיאה בהפקת קישור לתשלום דיגיטלי מול קשר. ודא כי פרטי מסוף קשר מוגדרים במערכת.");
       }
     } catch (err: any) {
       console.error("Bit payment error:", err);
@@ -278,8 +256,18 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         transactionId: bitStatus?.transactionId || `BIT-${Date.now()}`
       });
 
-      setSuccessMsg("התשלום ב-Bit נקלט בהצלחה! תודה רבה.");
+      if (config.custom_success_modal_enable && config.custom_success_modal_content) {
+        setSuccessMsg(config.custom_success_modal_content);
+      } else {
+        setSuccessMsg(config.standard_success_message || "התשלום ב-Bit נקלט בהצלחה! תודה רבה.");
+      }
       setIsSubmitted(true);
+
+      if (config.standard_redirect_url) {
+        setTimeout(() => {
+          window.location.href = config.standard_redirect_url;
+        }, 1200);
+      }
     } catch (err: any) {
       setSubmissionError("שגיאה ברישום תשלום ה-Bit: " + err.message);
     } finally {
@@ -1279,118 +1267,113 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                     </div>
 
                     {paymentGateway === "bit" ? (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="animate-in fade-in duration-300">
+                        {submissionError && (
+                          <div className="p-3 mb-3 bg-red-950/80 border border-red-500/80 text-red-200 text-xs font-bold rounded-2xl flex items-center gap-2 animate-shake text-right">
+                            <ShieldAlert className="w-4 h-4 shrink-0 text-red-400" />
+                            <span className="flex-1">{submissionError}</span>
+                          </div>
+                        )}
+
                         {bitStatus ? (
-                          <div className="p-5 bg-zinc-900/95 border-2 border-[#00D2D2]/50 rounded-2xl text-center space-y-4 shadow-2xl">
-                            <div className="flex items-center justify-center gap-2 text-[#00D2D2]">
-                              <span className="font-black text-base">📱 בקשת התשלום ב-Bit נשלחה בהצלחה!</span>
+                          <div className="p-4 rounded-2xl border text-center space-y-3 bg-gradient-to-b from-emerald-950/60 to-slate-900 border-emerald-500/40">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
+                              <span className="font-black text-lg">bit</span>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-black text-sm sm:text-base text-white">
+                                {bitStatus.message || "הבקשה נשלחה בהצלחה ל-Bit! 📱"}
+                              </h4>
+                              <p className="text-xs max-w-sm mx-auto leading-relaxed text-slate-200">
+                                נשלחה התראה / מסרון למכשיר הנייד. ניתן גם לסרוק את הקוד או לפתוח ישירות בנייד לאישור תשלום על סך <strong>₪{getPaymentAmount().toLocaleString()}</strong>:
+                              </p>
                             </div>
 
-                            <p className="text-xs text-slate-300">
-                              {bitStatus.message}
-                            </p>
-
-                            {bitStatus.bitUrl ? (
-                              <div className="flex flex-col items-center gap-2.5 pt-2 pb-1">
-                                <div className="p-3 bg-white rounded-2xl shadow-xl inline-block border-2 border-[#00D2D2]">
-                                  <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(bitStatus.bitUrl)}`} 
-                                    alt="QR Code לסריקה ב-Bit"
-                                    className="w-40 h-40 block"
-                                  />
-                                </div>
-                                <p className="text-xs font-bold text-[#00D2D2]">
-                                  📷 סרוק את הברקוד באמצעות מצלמת הנייד לתשלום מהיר
+                            {/* QR CODE FOR INSTANT SCAN FROM PHONE CAMERA */}
+                            {bitStatus.bitUrl && (
+                              <div className="p-3 bg-white rounded-2xl inline-block shadow-lg border border-emerald-400 mx-auto">
+                                <img 
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(bitStatus.bitUrl)}`} 
+                                  alt="סרוק עם מצלמת הנייד לתשלום ב-Bit" 
+                                  className="w-32 h-32 mx-auto rounded-lg"
+                                />
+                                <p className="text-[11px] font-bold text-slate-800 mt-1.5 flex items-center justify-center gap-1">
+                                  <span>📸 סרוק במצלמת הנייד לפתיחה ב-Bit</span>
                                 </p>
                               </div>
-                            ) : null}
+                            )}
 
-                            <div className="flex flex-col gap-2.5 pt-2">
-                              {bitStatus.bitUrl && (
-                                <a
-                                  href={bitStatus.bitUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="w-full py-3 px-4 bg-[#00D2D2] text-black font-black rounded-xl text-xs hover:bg-[#00D2D2]/90 flex items-center justify-center gap-2 shadow-md transition-transform hover:scale-[1.01]"
-                                >
-                                  פתח את אפליקציית Bit ישירות 📱
-                                </a>
-                              )}
-                              {bitStatus.phone && bitStatus.bitUrl && (() => {
-                                const cleanPhone = bitStatus.phone.startsWith("0") ? bitStatus.phone.slice(1) : bitStatus.phone;
-                                const digitsOnly = cleanPhone.split("").filter((c) => c >= "0" && c <= "9").join("");
-                                const waUrl = `https://api.whatsapp.com/send?phone=972${digitsOnly}&text=${encodeURIComponent(`קישור ישיר לאישור תשלום Bit על סך ₪${getPaymentAmount().toLocaleString()}:\n${bitStatus.bitUrl}`)}`;
-                                return (
-                                  <a
-                                    href={waUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="w-full py-2.5 px-4 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-bold rounded-xl text-xs hover:bg-emerald-600/30 flex items-center justify-center gap-2"
-                                  >
-                                    שלח קישור לתשלום בוואטסאפ ל-{bitStatus.phone} 💬
-                                  </a>
-                                );
-                              })()}
+                            {bitStatus.phone && (
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                                <div className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  📱 נשלח למספר: {bitStatus.phone}
+                                </div>
 
-                              <div className="flex gap-2 pt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setBitStatus(null)}
-                                  className="flex-1 py-2.5 px-3 bg-white/5 hover:bg-white/10 text-slate-300 font-medium rounded-xl text-xs border border-white/10 cursor-pointer"
-                                >
-                                  ערוך פרטים / נסה שוב
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleBitPaymentConfirmed}
-                                  disabled={submitting}
-                                  className="flex-1 py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                                >
-                                  {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                                  אישרתי תשלום
-                                </button>
+                                {bitStatus.bitUrl && (() => {
+                                  const cleanP = bitStatus.phone.startsWith("0") ? bitStatus.phone.slice(1) : bitStatus.phone;
+                                  const digitsOnly = cleanP.split("").filter((c) => c >= "0" && c <= "9").join("");
+                                  return (
+                                    <a
+                                      href={`https://api.whatsapp.com/send?phone=972${digitsOnly}&text=${encodeURIComponent(`קישור ישיר לאישור תשלום Bit על סך ₪${getPaymentAmount().toLocaleString()}:\n${bitStatus.bitUrl}`)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                                    >
+                                      <span>פתח ב-WhatsApp 💬</span>
+                                    </a>
+                                  );
+                                })()}
                               </div>
+                            )}
+
+                            <div className="space-y-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleBitPaymentConfirmed}
+                                disabled={submitting}
+                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-sm flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                <span>אישרתי את התשלום באפליקציה ✓</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBitStatus(null);
+                                  setSubmissionError("");
+                                }}
+                                className="w-full py-1 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                              >
+                                חזור ובחר אמצעי תשלום אחר
+                              </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="p-5 bg-black/40 border border-[#00D2D2]/30 rounded-2xl text-center space-y-4">
-                            <div className="w-14 h-14 mx-auto rounded-full bg-[#00D2D2]/10 text-[#00D2D2] flex items-center justify-center border border-[#00D2D2]/30">
-                              <span className="font-black text-xl">bit</span>
+                          <div className="p-4 rounded-2xl border text-center space-y-2.5 bg-gradient-to-b from-emerald-950/60 to-slate-900 border-emerald-500/40">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
+                              <span className="font-black text-lg">bit</span>
                             </div>
-                            <div>
-                              <h4 className="font-black text-white text-base">תשלום מהיר ומאובטח ב-Bit</h4>
-                              <p className="text-xs text-slate-400 mt-1">
-                                בלחיצה על הכפתור תועבר לאפליקציית Bit או שתקבל מסרון עם קישור לתשלום על סך <strong className="text-white font-mono">₪{getPaymentAmount().toLocaleString()}</strong>
+                            <div className="space-y-0.5">
+                              <h4 className="font-black text-xs sm:text-sm text-white">תשלום מהיר ומאובטח באפליקציית Bit</h4>
+                              <p className="text-[11px] max-w-sm mx-auto leading-tight text-slate-300">
+                                סליקת Bit מאובטחת דרך קשר (Kesher) עבור סכום של ₪{getPaymentAmount().toLocaleString()}.
                               </p>
                             </div>
-
-                            <div className="space-y-1.5 text-right bg-zinc-900/80 p-3.5 rounded-xl border border-white/10">
-                              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                                <span>📱</span> מספר טלפון נייד לחיוב ב-Bit (חובה):
-                              </label>
-                              <input
-                                type="tel"
-                                dir="ltr"
-                                placeholder="050-0000000"
-                                value={customBitPhone !== "" ? customBitPhone : (getContactInfo().phone || "")}
-                                onChange={(e) => setCustomBitPhone(e.target.value)}
-                                className="w-full bg-black/60 text-white border border-[#00D2D2]/40 focus:border-[#00D2D2] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left"
-                              />
-                              <p className="text-[11px] text-slate-400">
-                                {getContactInfo().phone 
-                                  ? "המספר נמשך אוטומטית מטופס הפרטים. ניתן לערוך במידת הצורך."
-                                  : "אנא הזן מספר נייד ישראלי תקין שאליו מחוברת אפליקציית Bit."}
-                              </p>
-                            </div>
-
                             <button
                               type="button"
-                              onClick={handlePayWithBit}
                               disabled={submitting}
-                              className="w-full py-3.5 px-6 bg-[#00D2D2] hover:bg-[#00D2D2]/90 text-black font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#00D2D2]/20 cursor-pointer transition-all transform hover:scale-[1.01]"
+                              onClick={handlePayWithBit}
+                              className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                             >
-                              {submitting ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : null}
-                              {submitting ? "מתחבר ל-Bit..." : `שלם ₪${getPaymentAmount().toLocaleString()} ב-Bit 📱`}
+                              {submitting ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span>שולח בקשה ל-Bit...</span>
+                                </>
+                              ) : (
+                                <span>מעבר לתשלום ₪{getPaymentAmount().toLocaleString()} ב-Bit</span>
+                              )}
                             </button>
                           </div>
                         )}
@@ -1713,21 +1696,23 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 {!(nextStepConf?.buttonIcon !== undefined ? nextStepConf.buttonIcon : config.continue_button_icon) && <ChevronLeft className="w-4 h-4" />}
               </Button>
             ) : (
-              <Button
-                type="submit"
-                disabled={submitting}
-                style={btnStyle}
-                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
-              >
-                {submitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : config.form_type === "payment" ? (
-                  <CreditCard className="w-4 h-4" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                {submitting ? "מעבד..." : config.submit_button_text || "שלח פנייה"}
-              </Button>
+              paymentGateway === "bit" && visibleFields.some(f => f.type === "payment_cc") ? null : (
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  style={btnStyle}
+                  className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
+                >
+                  {submitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : config.form_type === "payment" ? (
+                    <CreditCard className="w-4 h-4" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {submitting ? "מעבד..." : config.submit_button_text || "שלח פנייה"}
+                </Button>
+              )
             )}
           </div>
         </form>

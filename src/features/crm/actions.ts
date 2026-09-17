@@ -1168,7 +1168,7 @@ export async function submitCRMForm(params: {
 
     const contactData: Record<string, any> = {};
 
-    formConfig.fields.forEach((field: any) => {
+    formConfig.fields?.forEach((field: any) => {
       const value = formData[field.label];
       if (value !== undefined) {
         if (field.map_to) {
@@ -1179,6 +1179,64 @@ export async function submitCRMForm(params: {
         }
       }
     });
+
+    // Fallback smart extraction if conta_phone, conta_name or email were not explicitly mapped
+    if (!contactData.conta_phone) {
+      formConfig.fields?.forEach((field: any) => {
+        if (!contactData.conta_phone && (field.type === "tel" || /טל|נייד|סלולר|phone/i.test(field.label))) {
+          contactData.conta_phone = formData[field.label];
+        }
+      });
+      if (!contactData.conta_phone) {
+        Object.entries(formData).forEach(([k, v]) => {
+          if (!contactData.conta_phone && typeof v === "string" && /טל|נייד|סלולר|phone/i.test(k)) {
+            contactData.conta_phone = v;
+          }
+        });
+      }
+      if (!contactData.conta_phone) {
+        for (const v of Object.values(formData)) {
+          if (typeof v === "string") {
+            const digits = v.replace(/\D/g, "");
+            if (digits.startsWith("05") && digits.length >= 9 && digits.length <= 10) {
+              contactData.conta_phone = v;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!contactData.conta_name) {
+      formConfig.fields?.forEach((field: any) => {
+        if (!contactData.conta_name && /שם מלא|השם המלא|שם פרטי|name/i.test(field.label)) {
+          contactData.conta_name = formData[field.label];
+        }
+      });
+      if (!contactData.conta_name) {
+        Object.entries(formData).forEach(([k, v]) => {
+          if (!contactData.conta_name && typeof v === "string" && (/שם מלא|השם המלא|שם פרטי/i.test(k) || (k.includes("שם") && !k.includes("האם") && !k.includes("משפחה")))) {
+            contactData.conta_name = v;
+          }
+        });
+      }
+    }
+
+    if (!contactData.email) {
+      formConfig.fields?.forEach((field: any) => {
+        if (!contactData.email && (field.type === "email" || /מייל|אימייל|דוא|email/i.test(field.label))) {
+          contactData.email = formData[field.label];
+        }
+      });
+      if (!contactData.email) {
+        for (const v of Object.values(formData)) {
+          if (typeof v === "string" && v.includes("@") && /\S+@\S+\.\S+/.test(v)) {
+            contactData.email = v;
+            break;
+          }
+        }
+      }
+    }
 
     if (amountPaid && formConfig.payment_amount_crm_map) {
       contactData[formConfig.payment_amount_crm_map] = amountPaid;
@@ -1390,17 +1448,87 @@ export async function submitCRMForm(params: {
       : formConfig.standard_whatsapp_image_url;
 
     if (whatsappTemplate) {
+      const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
       let resolvedMsg = whatsappTemplate;
-      Object.keys(formData).forEach((key) => {
-        resolvedMsg = resolvedMsg.replace(new RegExp(`{${key}}`, "g"), formData[key]);
+
+      // 1. Replace exact form data keys (handling both {key} and {{key}} safely with escaped regex)
+      Object.entries(formData).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+          const escaped = escapeRegExp(k.trim());
+          resolvedMsg = resolvedMsg.replace(new RegExp(`\\{\\{?\\s*${escaped}\\s*\\}?}`, "g"), String(v));
+        }
       });
-      resolvedMsg = resolvedMsg.replace(/{סכום}/g, String(amountPaid || formConfig.payment_amount || 0));
-      resolvedMsg = resolvedMsg.replace(/{עמוד}/g, embeddingPostTitle || "");
-      resolvedMsg = resolvedMsg.replace(/{link_kabala}/g, params.transactionId ? `https://hakel.club/receipt/${params.transactionId}` : "https://hakel.club/receipt/mock");
-      resolvedMsg = resolvedMsg.replace(/{שם מלא}/g, contactData.conta_name || "");
-      resolvedMsg = resolvedMsg.replace(/{שם}/g, contactData.conta_name || "");
-      resolvedMsg = resolvedMsg.replace(/{טלפון}/g, phone || "");
-      resolvedMsg = resolvedMsg.replace(/{מזהה עסקה}/g, params.transactionId || "");
+
+      // 2. Standard placeholders & common aliases
+      const clientName = contactData.conta_name || "";
+      const clientPhone = phone || contactData.conta_phone || "";
+      const amountStr = String(amountPaid || formConfig.payment_amount || 0);
+      const pageTitle = embeddingPostTitle || formTitle || "";
+      const txId = params.transactionId || "";
+      const receiptLink = txId ? `https://hakel.club/receipt/${txId}` : "https://hakel.club/receipt/mock";
+      const emailVal = contactData.email || "";
+
+      const standardReplacements: Record<string, string> = {
+        "סכום": amountStr,
+        "סכום לתשלום": amountStr,
+        "amount": amountStr,
+        "עמוד": pageTitle,
+        "דף": pageTitle,
+        "שם מלא": clientName,
+        "השם המלא": clientName,
+        "שם": clientName,
+        "שם פרטי": contactData.f_m || clientName.split(" ")[0] || clientName,
+        "שם משפחה": contactData.l_m || clientName.split(" ").slice(1).join(" ") || "",
+        "name": clientName,
+        "full_name": clientName,
+        "טלפון": clientPhone,
+        "נייד": clientPhone,
+        "סלולרי": clientPhone,
+        "phone": clientPhone,
+        "tel": clientPhone,
+        "מייל": emailVal,
+        "אימייל": emailVal,
+        "דואל": emailVal,
+        'דוא"ל': emailVal,
+        "email": emailVal,
+        "link_kabala": receiptLink,
+        "קבלה": receiptLink,
+        "קישור לקבלה": receiptLink,
+        "מזהה עסקה": txId,
+        "מספר עסקה": txId,
+        "transaction_id": txId,
+      };
+
+      Object.entries(standardReplacements).forEach(([k, val]) => {
+        const escaped = escapeRegExp(k);
+        resolvedMsg = resolvedMsg.replace(new RegExp(`\\{\\{?\\s*${escaped}\\s*\\}?}`, "gi"), val);
+      });
+
+      // 3. Loose smart fallback for any remaining {placeholder} containing parentheses or variations
+      resolvedMsg = resolvedMsg.replace(/\{\{?\s*([^}]+)\s*\}?\}/g, (match, tag) => {
+        const cleanTag = tag.trim();
+        // Check exact or partial match in formData
+        if (formData[cleanTag] !== undefined && formData[cleanTag] !== "") return String(formData[cleanTag]);
+        const foundKey = Object.keys(formData).find(k => k.trim() === cleanTag || k.includes(cleanTag) || cleanTag.includes(k));
+        if (foundKey && formData[foundKey] !== undefined && formData[foundKey] !== "") {
+          return String(formData[foundKey]);
+        }
+        // Fallback heuristics for common field intents
+        if (/שם/i.test(cleanTag) && !/משפחה|האם/i.test(cleanTag) && clientName) {
+          return clientName;
+        }
+        if (/טל|נייד|סלולר|phone/i.test(cleanTag) && clientPhone) {
+          return clientPhone;
+        }
+        if (/סכום|amount/i.test(cleanTag)) {
+          return amountStr;
+        }
+        if (/מייל|email/i.test(cleanTag) && emailVal) {
+          return emailVal;
+        }
+        return match;
+      });
 
       finalWhatsAppMessage = resolvedMsg;
       whatsappSent = true;
