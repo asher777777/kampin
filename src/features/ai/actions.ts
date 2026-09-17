@@ -27,13 +27,28 @@ export async function getAiSettings() {
     const { getUserDb } = await import("@/lib/firebase-admin");
     const docRef = getUserDb(userId).collection("settings").doc("ai");
     const docSnap = await docRef.get();
-    if (docSnap.exists) {
+    if (docSnap.exists && docSnap.data()?.googleAiKey) {
       return docSnap.data();
     }
-    return { googleAiKey: "" };
+
+    // Fallback to global admin settings (configs/global)
+    const globalDoc = await adminDb.collection("configs").doc("global").get();
+    const globalConfig = globalDoc.data() || {};
+    if (globalConfig.googleAiKey) {
+      return { googleAiKey: globalConfig.googleAiKey };
+    }
+
+    return { googleAiKey: process.env.GEMINI_API_KEY || "" };
   } catch (error) {
     console.error("Error getting AI settings:", error);
-    return { googleAiKey: "" };
+    try {
+      const globalDoc = await adminDb.collection("configs").doc("global").get();
+      const globalConfig = globalDoc.data() || {};
+      if (globalConfig.googleAiKey) {
+        return { googleAiKey: globalConfig.googleAiKey };
+      }
+    } catch (e) {}
+    return { googleAiKey: process.env.GEMINI_API_KEY || "" };
   }
 }
 

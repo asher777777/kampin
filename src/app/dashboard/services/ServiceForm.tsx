@@ -85,18 +85,23 @@ export function ServiceForm() {
   }, []);
 
   const handleGenerate = async () => {
-    if (!prompt) {
-      setError("נא לתאר את נושא העמוד");
+    console.log("⚡ Starting AI Generation...", { prompt, typeId, audience, tone, selectedSections });
+    if (!prompt || !prompt.trim()) {
+      setError("נא לתאר את נושא העמוד (חזור לשלב 3 למילוי התיאור)");
+      return;
+    }
+
+    const selectedType = PAGE_TYPES.find(t => t.id === typeId);
+    if (!selectedType) {
+      console.warn("⚠️ No page type selected!");
+      setError("נא לבחור סוג עמוד תקין (חזור לשלב 1)");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const selectedType = PAGE_TYPES.find(t => t.id === typeId);
-    if (!selectedType) return;
-
-    let finalPrompt = prompt;
+    let finalPrompt = prompt.trim();
     if (typeId === 'event') {
       finalPrompt = `מדובר בעמוד אירוע. ${finalPrompt}`;
     } else if (typeId === 'seo') {
@@ -107,6 +112,7 @@ export function ServiceForm() {
     const finalTone = tone === "other" ? customTone : tone;
 
     try {
+      console.log("🚀 Sending request to generatePageWithAI...");
       const result = await generatePageWithAI(
         finalPrompt, 
         "", 
@@ -118,6 +124,8 @@ export function ServiceForm() {
         ""
       );
       
+      console.log("✨ Server Action Response:", result);
+
       if (result.success) {
         setIsOpen(false);
         setWizardStep(1);
@@ -132,10 +140,12 @@ export function ServiceForm() {
           router.push(`/service/${result.slug}`);
         }
       } else {
+        console.error("❌ AI Generation failed:", result.error);
         setError(result.error || "שגיאה ביצירת העמוד.");
       }
     } catch (e: any) {
-      setError(e.message || "שגיאה לא ידועה");
+      console.error("❌ Unexpected error:", e);
+      setError(e.message || "שגיאה לא ידועה בתקשורת עם ה-AI");
     } finally {
       setLoading(false);
     }
@@ -157,9 +167,9 @@ export function ServiceForm() {
     <>
       <GeneratingLoader isOpen={loading} />
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <Modal.Content className="max-w-xl w-full p-0 overflow-hidden bg-white rounded-[2.5rem] border shadow-2xl">
+        <Modal.Content className="max-w-xl w-full p-0 overflow-hidden bg-white rounded-[2.5rem] border shadow-2xl flex flex-col max-h-[85vh]">
           {/* Header */}
-          <div className="relative bg-slate-50 border-b border-slate-100 p-6 text-center">
+          <div className="relative bg-slate-50 border-b border-slate-100 p-6 text-center shrink-0">
             <button 
               onClick={() => setIsOpen(false)}
               className="absolute top-6 left-6 p-1.5 rounded-full bg-white border shadow-sm hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
@@ -185,7 +195,7 @@ export function ServiceForm() {
           </div>
 
           {/* Body */}
-          <div className="p-6 md:p-8 min-h-[350px] flex flex-col justify-center" dir="rtl">
+          <div className="p-6 md:p-8 flex-1 overflow-y-auto flex flex-col justify-center min-h-[220px]" dir="rtl">
             {error && (
               <p className="text-red-500 text-sm font-semibold bg-red-50 p-3 rounded-xl border border-red-100 mb-6 text-center">
                 {error}
@@ -354,7 +364,13 @@ export function ServiceForm() {
 
           {/* Footer (Navigation) */}
           {wizardStep > 1 && (
-            <div className="bg-slate-50 border-t border-slate-100 p-6 flex justify-between items-center" dir="rtl">
+            <div className="bg-slate-50 border-t border-slate-100 p-6 flex flex-col gap-3 shrink-0" dir="rtl">
+              {error && (
+                <p className="text-red-600 text-xs font-bold bg-red-50 p-2.5 rounded-xl border border-red-200 text-center animate-shake">
+                  ⚠️ {error}
+                </p>
+              )}
+              <div className="flex justify-between items-center w-full">
               <Button 
                 type="button" 
                 variant="outline" 
@@ -397,6 +413,7 @@ export function ServiceForm() {
                   {loading ? "מייצר..." : "חולל עמוד"}
                 </Button>
               )}
+              </div>
             </div>
           )}
         </Modal.Content>
