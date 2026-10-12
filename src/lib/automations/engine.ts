@@ -1,5 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
-import { getWhatsAppSettings } from "@/features/whatsapp/actions";
+import { getWhatsAppSettings, getGreenApiUrl } from "@/features/whatsapp/actions";
 
 export type Trigger = 
   | { type: "webhook"; webhookId: string }
@@ -53,7 +53,7 @@ async function executeStep(step: ActionStep, payload: any, ownerId: string) {
       if (cleanPhone.startsWith("0")) cleanPhone = "972" + cleanPhone.slice(1);
       const chatId = `${cleanPhone}@c.us`;
 
-      const url = `https://api.green-api.com/waInstance${settings.idInstance}/sendMessage/${settings.apiToken}`;
+      const url = getGreenApiUrl(settings, "sendMessage");
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

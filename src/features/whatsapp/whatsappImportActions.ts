@@ -3,7 +3,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { getWhatsAppSettings, getWhatsAppConnection } from "./actions";
+import { getWhatsAppSettings, getWhatsAppConnection, getGreenApiUrl } from "./actions";
 import { saveSmartGroup } from "../crm/groupsActions";
 
 async function getUserId(): Promise<string> {
@@ -63,7 +63,7 @@ export async function getWhatsAppGroupsList(): Promise<{
       return { success: false, groups: [], error: "חסרים פרטי חיבור וואטסאפ (Green API)." };
     }
 
-    const url = `https://api.green-api.com/waInstance${settings.idInstance}/getContacts/${settings.apiToken}`;
+    const url = getGreenApiUrl(settings, "getContacts");
     console.log("===> [WhatsApp Import] Fetching contacts from Green API to extract groups...");
     const res = await fetch(url, { next: { revalidate: 0 } });
     
@@ -109,7 +109,7 @@ export async function getWhatsAppGroupDetails(groupId: string): Promise<{
     }
 
     // 1. Fetch group data from Green API
-    const url = `https://api.green-api.com/waInstance${settings.idInstance}/getGroupData/${settings.apiToken}`;
+    const url = getGreenApiUrl(settings, "getGroupData");
     console.log(`===> [WhatsApp Import] Fetching group details for ${groupId}...`);
     const res = await fetch(url, {
       method: "POST",
@@ -130,7 +130,7 @@ export async function getWhatsAppGroupDetails(groupId: string): Promise<{
     // 2. Fetch contacts list for name resolution if available
     let contactsMap = new Map<string, string>();
     try {
-      const contactsUrl = `https://api.green-api.com/waInstance${settings.idInstance}/getContacts/${settings.apiToken}`;
+      const contactsUrl = getGreenApiUrl(settings, "getContacts");
       const contactsRes = await fetch(contactsUrl, { next: { revalidate: 0 } });
       if (contactsRes.ok) {
         const allWaContacts: any[] = await contactsRes.json();
@@ -204,7 +204,7 @@ export async function getWhatsAppDirectContactsList(): Promise<{
       return { success: false, contacts: [], error: "חסרים פרטי חיבור וואטסאפ." };
     }
 
-    const url = `https://api.green-api.com/waInstance${settings.idInstance}/getContacts/${settings.apiToken}`;
+    const url = getGreenApiUrl(settings, "getContacts");
     console.log("===> [WhatsApp Import] Fetching all direct contacts from Green API...");
     const res = await fetch(url, { next: { revalidate: 0 } });
     

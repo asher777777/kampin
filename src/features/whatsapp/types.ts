@@ -1,6 +1,7 @@
 export interface WhatsAppSettings {
   idInstance: string;
   apiToken: string;
+  apiUrl?: string;
 }
 
 export type WhatsAppConnectionStatus = "authorized" | "notAuthorized" | "notConfigured" | "checking" | "qr" | "error";

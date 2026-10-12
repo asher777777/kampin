@@ -33,14 +33,17 @@ export async function getWhatsAppSettings(specificUserId?: string): Promise<What
       if (!obj || typeof obj !== "object") return null;
       const idInstance = obj.instanceId || obj.idInstance || obj.greenApiInstanceId || obj.greenApiSettings?.instanceId || obj.greenApiSettings?.idInstance;
       const apiToken = obj.apiTokenInstance || obj.apiToken || obj.greenApiToken || obj.greenApiSettings?.apiTokenInstance || obj.greenApiSettings?.apiToken;
+      const apiUrl = obj.apiUrl || obj.greenApiUrl || obj.greenApiSettings?.apiUrl;
       if (idInstance && apiToken) {
         console.log(`===> [WhatsApp Server] Found Green API keys in [${sourceName}]:`, {
           idInstance: String(idInstance).trim(),
           apiTokenLength: String(apiToken).trim().length,
+          apiUrl: apiUrl ? String(apiUrl).trim() : undefined,
         });
         return {
           idInstance: String(idInstance).trim(),
           apiToken: String(apiToken).trim(),
+          apiUrl: apiUrl ? String(apiUrl).trim() : undefined,
         };
       }
       return null;
@@ -142,9 +145,24 @@ export async function saveWhatsAppSettings(settings: WhatsAppSettings) {
   }
 }
 
+// Helper to determine Green API Host URL dynamically
+export function getGreenApiHost(settings: WhatsAppSettings): string {
+  if (settings.apiUrl && settings.apiUrl.trim()) {
+    return settings.apiUrl.trim().replace(/\/+$/, "");
+  }
+  const trimmedId = (settings.idInstance || "").trim();
+  // Green API instance IDs often start with the 4-digit cluster host prefix, e.g. 7103... -> https://7103.api.greenapi.com
+  const match = trimmedId.match(/^(\d{4})/);
+  if (match) {
+    return `https://${match[1]}.api.greenapi.com`;
+  }
+  return "https://api.green-api.com";
+}
+
 // Helper to construct Green API Endpoint URLs
-function getGreenApiUrl(settings: WhatsAppSettings, action: string): string {
-  return `https://api.green-api.com/waInstance${settings.idInstance}/${action}/${settings.apiToken}`;
+export function getGreenApiUrl(settings: WhatsAppSettings, action: string): string {
+  const host = getGreenApiHost(settings);
+  return `${host}/waInstance${settings.idInstance}/${action}/${settings.apiToken}`;
 }
 
 // 3. Get WhatsApp Connection Status
@@ -161,7 +179,7 @@ export async function getWhatsAppConnection(): Promise<WhatsAppConnectionState> 
     }
 
     const stateUrl = getGreenApiUrl(settings, "getStateInstance");
-    console.log("===> [WhatsApp Server] Fetching getStateInstance from Green API:", `https://api.green-api.com/waInstance${settings.idInstance}/getStateInstance/***`);
+    console.log("===> [WhatsApp Server] Fetching getStateInstance from Green API:", stateUrl.replace(settings.apiToken, "***"));
     const stateRes = await fetch(stateUrl, { next: { revalidate: 0 } });
     const stateStatus = stateRes.status;
     const stateBody = await stateRes.text();
@@ -182,28 +200,53 @@ export async function getWhatsAppConnection(): Promise<WhatsAppConnectionState> 
     console.log("===> [WhatsApp Server] Green API stateInstance status:", status);
 
     if (status === "authorized") {
-      // Get settings to retrieve phone number, avatar, name
+      let phoneNumber = "";
+      let avatar = "";
+      let name = "משתמש וואטסאפ";
+
+      // 1. Get settings to retrieve phone number (wid)
       try {
         const settingsUrl = getGreenApiUrl(settings, "getSettings");
         const settingsRes = await fetch(settingsUrl, { next: { revalidate: 0 } });
         if (settingsRes.ok) {
           const settingsData = await settingsRes.json();
-          return {
-            status: "authorized",
-            phoneNumber: settingsData.wid ? settingsData.wid.replace("@c.us", "") : "",
-            avatar: settingsData.avatar || "",
-            name: settingsData.contactName || "משתמש וואטסאפ",
-          };
+          if (settingsData.wid) {
+            phoneNumber = settingsData.wid.replace("@c.us", "");
+          }
+          if (settingsData.contactName) {
+            name = settingsData.contactName;
+          }
         }
       } catch (err) {
         console.warn("Failed to get WhatsApp user profile settings:", err);
       }
 
+      // 2. If phone number is available, fetch contact avatar
+      if (phoneNumber) {
+        try {
+          const avatarUrl = getGreenApiUrl(settings, "getAvatar");
+          const avatarRes = await fetch(avatarUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chatId: `${phoneNumber}@c.us` }),
+            next: { revalidate: 0 },
+          });
+          if (avatarRes.ok) {
+            const avatarData = await avatarRes.json();
+            if (avatarData.urlAvatar) {
+              avatar = avatarData.urlAvatar;
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to get WhatsApp user avatar:", err);
+        }
+      }
+
       return {
         status: "authorized",
-        phoneNumber: "",
-        avatar: "",
-        name: "וואטסאפ מחובר",
+        phoneNumber,
+        avatar,
+        name,
       };
     } else if (status === "notAuthorized") {
       return { status: "notAuthorized" };
