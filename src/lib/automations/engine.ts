@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
-import { getWhatsAppSettings, getGreenApiUrl } from "@/features/whatsapp/actions";
+import { getWhatsAppSettings } from "@/features/whatsapp/actions";
+import { getGreenApiUrl } from "@/features/whatsapp/utils";
 
 export type Trigger = 
   | { type: "webhook"; webhookId: string }

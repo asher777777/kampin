@@ -3,7 +3,8 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { getWhatsAppSettings, getWhatsAppConnection, getGreenApiUrl } from "./actions";
+import { getWhatsAppSettings, getWhatsAppConnection } from "./actions";
+import { getGreenApiUrl } from "./utils";
 import { saveSmartGroup } from "../crm/groupsActions";
 
 async function getUserId(): Promise<string> {
